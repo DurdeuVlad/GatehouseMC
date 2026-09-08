@@ -21,7 +21,10 @@ public final class WhitelistRequestCommands {
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher, Supplier<FabricRuntime> runtimeSupplier) {
         dispatcher.register(CommandManager.literal("wlreq")
-                .requires(source -> runtimeSupplier.get() != null && source.hasPermissionLevel(runtimeSupplier.get().config().requests().commandPermissionLevel()))
+                .requires(source -> {
+                    FabricRuntime runtime = runtimeSupplier.get();
+                    return runtime != null && !runtime.degraded() && source.hasPermissionLevel(runtime.config().requests().commandPermissionLevel());
+                })
                 .then(CommandManager.literal("list")
                         .executes(context -> list(context, runtimeSupplier, Optional.empty()))
                         .then(CommandManager.argument("status", StringArgumentType.word())
@@ -39,9 +42,8 @@ public final class WhitelistRequestCommands {
                                         .executes(context -> unblock(context, runtimeSupplier)))))
                 .then(CommandManager.literal("status").executes(context -> status(context, runtimeSupplier)))
                 .then(CommandManager.literal("reload").executes(context -> {
-                    String message = WhitelistRequestMod.reload();
-                    context.getSource().sendFeedback(() -> Text.literal(message), false);
-                    return message.startsWith("Config reload failed") ? 0 : 1;
+                    WhitelistRequestMod.reloadAsync();
+                    return feedback(context, "Whitelist Request reload started; check server logs for completion");
                 })));
     }
 
@@ -56,46 +58,86 @@ public final class WhitelistRequestCommands {
 
     private static int list(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier, Optional<RequestStatus> status) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null) return fail(context, "Whitelist Request is not running");
-        var requests = runtime.repository().findByStatus(status, 50);
-        if (requests.isEmpty()) return feedback(context, "No requests found");
-        for (WhitelistRequest request : requests) {
-            context.getSource().sendFeedback(() -> Text.literal(shortId(request.id()) + " " + request.status() + " " + request.identity().exactUsername() + " attempts=" + request.attemptCount()), false);
-        }
-        return requests.size();
+        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        ServerCommandSource source = context.getSource();
+        runtime.commandExecutor().execute(() -> {
+            var requests = runtime.repository().findByStatus(status, 50);
+            source.getServer().execute(() -> {
+                if (requests.isEmpty()) {
+                    source.sendFeedback(() -> Text.literal("No requests found"), false);
+                } else {
+                    for (WhitelistRequest request : requests) {
+                        source.sendFeedback(() -> Text.literal(shortId(request.id()) + " " + request.status() + " " + request.identity().exactUsername() + " attempts=" + request.attemptCount()), false);
+                    }
+                }
+            });
+        });
+        return 1;
     }
 
     private static int show(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null) return fail(context, "Whitelist Request is not running");
-        Optional<WhitelistRequest> request = resolve(runtime, context.getArgument("request", String.class));
-        if (request.isEmpty()) return fail(context, "Request not found");
-        WhitelistRequest value = request.get();
-        return feedback(context, value.id() + " " + value.status() + " player=" + value.identity().exactUsername() + " uuid=" + value.identity().offlineUuid() + " attempts=" + value.attemptCount());
+        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        ServerCommandSource source = context.getSource();
+        String key = context.getArgument("request", String.class);
+        runtime.commandExecutor().execute(() -> {
+            Optional<WhitelistRequest> request = resolve(runtime, key);
+            source.getServer().execute(() -> {
+                if (request.isEmpty()) {
+                    source.sendError(Text.literal("Request not found"));
+                } else {
+                    WhitelistRequest value = request.get();
+                    source.sendFeedback(() -> Text.literal(value.id() + " " + value.status() + " player=" + value.identity().exactUsername() + " uuid=" + value.identity().offlineUuid() + " attempts=" + value.attemptCount()), false);
+                }
+            });
+        });
+        return 1;
     }
 
     private static int decide(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier, DecisionAction action, String reason) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null) return fail(context, "Whitelist Request is not running");
-        Optional<WhitelistRequest> request = resolve(runtime, context.getArgument("request", String.class));
-        if (request.isEmpty()) return fail(context, "Request not found");
-        runtime.decisions().decide(request.get().id(), action, AdminPrincipal.console(), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
-                .thenAccept(result -> context.getSource().sendFeedback(() -> Text.literal(result.message()), false));
+        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        ServerCommandSource source = context.getSource();
+        String key = context.getArgument("request", String.class);
+        runtime.commandExecutor().execute(() -> {
+            Optional<WhitelistRequest> request = resolve(runtime, key);
+            if (request.isEmpty()) {
+                source.getServer().execute(() -> source.sendError(Text.literal("Request not found")));
+                return;
+            }
+            runtime.decisions().decide(request.get().id(), action, AdminPrincipal.console(), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
+                    .thenAcceptAsync(result -> source.sendFeedback(() -> Text.literal(result.message()), false), source.getServer()::execute)
+                    .exceptionallyAsync(error -> {
+                        source.getServer().execute(() -> source.sendError(Text.literal("Decision failed: " + safeMessage(error))));
+                        return null;
+                    }, source.getServer()::execute);
+        });
         return 1;
     }
 
     private static int unblock(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null) return fail(context, "Whitelist Request is not running");
+        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        ServerCommandSource source = context.getSource();
         String username = context.getArgument("username", String.class).toLowerCase(Locale.ROOT);
-        boolean removed = runtime.repository().unblock(username, AdminPrincipal.console(), "", java.time.Instant.now());
-        return feedback(context, removed ? "Unblocked " + username : "No block exists for " + username);
+        runtime.commandExecutor().execute(() -> {
+            boolean removed = runtime.repository().unblock(username, AdminPrincipal.console(), "", java.time.Instant.now());
+            source.getServer().execute(() ->
+                    source.sendFeedback(() -> Text.literal(removed ? "Unblocked " + username : "No block exists for " + username), false));
+        });
+        return 1;
     }
 
     private static int status(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null) return fail(context, "Whitelist Request is not running");
-        return feedback(context, "health=" + (runtime.degraded() ? "DEGRADED" : "HEALTHY") + " queue=" + runtime.queueSize() + " outbox=" + runtime.repository().pendingOutboxCount());
+        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        ServerCommandSource source = context.getSource();
+        runtime.commandExecutor().execute(() -> {
+            long pending = runtime.repository().pendingOutboxCount();
+            source.getServer().execute(() ->
+                    source.sendFeedback(() -> Text.literal("health=HEALTHY queue=" + runtime.queueSize() + " outbox=" + pending), false));
+        });
+        return 1;
     }
 
     private static Optional<WhitelistRequest> resolve(FabricRuntime runtime, String value) {
@@ -114,4 +156,10 @@ public final class WhitelistRequestCommands {
     private static String shortId(UUID id) { return id.toString().substring(0, 8); }
     private static int feedback(CommandContext<ServerCommandSource> context, String message) { context.getSource().sendFeedback(() -> Text.literal(message), false); return 1; }
     private static int fail(CommandContext<ServerCommandSource> context, String message) { context.getSource().sendError(Text.literal(message)); return 0; }
+
+    private static String safeMessage(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+    }
 }

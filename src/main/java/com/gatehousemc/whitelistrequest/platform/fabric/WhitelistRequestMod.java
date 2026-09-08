@@ -93,28 +93,42 @@ public final class WhitelistRequestMod implements ModInitializer {
      * Reloads non-structural configuration without requiring a Minecraft
      * restart. The SQLite path is intentionally structural because moving it
      * while the server is running could split the workflow store.
+     * Runs asynchronously to avoid blocking the server thread on recovery.
      */
-    public static String reload() {
-        synchronized (RUNTIME_LOCK) {
-            FabricRuntime current = runtime;
-        if (current == null) return "Whitelist Request is not running";
-        Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
-        try {
-            ModConfig next = ConfigLoader.loadOrDefault(configDir);
-            if (!samePath(current.config().database().path(), next.database().path())) {
-                return "Config reload rejected: database.path changes require a server restart";
+    public static void reloadAsync() {
+        STARTUP_EXECUTOR.execute(() -> {
+            FabricRuntime current;
+            synchronized (RUNTIME_LOCK) {
+                current = runtime;
+                if (current == null || current.degraded()) return;
             }
-            runtime = null;
-            current.close();
-            runtime = FabricRuntime.start(current.server(), next);
-            LOGGER.info("Whitelist Request configuration reloaded: {}", next.redactedSummary());
-            return "Whitelist Request configuration reloaded";
-        } catch (Exception error) {
-            LOGGER.error("Config reload failed; request workflow is degraded until the server is restarted", error);
-            runtime = FabricRuntime.degraded(current.server(), current.config());
-            return "Config reload failed; workflow is degraded: " + safeMessage(error);
-        }
-        }
+            Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
+            try {
+                ModConfig next = ConfigLoader.loadOrDefault(configDir);
+                if (!samePath(current.config().database().path(), next.database().path())) {
+                    LOGGER.warn("Config reload rejected: database.path changes require a server restart");
+                    return;
+                }
+                FabricRuntime started = FabricRuntime.start(current.server(), next);
+                synchronized (RUNTIME_LOCK) {
+                    if (STOPPING.get()) {
+                        started.close();
+                        return;
+                    }
+                    runtime = started;
+                }
+                current.close();
+                LOGGER.info("Whitelist Request configuration reloaded: {}", next.redactedSummary());
+            } catch (Exception error) {
+                LOGGER.error("Config reload failed; request workflow is degraded until the server is restarted", error);
+                synchronized (RUNTIME_LOCK) {
+                    if (!STOPPING.get()) {
+                        runtime = FabricRuntime.degraded(current.server(), current.config());
+                    }
+                }
+                current.close();
+            }
+        });
     }
 
     private static boolean samePath(Path left, Path right) {

@@ -36,6 +36,7 @@ public final class FabricRuntime implements AutoCloseable {
     private final DecisionService decisions;
     private final AdmissionWorker worker;
     private final ExecutorService decisionExecutor;
+    private final ExecutorService commandExecutor;
     private final List<ApprovalInterface> providers;
     private final OutboxWorker outbox;
     private final boolean degraded;
@@ -43,7 +44,7 @@ public final class FabricRuntime implements AutoCloseable {
     private FabricRuntime(MinecraftServer server, ModConfig config, RequestAdmissionCache cache,
                            WorkflowRepository repository, WhitelistRequestService requests,
                            DecisionService decisions, AdmissionWorker worker, ExecutorService decisionExecutor,
-                           boolean degraded) {
+                           ExecutorService commandExecutor, boolean degraded) {
         this.server = server;
         this.config = config;
         this.cache = cache;
@@ -52,6 +53,7 @@ public final class FabricRuntime implements AutoCloseable {
         this.decisions = decisions;
         this.worker = worker;
         this.decisionExecutor = decisionExecutor;
+        this.commandExecutor = commandExecutor;
         this.degraded = degraded;
         this.providers = List.of();
         this.outbox = null;
@@ -60,6 +62,7 @@ public final class FabricRuntime implements AutoCloseable {
     private FabricRuntime(MinecraftServer server, ModConfig config, RequestAdmissionCache cache,
                            WorkflowRepository repository, WhitelistRequestService requests,
                            DecisionService decisions, AdmissionWorker worker, ExecutorService decisionExecutor,
+                           ExecutorService commandExecutor,
                            List<ApprovalInterface> providers, OutboxWorker outbox) {
         this.server = server;
         this.config = config;
@@ -69,6 +72,7 @@ public final class FabricRuntime implements AutoCloseable {
         this.decisions = decisions;
         this.worker = worker;
         this.decisionExecutor = decisionExecutor;
+        this.commandExecutor = commandExecutor;
         this.degraded = false;
         this.providers = List.copyOf(providers);
         this.outbox = outbox;
@@ -79,6 +83,7 @@ public final class FabricRuntime implements AutoCloseable {
         WorkflowRepository repository = null;
         AdmissionWorker worker = null;
         ExecutorService decisionExecutor = null;
+        ExecutorService commandExecutor = null;
         List<ApprovalInterface> providers = new ArrayList<>();
         OutboxWorker outbox = null;
         try {
@@ -91,6 +96,11 @@ public final class FabricRuntime implements AutoCloseable {
         worker = new AdmissionWorker(config.requests().queueCapacity(), requests);
         decisionExecutor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "whitelistrequest-decisions");
+            thread.setDaemon(true);
+            return thread;
+        });
+        commandExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "whitelistrequest-commands");
             thread.setDaemon(true);
             return thread;
         });
@@ -117,13 +127,16 @@ public final class FabricRuntime implements AutoCloseable {
         providers.forEach(ApprovalInterface::start);
         worker.start();
         outbox.start();
-        return new FabricRuntime(server, config, cache, repository, requests, decisions, worker, decisionExecutor, providers, outbox);
+        return new FabricRuntime(server, config, cache, repository, requests, decisions, worker, decisionExecutor, commandExecutor, providers, outbox);
         } catch (IOException | SQLException | RuntimeException error) {
             if (outbox != null) outbox.close();
             providers.forEach(ApprovalInterface::stop);
             if (worker != null) worker.close();
             if (decisionExecutor != null) {
                 decisionExecutor.shutdownNow();
+            }
+            if (commandExecutor != null) {
+                commandExecutor.shutdownNow();
             }
             if (repository != null) {
                 try { repository.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
@@ -137,7 +150,7 @@ public final class FabricRuntime implements AutoCloseable {
     static FabricRuntime degraded(MinecraftServer server, ModConfig config) {
         RequestAdmissionCache cache = new RequestAdmissionCache();
         cache.markDegraded(true);
-        return new FabricRuntime(server, config, cache, null, null, null, null, null, true);
+        return new FabricRuntime(server, config, cache, null, null, null, null, null, null, true);
     }
 
     public Text onWhitelistDenied(GameProfileIdentity profile) {
@@ -157,6 +170,7 @@ public final class FabricRuntime implements AutoCloseable {
     public DecisionService decisions() { return decisions; }
     public WorkflowRepository repository() { return repository; }
     public ModConfig config() { return config; }
+    public ExecutorService commandExecutor() { return commandExecutor; }
     MinecraftServer server() { return server; }
     public int queueSize() { return worker == null ? 0 : worker.size(); }
     public boolean degraded() { return degraded || cache.isDegraded(); }
@@ -180,6 +194,15 @@ public final class FabricRuntime implements AutoCloseable {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 decisionExecutor.shutdownNow();
+            }
+        }
+        if (commandExecutor != null) {
+            commandExecutor.shutdown();
+            try {
+                if (!commandExecutor.awaitTermination(5, TimeUnit.SECONDS)) commandExecutor.shutdownNow();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                commandExecutor.shutdownNow();
             }
         }
         if (repository != null) {
