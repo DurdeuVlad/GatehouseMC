@@ -5,6 +5,8 @@ import com.gatehousemc.whitelistrequest.domain.RequestView;
 import com.gatehousemc.whitelistrequest.domain.WhitelistRequest;
 import com.gatehousemc.whitelistrequest.port.ClockPort;
 import com.gatehousemc.whitelistrequest.port.WorkflowRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class OutboxWorker implements AutoCloseable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OutboxWorker.class);
     private final WorkflowRepository repository;
     private final ApprovalInterfaceRouter router;
     private final ClockPort clock;
@@ -37,8 +40,20 @@ public final class OutboxWorker implements AutoCloseable {
     }
 
     public void drain() {
-        List<OutboxEvent> events = repository.readyOutbox(clock.now(), 25);
-        for (OutboxEvent event : events) process(event);
+        List<OutboxEvent> events;
+        try {
+            events = repository.readyOutbox(clock.now(), 25);
+        } catch (RuntimeException error) {
+            LOGGER.warn("outbox.poll_failed errorType={}", error.getClass().getSimpleName());
+            return;
+        }
+        for (OutboxEvent event : events) {
+            try {
+                process(event);
+            } catch (RuntimeException error) {
+                retry(event, error);
+            }
+        }
     }
 
     private void process(OutboxEvent event) {
@@ -50,11 +65,16 @@ public final class OutboxWorker implements AutoCloseable {
         if (event.eventType().equals("REQUEST_CREATED")) {
             List<com.gatehousemc.whitelistrequest.domain.PublicationRef> existing = repository.publications(request.id());
             router.publish(RequestView.from(request), existing).whenComplete((publications, error) -> {
-                saveSuccessfulPublications(request.id(), publications, error);
-                finish(event, error);
+                Throwable failure = error;
+                try {
+                    saveSuccessfulPublications(request.id(), publications, error);
+                } catch (RuntimeException storageError) {
+                    failure = storageError;
+                }
+                finish(event, failure);
             });
             return;
-        } else if (event.eventType().equals("REQUEST_RESOLVED")) {
+        } else if (event.eventType().equals("REQUEST_RESOLVED") || event.eventType().equals("REQUEST_UPDATED")) {
             router.updateAll(repository.publications(request.id()), RequestView.from(request)).whenComplete((ignored, error) -> finish(event, error));
             return;
         } else {
@@ -72,9 +92,23 @@ public final class OutboxWorker implements AutoCloseable {
         }
     }
 
+    private void retry(OutboxEvent event, Throwable error) {
+        try {
+            repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
+        } catch (RuntimeException storageError) {
+            LOGGER.warn("outbox.persistence.failed operation=retry errorType={}",
+                    storageError.getClass().getSimpleName());
+        }
+    }
+
     private void finish(OutboxEvent event, Throwable error) {
-        if (error == null) repository.completeOutbox(event.id(), clock.now());
-        else repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
+        try {
+            if (error == null) repository.completeOutbox(event.id(), clock.now());
+            else repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
+        } catch (RuntimeException storageError) {
+            LOGGER.warn("outbox.persistence.failed operation=finish errorType={}",
+                    storageError.getClass().getSimpleName());
+        }
     }
 
     private Instant nextAttempt(OutboxEvent event) {
@@ -86,7 +120,7 @@ public final class OutboxWorker implements AutoCloseable {
         if (error == null) return "";
         Throwable cause = error;
         while (cause.getCause() != null) cause = cause.getCause();
-        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+        return cause.getClass().getSimpleName();
     }
 
     private static <T extends Throwable> T findCause(Throwable error, Class<T> type) {
@@ -100,6 +134,12 @@ public final class OutboxWorker implements AutoCloseable {
 
     @Override
     public void close() {
-        executor.shutdownNow();
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) executor.shutdownNow();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
+        }
     }
 }

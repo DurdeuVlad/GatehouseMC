@@ -71,6 +71,14 @@ M1-04 verification evidence (2026-09-08):
 - Decision persistence and approval continuations use a dedicated decision executor rather than the Minecraft/server thread or admission worker; CAS losers refresh the cache from their durable request snapshot.
 - The application still uses the repository compare-and-set claim/finalize/reset flow; outbox publication and Fabric startup ordering remain tracked by later issues.
 
+M1-05 verification evidence (2026-09-08):
+
+- RED: the new outbox repository suite initially exposed the SELECT-then-CAS claim path; implementation now returns only rows whose PROCESSING claim actually changed state.
+- Required gate: `./gradlew.ps1 test --tests '*Outbox*' --tests '*Retry*' --rerun-tasks --stacktrace` — PASS.
+- Full regression: `./gradlew.ps1 clean test build --stacktrace` — PASS.
+- Real SQLite tests prove concurrent outbox claim exclusivity, PROCESSING requeue after reopen, deterministic retry availability/attempt increment, and REQUEST_UPDATED/approval-failure event durability.
+- Outbox retry errors are reduced to exception type names before persistence; repository update failures emit structured warning events instead of being silent.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.

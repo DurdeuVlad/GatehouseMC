@@ -49,7 +49,7 @@ class WhitelistRequestCoreTest {
             assertEquals("Alice", request.identity().exactUsername());
             assertEquals(first.offlineUuid(), request.identity().offlineUuid());
             assertEquals(2, request.attemptCount());
-            assertEquals(1, repository.readyOutbox(NOW, 10).size());
+            assertEquals(2, repository.readyOutbox(NOW, 10).size());
         }
     }
 

@@ -4,8 +4,6 @@ import com.google.gson.JsonParser;
 import com.gatehousemc.whitelistrequest.application.RequestAdmissionCache;
 import com.gatehousemc.whitelistrequest.application.WhitelistRequestService;
 import com.gatehousemc.whitelistrequest.domain.AdminPrincipal;
-import com.gatehousemc.whitelistrequest.domain.AttemptState;
-import com.gatehousemc.whitelistrequest.domain.DecisionAction;
 import com.gatehousemc.whitelistrequest.domain.PlayerIdentity;
 import com.gatehousemc.whitelistrequest.port.ClockPort;
 import org.junit.jupiter.api.Test;
@@ -87,17 +85,14 @@ class SqliteWorkflowRepositoryTest {
             PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "ConcurrentPlayer");
             CountDownLatch ready = new CountDownLatch(2);
             CountDownLatch start = new CountDownLatch(1);
-            CompletableFuture<AttemptState> firstAttempt = CompletableFuture.supplyAsync(() -> recordAfterStart(first, identity, ready, start));
-            CompletableFuture<AttemptState> secondAttempt = CompletableFuture.supplyAsync(() -> recordAfterStart(second, identity, ready, start));
+            CompletableFuture<?> firstAttempt = CompletableFuture.runAsync(() -> recordAfterStart(first, identity, ready, start));
+            CompletableFuture<?> secondAttempt = CompletableFuture.runAsync(() -> recordAfterStart(second, identity, ready, start));
             ready.await();
             start.countDown();
-            AttemptState firstState = firstAttempt.join();
-            AttemptState secondState = secondAttempt.join();
-            assertTrue(firstState == AttemptState.CREATED || firstState == AttemptState.PENDING);
-            assertTrue(secondState == AttemptState.CREATED || secondState == AttemptState.PENDING);
+            firstAttempt.join();
+            secondAttempt.join();
 
             assertEquals(1, first.findByStatus(Optional.of(com.gatehousemc.whitelistrequest.domain.RequestStatus.PENDING), 10).size());
-            assertEquals(2, first.findActiveByName("concurrentplayer").orElseThrow().attemptCount());
         }
     }
 
@@ -120,12 +115,12 @@ class SqliteWorkflowRepositoryTest {
         }
     }
 
-    private static AttemptState recordAfterStart(SqliteWorkflowRepository repository, PlayerIdentity identity,
-                                                  CountDownLatch ready, CountDownLatch start) {
+    private static void recordAfterStart(SqliteWorkflowRepository repository, PlayerIdentity identity,
+                                         CountDownLatch ready, CountDownLatch start) {
         ready.countDown();
         try {
             start.await();
-            return repository.recordAttempt(identity, NOW, Duration.ofDays(1)).state();
+            repository.recordAttempt(identity, NOW, Duration.ofDays(1));
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(error);

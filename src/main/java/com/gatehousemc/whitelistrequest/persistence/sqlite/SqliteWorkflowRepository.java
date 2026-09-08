@@ -2,6 +2,8 @@ package com.gatehousemc.whitelistrequest.persistence.sqlite;
 
 import com.gatehousemc.whitelistrequest.domain.*;
 import com.gatehousemc.whitelistrequest.port.WorkflowRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.Duration;
@@ -12,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class SqliteWorkflowRepository implements WorkflowRepository {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SqliteWorkflowRepository.class);
     private final SqliteDatabase database;
     private final Connection connection;
 
@@ -45,6 +48,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 }
                 audit(active.id(), "ATTEMPT_UPDATED", null, null, null,
                         "{\"exactUsername\":\"" + escape(identity.exactUsername()) + "\"}", now);
+                insertOutbox("REQUEST_UPDATED", active.id(), now);
                 connection.commit();
                 return AttemptOutcome.of(AttemptState.PENDING, findByIdInternal(active.id()));
             }
@@ -84,7 +88,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
         try {
             return Optional.ofNullable(findByIdInternal(requestId));
         } catch (SQLException exception) {
-            return Optional.empty();
+            throw storageFailure("find_request", exception);
         }
     }
 
@@ -93,7 +97,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
         try {
             return Optional.ofNullable(findActiveByNameInternal(normalizedUsername));
         } catch (SQLException exception) {
-            return Optional.empty();
+            throw storageFailure("find_active_request", exception);
         }
     }
 
@@ -110,7 +114,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 return requests;
             }
         } catch (SQLException exception) {
-            return List.of();
+            throw storageFailure("find_requests_by_status", exception);
         }
     }
 
@@ -125,7 +129,10 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             statement.setLong(6, millis(now));
             statement.setLong(7, millis(now));
             statement.executeUpdate();
-        } catch (SQLException ignored) {
+        } catch (SQLException error) {
+            LOGGER.warn("storage.persistence.failed operation=save_publication requestId={} provider={} errorType={}",
+                    requestId, publication.provider(), error.getClass().getSimpleName());
+            throw storageFailure("save_publication", error);
         }
     }
 
@@ -138,8 +145,8 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 while (result.next()) publications.add(new PublicationRef(result.getString(1), result.getString(2), result.getString(3)));
                 return publications;
             }
-        } catch (SQLException ignored) {
-            return List.of();
+        } catch (SQLException exception) {
+            throw storageFailure("find_publications", exception);
         }
     }
 
@@ -291,6 +298,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 }
             }
             audit(requestId, "APPROVAL_FAILED", actor, null, null, "{\"error\":\"" + escape(error) + "\"}", now);
+            insertOutbox("REQUEST_UPDATED", requestId, now);
             connection.commit();
             return true;
         } catch (SQLException exception) {
@@ -338,6 +346,10 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
 
     @Override
     public synchronized List<OutboxEvent> readyOutbox(Instant now, int limit) {
+        return readyOutbox(now, limit, 3);
+    }
+
+    private List<OutboxEvent> readyOutbox(Instant now, int limit, int retriesRemaining) {
         try {
             connection.setAutoCommit(false);
             List<OutboxEvent> events = new ArrayList<>();
@@ -348,18 +360,23 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                     while (result.next()) events.add(readOutbox(result));
                 }
             }
+            List<OutboxEvent> claimed = new ArrayList<>();
             for (OutboxEvent event : events) {
                 try (PreparedStatement statement = connection.prepareStatement("UPDATE integration_outbox SET state='PROCESSING', updated_at=? WHERE id=? AND state='READY'")) {
                     statement.setLong(1, millis(now));
                     statement.setString(2, event.id().toString());
-                    statement.executeUpdate();
+                    if (statement.executeUpdate() == 1) claimed.add(event);
                 }
             }
             connection.commit();
-            return events.stream().map(event -> new OutboxEvent(event.id(), event.eventType(), event.aggregateId(), event.payloadJson(), OutboxEvent.OutboxState.PROCESSING, event.attempts(), event.availableAt(), event.createdAt(), now, event.lastError())).toList();
+            return claimed.stream().map(event -> new OutboxEvent(event.id(), event.eventType(), event.aggregateId(), event.payloadJson(), OutboxEvent.OutboxState.PROCESSING, event.attempts(), event.availableAt(), event.createdAt(), now, event.lastError())).toList();
         } catch (SQLException exception) {
             rollbackQuietly();
-            return List.of();
+            if (retriesRemaining > 0 && isRetryableAttemptRace(exception)) {
+                resetAutoCommit();
+                return readyOutbox(now, limit, retriesRemaining - 1);
+            }
+            throw storageFailure("claim_outbox", exception);
         } finally {
             resetAutoCommit();
         }
@@ -367,12 +384,12 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
 
     @Override
     public synchronized void completeOutbox(UUID outboxId, Instant now) {
-        updateOutbox("UPDATE integration_outbox SET state='COMPLETE', updated_at=?, last_error=NULL WHERE id=?", outboxId, now, null, null);
+        updateOutbox("UPDATE integration_outbox SET state='COMPLETE', updated_at=?, last_error=NULL WHERE id=? AND state='PROCESSING'", outboxId, now, null, null);
     }
 
     @Override
     public synchronized void retryOutbox(UUID outboxId, Instant nextAttempt, String error, Instant now) {
-        updateOutbox("UPDATE integration_outbox SET state='READY', attempts=attempts+1, available_at=?, updated_at=?, last_error=? WHERE id=?", outboxId, now, nextAttempt, error);
+        updateOutbox("UPDATE integration_outbox SET state='READY', attempts=attempts+1, available_at=?, updated_at=?, last_error=? WHERE id=? AND state='PROCESSING'", outboxId, now, nextAttempt, error);
     }
 
     @Override
@@ -408,7 +425,9 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                     statement.executeUpdate();
                 }
             }
-        } catch (SQLException ignored) {
+        } catch (SQLException sqlError) {
+            LOGGER.warn("storage.persistence.failed operation=update_outbox outboxId={} errorType={}",
+                    id, sqlError.getClass().getSimpleName());
             // Outbox failures are surfaced by the next status check and retry loop.
         }
     }
@@ -524,11 +543,17 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
         statement.setString(start + 2, actor.displayName());
     }
 
+    private static IllegalStateException storageFailure(String operation, SQLException error) {
+        LOGGER.error("storage.degraded operation={} errorType={}", operation, error.getClass().getSimpleName());
+        return new IllegalStateException("SQLite storage operation failed: " + operation, error);
+    }
+
     private static boolean isRetryableAttemptRace(SQLException exception) {
         int errorCode = exception.getErrorCode();
-        if (errorCode == 5 || errorCode == 6) return true;
+        int primaryCode = errorCode & 0xff;
+        if (primaryCode == 5 || primaryCode == 6) return true;
         String message = exception.getMessage();
-        return (errorCode == 19 && message != null && message.contains("whitelist_requests.normalized_name"))
+        return (primaryCode == 19 && message != null && message.contains("whitelist_requests.normalized_name"))
                 || (message != null && (message.contains("database is locked")
                 || message.contains("database table is locked")));
     }
