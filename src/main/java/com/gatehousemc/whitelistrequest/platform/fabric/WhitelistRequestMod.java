@@ -14,10 +14,20 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class WhitelistRequestMod implements ModInitializer {
     public static final String MOD_ID = "whitelistrequest";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    private static final ExecutorService STARTUP_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "whitelistrequest-startup");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final AtomicBoolean STOPPING = new AtomicBoolean();
+    private static final Object RUNTIME_LOCK = new Object();
     private static volatile FabricRuntime runtime;
 
     @Override
@@ -25,21 +35,48 @@ public final class WhitelistRequestMod implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 WhitelistRequestCommands.register(dispatcher, () -> runtime));
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
-            try {
-                ModConfig config = ConfigLoader.loadOrDefault(configDir);
-                runtime = FabricRuntime.start(server, config);
-                LOGGER.info("Whitelist Request started: {}", config.redactedSummary());
-            } catch (Exception error) {
-                LOGGER.error("storage.degraded: whitelist request persistence is unavailable", error);
-                runtime = FabricRuntime.degraded(server, ModConfig.defaults(configDir));
+            synchronized (RUNTIME_LOCK) {
+                STOPPING.set(false);
+                runtime = null;
             }
+            Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
+            STARTUP_EXECUTOR.execute(() -> startRuntime(server, configDir));
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            FabricRuntime current = runtime;
-            runtime = null;
+            FabricRuntime current;
+            synchronized (RUNTIME_LOCK) {
+                STOPPING.set(true);
+                current = runtime;
+                runtime = null;
+            }
             if (current != null) current.close();
         });
+    }
+
+    private static void startRuntime(net.minecraft.server.MinecraftServer server, Path configDir) {
+        synchronized (RUNTIME_LOCK) {
+            if (STOPPING.get()) return;
+        }
+        ModConfig config = null;
+        try {
+            config = ConfigLoader.loadOrDefault(configDir);
+            FabricRuntime started = FabricRuntime.start(server, config);
+            synchronized (RUNTIME_LOCK) {
+                if (STOPPING.get() || runtime != null) {
+                    started.close();
+                    return;
+                }
+                runtime = started;
+            }
+            LOGGER.info("Whitelist Request started: {}", config.redactedSummary());
+        } catch (Exception error) {
+            synchronized (RUNTIME_LOCK) {
+                if (!STOPPING.get() && runtime == null) {
+                    LOGGER.error("storage.degraded: whitelist request persistence is unavailable", error);
+                    runtime = FabricRuntime.degraded(server, config == null ? ModConfig.defaults(configDir) : config);
+                }
+            }
+        }
     }
 
     public static Text handleWhitelistDenial(GameProfile profile) {
@@ -57,8 +94,9 @@ public final class WhitelistRequestMod implements ModInitializer {
      * restart. The SQLite path is intentionally structural because moving it
      * while the server is running could split the workflow store.
      */
-    public static synchronized String reload() {
-        FabricRuntime current = runtime;
+    public static String reload() {
+        synchronized (RUNTIME_LOCK) {
+            FabricRuntime current = runtime;
         if (current == null) return "Whitelist Request is not running";
         Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
         try {
@@ -75,6 +113,7 @@ public final class WhitelistRequestMod implements ModInitializer {
             LOGGER.error("Config reload failed; request workflow is degraded until the server is restarted", error);
             runtime = FabricRuntime.degraded(current.server(), current.config());
             return "Config reload failed; workflow is degraded: " + safeMessage(error);
+        }
         }
     }
 

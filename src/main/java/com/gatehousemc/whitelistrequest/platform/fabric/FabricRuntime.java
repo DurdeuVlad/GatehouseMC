@@ -75,14 +75,21 @@ public final class FabricRuntime implements AutoCloseable {
     }
 
     static FabricRuntime start(MinecraftServer server, ModConfig config) throws IOException, SQLException {
-        SqliteDatabase database = new SqliteDatabase(config.database().path(), config.database().busyTimeoutMs());
-        WorkflowRepository repository = new SqliteWorkflowRepository(database);
+        SqliteDatabase database = null;
+        WorkflowRepository repository = null;
+        AdmissionWorker worker = null;
+        ExecutorService decisionExecutor = null;
+        List<ApprovalInterface> providers = new ArrayList<>();
+        OutboxWorker outbox = null;
+        try {
+        database = new SqliteDatabase(config.database().path(), config.database().busyTimeoutMs());
+        repository = new SqliteWorkflowRepository(database);
         ClockPort clock = Instant::now;
         RequestAdmissionCache cache = new RequestAdmissionCache(clock);
         Duration denialCooldown = Duration.ofMinutes(config.requests().denialCooldownMinutes());
         WhitelistRequestService requests = new WhitelistRequestService(repository, clock, denialCooldown, cache);
-        AdmissionWorker worker = new AdmissionWorker(config.requests().queueCapacity(), requests);
-        ExecutorService decisionExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        worker = new AdmissionWorker(config.requests().queueCapacity(), requests);
+        decisionExecutor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "whitelistrequest-decisions");
             thread.setDaemon(true);
             return thread;
@@ -93,18 +100,38 @@ public final class FabricRuntime implements AutoCloseable {
                 .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending()));
         repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500)
                 .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.blocked()));
-        List<ApprovalInterface> providers = new ArrayList<>();
+        repository.findByStatus(Optional.of(RequestStatus.DENIED), 500)
+                .forEach(request -> {
+                    Instant deniedUntil = request.resolvedAt().plus(denialCooldown);
+                    if (deniedUntil.isAfter(clock.now())) {
+                        cache.put(request.identity().normalizedUsername(), AdmissionState.deniedUntil(deniedUntil));
+                    }
+                });
+        decisions.recoverInterruptedApprovals().toCompletableFuture().join();
         for (String provider : config.routing().providers()) {
             if (provider.equalsIgnoreCase("discord")) providers.add(new DiscordApprovalInterface(config.discord(), decisions));
             if (provider.equalsIgnoreCase("telegram")) providers.add(new TelegramApprovalInterface(config.telegram(), decisions));
         }
         ApprovalInterfaceRouter router = new ApprovalInterfaceRouter(providers, config.routing().mode());
-        OutboxWorker outbox = new OutboxWorker(repository, router, clock);
+        outbox = new OutboxWorker(repository, router, clock);
         providers.forEach(ApprovalInterface::start);
         worker.start();
         outbox.start();
-        decisions.recoverInterruptedApprovals();
         return new FabricRuntime(server, config, cache, repository, requests, decisions, worker, decisionExecutor, providers, outbox);
+        } catch (IOException | SQLException | RuntimeException error) {
+            if (outbox != null) outbox.close();
+            providers.forEach(ApprovalInterface::stop);
+            if (worker != null) worker.close();
+            if (decisionExecutor != null) {
+                decisionExecutor.shutdownNow();
+            }
+            if (repository != null) {
+                try { repository.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
+            } else if (database != null) {
+                try { database.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
+            }
+            throw error;
+        }
     }
 
     static FabricRuntime degraded(MinecraftServer server, ModConfig config) {
@@ -122,7 +149,8 @@ public final class FabricRuntime implements AutoCloseable {
             case BLOCKED -> Text.literal("Whitelist requests for this username are blocked. Please contact a server administrator.");
             case DENIED -> Text.literal("Your whitelist request was denied recently. Please contact a server administrator if you need another review.");
             case PENDING -> Text.literal("Your whitelist request is still pending. Player: " + identity.exactUsername() + ". Ask a server administrator to approve it, then reconnect.");
-            case UNKNOWN, DEGRADED -> Text.literal("You are not whitelisted on this server. A whitelist request has been queued automatically. Player: " + identity.exactUsername() + ". Ask a server administrator to approve the request, then reconnect.");
+            case UNKNOWN -> Text.literal("You are not whitelisted on this server. A whitelist request has been queued automatically. Player: " + identity.exactUsername() + ". Ask a server administrator to approve the request, then reconnect.");
+            case DEGRADED -> messagesUnavailable(identity.exactUsername());
         };
     }
 

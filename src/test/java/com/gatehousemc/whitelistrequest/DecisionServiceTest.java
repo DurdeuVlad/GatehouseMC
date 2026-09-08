@@ -134,6 +134,8 @@ class DecisionServiceTest {
 
             assertEquals(RequestStatus.APPROVED, repository.findById(requestId).orElseThrow().status());
             assertEquals(AdmissionState.Kind.UNKNOWN, cache.get("recoveredplayer").kind());
+            decisions.recoverInterruptedApprovals().toCompletableFuture().join();
+            assertEquals(RequestStatus.APPROVED, repository.findById(requestId).orElseThrow().status());
         }
     }
 

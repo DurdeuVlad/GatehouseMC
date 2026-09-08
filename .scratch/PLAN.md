@@ -93,6 +93,14 @@ M2-03/M2-04 live evidence (2026-09-08/09):
 - First and repeat `E2E_Pending` attempts rendered first-request and pending messages; E2E_Denied and E2E_Blocked rendered distinct denied/blocked messages after their decisions.
 - Final workflow query: `E2E_Blocked|BLOCKED|1`, `E2E_Denied|DENIED|1`, `E2E_M2Player|APPROVED|1`, `E2E_Pending|PENDING|2`; block key `e2e_blocked`.
 
+M2-05 verification evidence (2026-09-09):
+
+- `DecisionServiceTest` covers simulated crash after whitelist add (`RESOLVING` + whitelist true → `APPROVED`), before whitelist add (`false` → `PENDING`), failed whitelist inspection (`PENDING`), cache refresh, and repeated recovery idempotence.
+- `./gradlew.ps1 test --tests '*DecisionService*' --tests '*Concurrency*' --rerun-tasks --stacktrace` — PASS.
+- `./gradlew.ps1 clean test build --stacktrace` — PASS.
+- Fabric runtime construction now runs on a daemon startup executor, awaits recovery before publishing the runtime/providers, preloads pending/blocked/active-denial cache state, and coordinates start/stop publication under a lock with partial-resource cleanup.
+- Final packaged startup smoke (`build/e2e/m2-05-clean-server`, port 25573) used mod jar SHA-256 `7F5607F2FEB7003D79214AEDB1FC8DC14037FFBB5ABB5957B39BD71E8554CB0D`, logged `Whitelist Request started` on `whitelistrequest-startup` after the real Fabric server reached `Done`, and rejected the offline client with a queued request message.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.
