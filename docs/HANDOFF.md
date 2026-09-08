@@ -8,7 +8,7 @@ the acceptance evidence below.
 
 Private GitHub repository: [DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC)
 
-The tracker contains 30 imported implementation and release issues covering
+The tracker contains 31 imported implementation, compatibility, and release issues covering
 M0 through M7. Dependabot is enabled for the Gradle wrapper and the Node E2E
 client.
 
@@ -49,11 +49,13 @@ The remaining production gates are:
    smoke path.
 2. Add repeat-attempt, deny, block/unblock, restart persistence, non-whitelist
    rejection, and interrupted-approval scenarios.
-3. Exercise provider adapters with fake transports and prove authorization,
+3. Run the packaged artifact against a representative real mod stack; the
+   clean Fabric smoke server is not enough for compatibility claims.
+4. Exercise provider adapters with fake transports and prove authorization,
    publication reconciliation, and provider outage recovery.
-4. Review migrations, dependency licenses, release metadata, and checksums.
-5. Make CI run the appropriate unit/component gates and archive E2E evidence.
-6. Do not label the project production-ready until M6/M7 acceptance criteria
+5. Review migrations, dependency licenses, release metadata, and checksums.
+6. Make CI run the appropriate unit/component gates and archive E2E evidence.
+7. Do not label the project production-ready until M6/M7 acceptance criteria
    are green or explicitly accepted by a maintainer.
 
 ## Important known risks

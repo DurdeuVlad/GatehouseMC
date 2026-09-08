@@ -95,6 +95,7 @@ Issues:
 - M6-02 — Implement headless offline-mode client login driver
 - M6-03 — Automate the full acceptance matrix and failure scenarios
 - M6-04 — Produce deterministic test evidence and CI artifacts
+- M6-05 — Verify compatibility with representative real mod stacks
 
 ---
 

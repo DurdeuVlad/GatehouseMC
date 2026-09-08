@@ -900,6 +900,45 @@ Close the implementation loop with one auditable final proof package rather than
 
 ---
 
+# M6-05 — Verify compatibility with representative real mod stacks
+
+**Milestone:** 6 — Dedicated-Server E2E Automation  
+**Type:** `test(e2e)`  
+**Priority:** P1  
+**Depends on:** M6-01, M6-03
+
+## Strategic intent
+
+Prove that the packaged server-side mod behaves correctly in a realistic
+Fabric 1.21.1 deployment rather than only in the minimal clean test server.
+
+## Expected agent responsibilities
+
+- Select a documented representative server-side mod set or public modpack
+  that is legal to download for testing.
+- Boot the clean packaged server with the selected mods and the same offline
+  whitelist properties.
+- Repeat rejection, request persistence, approval, reconnect, restart, and
+  non-whitelist rejection scenarios.
+- Capture exact mod list, versions, jar checksums, logs, and machine-readable
+  results.
+- Record incompatibilities as concrete defects instead of masking them by
+  removing the conflicting mod.
+
+## Acceptance criteria
+
+- [ ] At least one representative real mod stack passes the critical workflow.
+- [ ] The exact stack and versions are reproducible from documented inputs.
+- [ ] Any incompatibility has a linked issue, reproduction, and severity.
+- [ ] No test uses developer-local runtime state or private credentials.
+
+## Verification
+
+Run the clean packaged-server E2E harness with the selected real mod stack and
+archive the evidence under the ignored E2E artifact directory.
+
+---
+
 # Global agent completion checklist
 
 Before closing any issue above:
