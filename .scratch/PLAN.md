@@ -33,6 +33,16 @@ M0-03 verification evidence (2026-09-08):
 - Environment placeholders are expanded in memory, malformed placeholders are rejected, and record string representations omit Discord/Telegram tokens.
 - `.gitignore` now excludes the runtime `logs/` directory so compressed server logs cannot be staged accidentally.
 
+M1-01 verification evidence (2026-09-08):
+
+- RED: `./gradlew.ps1 test --tests '*DomainStateTest' --rerun-tasks --stacktrace` failed at compilation because the transition API did not exist.
+- GREEN: `./gradlew.ps1 test --tests '*DomainStateTest' --rerun-tasks --stacktrace` — PASS.
+- Required issue gate: `./gradlew.ps1 test --tests '*Domain*' --tests '*State*' --rerun-tasks --stacktrace` — PASS.
+- Full regression: `./gradlew.ps1 clean test build --stacktrace` — PASS after correcting an existing test fixture to use a monotonic later decision clock.
+- `RequestStatus` now rejects undocumented transitions; `WhitelistRequest` rejects contradictory lifecycle metadata and invalid timestamp ordering, including resolution before creation.
+- `PlayerIdentity` rejects names outside Minecraft's ASCII letter/digit/underscore profile syntax while retaining exact and normalized values.
+- Domain sources remain free of Minecraft, Fabric, provider, and JDBC imports.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.

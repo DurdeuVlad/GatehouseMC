@@ -10,8 +10,8 @@ public record PlayerIdentity(UUID offlineUuid, String exactUsername, String norm
         Objects.requireNonNull(offlineUuid, "offlineUuid");
         Objects.requireNonNull(exactUsername, "exactUsername");
         Objects.requireNonNull(normalizedUsername, "normalizedUsername");
-        if (exactUsername.isBlank() || exactUsername.length() > 16) {
-            throw new IllegalArgumentException("Username must contain 1-16 characters");
+        if (!exactUsername.matches("[A-Za-z0-9_]{1,16}")) {
+            throw new IllegalArgumentException("Username must contain 1-16 ASCII letters, digits, or underscores");
         }
         String expected = exactUsername.toLowerCase(Locale.ROOT);
         if (!expected.equals(normalizedUsername)) {
