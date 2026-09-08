@@ -3,6 +3,7 @@ build/
 out/
 config/whitelistrequest/
 run/
+logs/
 *.log
 *.sqlite
 *.sqlite-shm

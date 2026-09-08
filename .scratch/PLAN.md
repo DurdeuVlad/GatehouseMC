@@ -24,6 +24,15 @@ M0-02 verification evidence (2026-09-08):
 - `./gradlew.ps1 test --stacktrace` — PASS.
 - `ArchitectureTest` scans `domain`, `application`, and `port` source packages and rejects Minecraft, Fabric, JDA, JDBC, and SQLite imports; direct source inspection found no violations.
 
+M0-03 verification evidence (2026-09-08):
+
+- `./gradlew.ps1 test --tests '*Config*' --rerun-tasks --stacktrace` — PASS after the validation changes.
+- RED run of the same targeted configuration suite — 6 expected failures before implementation, covering provider isolation, malformed values, redaction, malformed placeholders, directory paths, and non-object roots.
+- Enabled Discord/Telegram providers with invalid credentials, IDs, or authorization are disabled without taking down the core workflow.
+- Core configuration rejects duplicate routing providers, blank/invalid database paths, malformed JSON roots, and non-actionable JSON types.
+- Environment placeholders are expanded in memory, malformed placeholders are rejected, and record string representations omit Discord/Telegram tokens.
+- `.gitignore` now excludes the runtime `logs/` directory so compressed server logs cannot be staged accidentally.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.
