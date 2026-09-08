@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: monthly
+  - package-ecosystem: npm
+    directory: "/tools/e2e"
+    schedule:
+      interval: monthly

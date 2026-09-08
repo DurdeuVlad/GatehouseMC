@@ -1,0 +1,11 @@
+.gradle/
+build/
+out/
+config/whitelistrequest/
+run/
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+node_modules/
+tools/e2e/.env

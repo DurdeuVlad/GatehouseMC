@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "whitelistrequest",
+  "version": "${version}",
+  "name": "Whitelist Request",
+  "description": "Durable whitelist requests for server-side Fabric servers running in offline mode.",
+  "authors": ["GatehouseMC contributors"],
+  "contact": {
+    "issues": "https://github.com/GatehouseMC/whitelist-request/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/whitelistrequest/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "com.gatehousemc.whitelistrequest.platform.fabric.WhitelistRequestMod"
+    ]
+  },
+  "mixins": [
+    "whitelistrequest.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

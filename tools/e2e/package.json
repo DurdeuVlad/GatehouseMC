@@ -1,0 +1,14 @@
+{
+  "name": "whitelist-request-e2e",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "minecraft-protocol": "1.66.2"
+  },
+  "scripts": {
+    "smoke": "node src/smoke.mjs"
+  }
+}
