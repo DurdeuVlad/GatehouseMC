@@ -1,5 +1,6 @@
 package com.gatehousemc.whitelistrequest.domain;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -22,5 +23,10 @@ public record PlayerIdentity(UUID offlineUuid, String exactUsername, String norm
     public static PlayerIdentity of(UUID offlineUuid, String exactUsername) {
         Objects.requireNonNull(exactUsername, "exactUsername");
         return new PlayerIdentity(offlineUuid, exactUsername, exactUsername.toLowerCase(Locale.ROOT));
+    }
+
+    public static UUID offlineUuidFor(String exactUsername) {
+        Objects.requireNonNull(exactUsername, "exactUsername");
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + exactUsername).getBytes(StandardCharsets.UTF_8));
     }
 }

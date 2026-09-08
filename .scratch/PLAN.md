@@ -79,6 +79,13 @@ M1-05 verification evidence (2026-09-08):
 - Real SQLite tests prove concurrent outbox claim exclusivity, PROCESSING requeue after reopen, deterministic retry availability/attempt increment, and REQUEST_UPDATED/approval-failure event durability.
 - Outbox retry errors are reduced to exception type names before persistence; repository update failures emit structured warning events instead of being silent.
 
+M2-01/M2-02 verification evidence (2026-09-08):
+
+- Exact mapped Minecraft 1.21.1 `PlayerManager#checkCanJoin(SocketAddress, GameProfile)` signature and bytecode branch order are recorded in `.scratch/MIXIN_INVESTIGATION.md`; Mixin uses translatable key detection and `require=1`.
+- Clean packaged Fabric server proof: Loader 0.19.5, Minecraft 1.21.1, Fabric API 0.116.17+1.21.1, offline mode, whitelist enabled; server reached `Done` and applied the Mixin without startup failure.
+- Packaged offline client smoke rejected `E2E_Alice` with the custom queued-request message; SQLite contained one PENDING request at attempt count 1 and `whitelist.json` remained empty.
+- `./gradlew.ps1 test --tests '*OfflineIdentity*' --rerun-tasks --stacktrace` — PASS; mapped `Uuids#getOfflinePlayerUuid` bytecode and known UUID formula are documented.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.

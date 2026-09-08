@@ -65,6 +65,14 @@ javap -classpath <mapped-common-jar> -p net.minecraft.server.PlayerManager
 javap -classpath <mapped-common-jar> -c -p net.minecraft.server.PlayerManager
 ```
 
+## Offline identity verification
+
+`javap -c -p net.minecraft.util.Uuids` against the same mapped common jar reports that `getOfflinePlayerUuid(String)` concatenates the username with the `OfflinePlayer:` prefix, encodes UTF-8, and calls `UUID.nameUUIDFromBytes`.
+
+The pure-domain helper `PlayerIdentity.offlineUuidFor` implements that exact algorithm for deterministic cross-checks. The live login path does not regenerate or replace the observed UUID: `WhitelistRequestMod` captures `GameProfile.getId()` and `GameProfile.getName()`, then `FabricRuntime.GameProfileIdentity.toDomain()` retains both exact values while `PlayerIdentity` separately derives the lowercase `Locale.ROOT` workflow key.
+
+`./gradlew.ps1 test --tests '*OfflineIdentity*' --rerun-tasks --stacktrace` — PASS. The tests cover the known `E2E_Alice` UUID and case-variant UUID differences with shared normalized workflow identity.
+
 ## Clean packaged-server runtime evidence
 
 Disposable server directory:
