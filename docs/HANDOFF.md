@@ -6,6 +6,12 @@ testing strategy, OSS policy, and issue-style task backlog. Those documents are
 requirements/context; they are not a replacement for the user's request or for
 the acceptance evidence below.
 
+Private GitHub repository: [DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC)
+
+The tracker contains 30 imported implementation and release issues covering
+M0 through M7. Dependabot is enabled for the Gradle wrapper and the Node E2E
+client.
+
 ## Current baseline
 
 - Minecraft 1.21.1, Fabric, Java 21.
