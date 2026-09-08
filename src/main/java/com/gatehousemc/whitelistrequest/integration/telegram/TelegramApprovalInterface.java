@@ -22,7 +22,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     private final ModConfig.Telegram config;
     private final DecisionService decisions;
     private volatile ProviderHealth health = ProviderHealth.STOPPED;
-    private volatile TelegramApiClient api;
+    private volatile TelegramTransport api;
     private volatile ExecutorService poller;
     private volatile boolean running;
     private volatile long offset;
@@ -30,6 +30,14 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     public TelegramApprovalInterface(ModConfig.Telegram config, DecisionService decisions) {
         this.config = config;
         this.decisions = decisions;
+    }
+
+    /** Package-private constructor for fake-transport testing. */
+    TelegramApprovalInterface(ModConfig.Telegram config, DecisionService decisions, TelegramTransport transport) {
+        this.config = config;
+        this.decisions = decisions;
+        this.api = transport;
+        this.health = ProviderHealth.HEALTHY;
     }
 
     @Override
@@ -66,7 +74,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
 
     @Override
     public CompletionStage<PublicationRef> publish(RequestView request) {
-        TelegramApiClient current = api;
+        TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
         String payload = "{\"chat_id\":\"" + json(config.chatId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), false) + "}";
         return current.post("sendMessage", payload).thenApply(body -> {
@@ -77,7 +85,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
 
     @Override
     public CompletionStage<Void> update(PublicationRef publication, RequestView request) {
-        TelegramApiClient current = api;
+        TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
         String payload = "{\"chat_id\":\"" + json(publication.containerId()) + "\",\"message_id\":\"" + json(publication.messageId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status().isTerminal()) + "}";
         return current.post("editMessageText", payload).thenApply(ignored -> null);
