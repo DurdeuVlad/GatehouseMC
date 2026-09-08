@@ -120,3 +120,30 @@ REQUEST_CREATED|READY
 ```
 
 `whitelist.json` remained `[]`. The live bytecode branch proof above establishes that ban/IP-ban/server-full returns occur before or after the exact whitelist-denial branch and therefore do not satisfy the Mixin predicate. A full ban/full/generic network matrix remains part of M6.
+
+## Vanilla whitelist mutation and restart evidence
+
+A second disposable clean-server run used:
+
+```text
+build/e2e/m2-03-clean-server/
+```
+
+It launched the same packaged artifact with Fabric Loader `0.19.5`, Minecraft `1.21.1`, Fabric API `0.116.17+1.21.1`, `online-mode=false`, `white-list=true`, and port `25572`. Artifact hashes for this run were:
+
+```text
+fabric-server-launch.jar                         F5EBBE78F110CD2577440039634B11E6EAD12955D9B9E79F663EB2144334ABB1
+fabric-api-0.116.17+1.21.1.jar                  79AC44B40780ACBD884B34C50BE1E39AF682847E5F5CB3B1FDDEEAA768DCE800
+whitelist-request-0.1.0-SNAPSHOT.jar            CD74FB6551B82A4712B2819ABFF1B568DDD7F544F367F52DE6A825DAB5D0E105
+```
+
+The packaged client first rejected `E2E_M2Player` with the queued-request message. An authorized local RCON console command (`wlreq approve 86b32f8d-97e2-45e3-9625-939ff174326a`) then completed the decision. The running server wrote:
+
+```text
+APPROVED|E2E_M2Player|1
+whitelist.json: uuid=f3d10e7e-b571-3786-aaeb-91cfb7f88cf2, name=E2E_M2Player
+```
+
+The client reconnected successfully (`npm run smoke`, `MC_EXPECTED_STATUS=joined`, exit code 0). After a graceful RCON `stop`, the same clean directory was restarted; the client reconnected successfully again, proving vanilla `whitelist.json` persistence across restart. The second-run log is at `build/e2e/m2-03-clean-server/logs/latest.log`; rotated logs are retained in the same directory.
+
+`javap` against `ServerConfigList` also confirmed `ServerConfigList.add` puts the entry in the map and invokes `save()` internally, with IOException logged by vanilla. Therefore the adapter's `Whitelist.add(new WhitelistEntry(...))` uses the canonical vanilla persistence path and does not write `whitelist.json` directly.
