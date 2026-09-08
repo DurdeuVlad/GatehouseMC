@@ -22,6 +22,11 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
 
     @Override
     public synchronized AttemptOutcome recordAttempt(PlayerIdentity identity, Instant now, Duration denialCooldown) {
+        return recordAttempt(identity, now, denialCooldown, 3);
+    }
+
+    private AttemptOutcome recordAttempt(PlayerIdentity identity, Instant now, Duration denialCooldown,
+                                         int retriesRemaining) {
         try {
             connection.setAutoCommit(false);
             if (isBlocked(identity.normalizedUsername())) {
@@ -64,6 +69,10 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             return AttemptOutcome.of(AttemptState.CREATED, created);
         } catch (SQLException exception) {
             rollbackQuietly();
+            if (retriesRemaining > 0 && isRetryableAttemptRace(exception)) {
+                resetAutoCommit();
+                return recordAttempt(identity, now, denialCooldown, retriesRemaining - 1);
+            }
             return AttemptOutcome.of(AttemptState.DEGRADED, null);
         } finally {
             resetAutoCommit();
@@ -501,7 +510,39 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
         statement.setString(start + 2, actor.displayName());
     }
 
-    private static String escape(String value) { return value.replace("\\", "\\\\").replace("\"", "\\\""); }
+    private static boolean isRetryableAttemptRace(SQLException exception) {
+        int errorCode = exception.getErrorCode();
+        if (errorCode == 5 || errorCode == 6) return true;
+        String message = exception.getMessage();
+        return (errorCode == 19 && message != null && message.contains("whitelist_requests.normalized_name"))
+                || (message != null && (message.contains("database is locked")
+                || message.contains("database table is locked")));
+    }
+
+    private static String escape(String value) {
+        if (value == null) return "";
+        StringBuilder escaped = new StringBuilder(value.length() + 8);
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '\\' -> escaped.append("\\\\");
+                case '"' -> escaped.append("\\\"");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
+    }
 
     private void rollbackQuietly() { try { connection.rollback(); } catch (SQLException ignored) {} }
     private void resetAutoCommit() { try { connection.setAutoCommit(true); } catch (SQLException ignored) {} }

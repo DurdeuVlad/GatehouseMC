@@ -51,6 +51,16 @@ M1-02 verification evidence (2026-09-08):
 - Existing SQLite core tests prove first-attempt creation, repeat/case-variant deduplication, attempt counting, cooldown, and block behavior; the cache now uses the injected `ClockPort` and atomically expires denied entries.
 - Fabric runtime wires its single wall clock into the admission cache; no provider or database calls were added to the cache path.
 
+M1-03 verification evidence (2026-09-08):
+
+- RED: `./gradlew.ps1 test --tests '*SqliteWorkflowRepositoryTest' --rerun-tasks --stacktrace` failed the future-schema rejection scenario before version gating was implemented.
+- GREEN: `./gradlew.ps1 test --tests '*SqliteWorkflowRepositoryTest' --rerun-tasks --stacktrace` — PASS.
+- Required issue gate: `./gradlew.ps1 test --tests '*Sqlite*' --tests '*Repository*' --rerun-tasks --stacktrace` — PASS.
+- Full regression: `./gradlew.ps1 clean test build --stacktrace` — PASS.
+- Real SQLite tests prove fresh schema migration, request/audit persistence after reopen, rejection of unsupported future schema versions, WAL/foreign-key/busy-timeout setup, and two independent repository connections cannot create duplicate active requests.
+- Migration initialization closes its JDBC connection if a migration fails; current version is explicitly gated before applying DDL and future migration steps run sequentially.
+- Transient unique-key and lock contention retries the active-request lookup instead of returning a false degraded state; audit JSON escaping now covers control characters.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.

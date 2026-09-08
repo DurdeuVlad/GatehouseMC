@@ -14,8 +14,18 @@ public final class SqliteDatabase implements AutoCloseable {
         Path absolute = path.toAbsolutePath().normalize();
         Path parent = absolute.getParent();
         if (parent != null) Files.createDirectories(parent);
-        connection = DriverManager.getConnection("jdbc:sqlite:" + absolute);
-        MigrationRunner.initialize(connection, busyTimeoutMs);
+        Connection opened = DriverManager.getConnection("jdbc:sqlite:" + absolute);
+        try {
+            MigrationRunner.initialize(opened, busyTimeoutMs);
+        } catch (SQLException | RuntimeException error) {
+            try {
+                opened.close();
+            } catch (SQLException closeError) {
+                error.addSuppressed(closeError);
+            }
+            throw error;
+        }
+        connection = opened;
     }
 
     Connection connection() {
