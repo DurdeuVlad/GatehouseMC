@@ -71,7 +71,8 @@ class WhitelistRequestCoreTest {
             AttemptOutcome afterCooldown = repository.recordAttempt(identity, later, Duration.ofDays(1));
             assertEquals(AttemptState.CREATED, afterCooldown.state());
             UUID secondId = repository.findActiveByName("bob").orElseThrow().id();
-            DecisionResult blocked = decisions.decide(secondId, DecisionAction.BLOCK, AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join();
+            DecisionService laterDecisions = new DecisionService(repository, new FakeWhitelist(), () -> later, service.cache());
+            DecisionResult blocked = laterDecisions.decide(secondId, DecisionAction.BLOCK, AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join();
             assertEquals(DecisionOutcome.BLOCKED, blocked.outcome());
             assertEquals(AttemptState.BLOCKED, service.recordAttempt(identity).state());
         }
