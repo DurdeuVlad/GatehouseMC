@@ -18,6 +18,12 @@ M0-01 verification evidence (2026-09-08):
 - Production jar contains `fabric.mod.json` and `whitelistrequest.mixins.json`, with no client entrypoint; SHA-256: `0557FAAA7C098BDBF4047950461F2CC349CFB647E57E11A62FFF02214DEC9447`.
 - Loom reports a non-fatal semver warning for the pinned four-component xerial SQLite version `3.53.2.1`; no dependency is floating.
 
+M0-02 verification evidence (2026-09-08):
+
+- `./gradlew.ps1 test --tests '*ArchitectureTest' --rerun-tasks --stacktrace` — PASS.
+- `./gradlew.ps1 test --stacktrace` — PASS.
+- `ArchitectureTest` scans `domain`, `application`, and `port` source packages and rejects Minecraft, Fabric, JDA, JDBC, and SQLite imports; direct source inspection found no violations.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.
