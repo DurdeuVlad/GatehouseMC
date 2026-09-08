@@ -147,3 +147,15 @@ whitelist.json: uuid=f3d10e7e-b571-3786-aaeb-91cfb7f88cf2, name=E2E_M2Player
 The client reconnected successfully (`npm run smoke`, `MC_EXPECTED_STATUS=joined`, exit code 0). After a graceful RCON `stop`, the same clean directory was restarted; the client reconnected successfully again, proving vanilla `whitelist.json` persistence across restart. The second-run log is at `build/e2e/m2-03-clean-server/logs/latest.log`; rotated logs are retained in the same directory.
 
 `javap` against `ServerConfigList` also confirmed `ServerConfigList.add` puts the entry in the map and invokes `save()` internally, with IOException logged by vanilla. Therefore the adapter's `Whitelist.add(new WhitelistEntry(...))` uses the canonical vanilla persistence path and does not write `whitelist.json` directly.
+
+The same live server then exercised the player-facing states. Two `E2E_Pending` attempts produced first-request then pending messages; `E2E_Denied` produced the distinct denied message after an RCON deny; and `E2E_Blocked` produced the distinct blocked message after an RCON block. Final SQLite state was:
+
+```text
+E2E_Blocked|BLOCKED|1
+e2e_blocked
+E2E_Denied|DENIED|1
+E2E_M2Player|APPROVED|1
+E2E_Pending|PENDING|2
+```
+
+All client attempts used the server-side packaged artifact; no client-side Whitelist Request mod was installed.

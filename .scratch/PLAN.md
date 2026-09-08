@@ -86,6 +86,13 @@ M2-01/M2-02 verification evidence (2026-09-08):
 - Packaged offline client smoke rejected `E2E_Alice` with the custom queued-request message; SQLite contained one PENDING request at attempt count 1 and `whitelist.json` remained empty.
 - `./gradlew.ps1 test --tests '*OfflineIdentity*' --rerun-tasks --stacktrace` — PASS; mapped `Uuids#getOfflinePlayerUuid` bytecode and known UUID formula are documented.
 
+M2-03/M2-04 live evidence (2026-09-08/09):
+
+- Clean packaged server `build/e2e/m2-03-clean-server/` booted twice with Loader 0.19.5, Minecraft 1.21.1, Fabric API 0.116.17+1.21.1, `online-mode=false`, `white-list=true`, port 25572; logs are retained in that directory.
+- `E2E_M2Player` was rejected, approved by `wlreq approve` over local test RCON, joined, then joined again after graceful server restart; `whitelist.json` retained the exact UUID/name.
+- First and repeat `E2E_Pending` attempts rendered first-request and pending messages; E2E_Denied and E2E_Blocked rendered distinct denied/blocked messages after their decisions.
+- Final workflow query: `E2E_Blocked|BLOCKED|1`, `E2E_Denied|DENIED|1`, `E2E_M2Player|APPROVED|1`, `E2E_Pending|PENDING|2`; block key `e2e_blocked`.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.
