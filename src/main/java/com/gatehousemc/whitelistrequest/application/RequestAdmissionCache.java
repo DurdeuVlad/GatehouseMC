@@ -1,23 +1,36 @@
 package com.gatehousemc.whitelistrequest.application;
 
-import java.time.Clock;
+import com.gatehousemc.whitelistrequest.port.ClockPort;
+
 import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class RequestAdmissionCache {
     private final ConcurrentHashMap<String, AdmissionState> states = new ConcurrentHashMap<>();
+    private final ClockPort clock;
     private volatile boolean degraded;
 
+    public RequestAdmissionCache() {
+        this(Instant::now);
+    }
+
+    public RequestAdmissionCache(ClockPort clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
     public AdmissionState get(String normalizedUsername) {
-        AdmissionState state = states.getOrDefault(normalizedUsername, AdmissionState.unknown());
-        if (state.kind() == AdmissionState.Kind.DENIED && state.until().isAfter(Instant.now(Clock.systemUTC()))) {
+        AtomicReference<AdmissionState> result = new AtomicReference<>(AdmissionState.unknown());
+        states.compute(normalizedUsername, (key, state) -> {
+            if (state == null) return null;
+            if (state.kind() == AdmissionState.Kind.DENIED && !state.until().isAfter(clock.now())) {
+                return null;
+            }
+            result.set(state);
             return state;
-        }
-        if (state.kind() == AdmissionState.Kind.DENIED) {
-            states.remove(normalizedUsername, state);
-            return AdmissionState.unknown();
-        }
-        return state;
+        });
+        return result.get();
     }
 
     public void put(String normalizedUsername, AdmissionState state) {

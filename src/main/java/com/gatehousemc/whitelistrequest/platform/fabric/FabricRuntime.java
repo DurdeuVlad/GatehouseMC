@@ -70,8 +70,8 @@ public final class FabricRuntime implements AutoCloseable {
     static FabricRuntime start(MinecraftServer server, ModConfig config) throws IOException, SQLException {
         SqliteDatabase database = new SqliteDatabase(config.database().path(), config.database().busyTimeoutMs());
         WorkflowRepository repository = new SqliteWorkflowRepository(database);
-        RequestAdmissionCache cache = new RequestAdmissionCache();
         ClockPort clock = Instant::now;
+        RequestAdmissionCache cache = new RequestAdmissionCache(clock);
         Duration denialCooldown = Duration.ofMinutes(config.requests().denialCooldownMinutes());
         WhitelistRequestService requests = new WhitelistRequestService(repository, clock, denialCooldown, cache);
         DecisionService decisions = new DecisionService(repository, new FabricVanillaWhitelistAdapter(server), clock, cache, denialCooldown);

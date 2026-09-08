@@ -262,7 +262,7 @@ The login hook must never query SQLite.
 `RequestAdmissionCache` provides a small immutable snapshot keyed by normalized username:
 
 ```text
-NONE
+UNKNOWN
 PENDING
 DENIED_UNTIL <instant>
 BLOCKED

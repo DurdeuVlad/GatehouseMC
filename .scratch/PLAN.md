@@ -43,6 +43,14 @@ M1-01 verification evidence (2026-09-08):
 - `PlayerIdentity` rejects names outside Minecraft's ASCII letter/digit/underscore profile syntax while retaining exact and normalized values.
 - Domain sources remain free of Minecraft, Fabric, provider, and JDBC imports.
 
+M1-02 verification evidence (2026-09-08):
+
+- RED: `./gradlew.ps1 test --tests '*WhitelistRequestServiceTest' --rerun-tasks --stacktrace` failed to compile because the cache did not accept a workflow clock.
+- GREEN: `./gradlew.ps1 test --tests '*WhitelistRequestService*' --rerun-tasks --stacktrace` — PASS.
+- Full regression: `./gradlew.ps1 clean test build --stacktrace` — PASS.
+- Existing SQLite core tests prove first-attempt creation, repeat/case-variant deduplication, attempt counting, cooldown, and block behavior; the cache now uses the injected `ClockPort` and atomically expires denied entries.
+- Fabric runtime wires its single wall clock into the admission cache; no provider or database calls were added to the cache path.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.
