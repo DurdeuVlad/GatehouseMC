@@ -66,6 +66,9 @@ The remaining production gates are:
 - Real Discord and Telegram credentials were not used. Their adapters need
   fake-transport coverage and optional secret-backed smoke tests.
 - The full acceptance matrix is not automated yet.
+- GitHub Actions is configured, but the private repository's jobs currently
+  cannot start because GitHub reports an account billing/spending-limit
+  failure. Re-run the workflow after the account billing state is fixed.
 - Release licensing and dependency notices need maintainer confirmation before
   publication.
 
