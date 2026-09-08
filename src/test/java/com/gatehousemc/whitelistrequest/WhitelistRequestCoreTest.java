@@ -87,9 +87,11 @@ class WhitelistRequestCoreTest {
             service.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("carol").orElseThrow().id();
             CompletableFuture<Void> whitelistResult = new CompletableFuture<>();
-            DecisionService decisions = new DecisionService(repository, new FakeWhitelist(whitelistResult), clock, service.cache());
+            FakeWhitelist whitelist = new FakeWhitelist(whitelistResult);
+            DecisionService decisions = new DecisionService(repository, whitelist, clock, service.cache());
 
             var approval = decisions.decide(requestId, DecisionAction.APPROVE, AdminPrincipal.console(), Optional.empty());
+            whitelist.addStarted.join();
             DecisionResult loser = decisions.decide(requestId, DecisionAction.DENY, AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join();
             assertEquals(DecisionOutcome.RESOLVING, loser.outcome());
             whitelistResult.complete(null);
@@ -104,11 +106,15 @@ class WhitelistRequestCoreTest {
 
     private static final class FakeWhitelist implements VanillaWhitelistPort {
         private final CompletableFuture<Void> addResult;
+        private final CompletableFuture<Void> addStarted = new CompletableFuture<>();
 
         private FakeWhitelist() { this(CompletableFuture.completedFuture(null)); }
         private FakeWhitelist(CompletableFuture<Void> addResult) { this.addResult = addResult; }
 
         @Override public CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity) { return CompletableFuture.completedFuture(false); }
-        @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) { return addResult; }
+        @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) {
+            addStarted.complete(null);
+            return addResult;
+        }
     }
 }

@@ -111,7 +111,7 @@ class SqliteWorkflowRepositoryTest {
             UUID requestId = repository.findActiveByName("auditplayer").orElseThrow().id();
             var claim = repository.claimApproval(requestId, AdminPrincipal.console(), "", NOW, UUID.randomUUID());
 
-            assertDoesNotThrow(() -> repository.resetApproval(requestId, claim.token(), "line\nbreak\t", NOW));
+            assertDoesNotThrow(() -> repository.resetApproval(requestId, claim.token(), AdminPrincipal.console(), "line\nbreak\t", NOW));
             try (Statement statement = database.connection().createStatement();
                  ResultSet result = statement.executeQuery("SELECT details_json FROM audit_log WHERE event_type='APPROVAL_FAILED'")) {
                 assertTrue(result.next());

@@ -61,6 +61,16 @@ M1-03 verification evidence (2026-09-08):
 - Migration initialization closes its JDBC connection if a migration fails; current version is explicitly gated before applying DDL and future migration steps run sequentially.
 - Transient unique-key and lock contention retries the active-request lookup instead of returning a false degraded state; audit JSON escaping now covers control characters.
 
+M1-04 verification evidence (2026-09-08):
+
+- RED: `./gradlew.ps1 test --tests '*DecisionServiceTest' --tests '*Concurrency*' --rerun-tasks --stacktrace` failed the approval-cache assertion before the terminal cache fix; the initial run also exposed a test-only package-access mistake, corrected before the behavioral RED result.
+- GREEN: `./gradlew.ps1 test --tests '*DecisionServiceTest' --tests '*Concurrency*' --rerun-tasks --stacktrace` — PASS.
+- Full regression: `./gradlew.ps1 clean test build --stacktrace` — PASS.
+- Decision tests prove approval calls the vanilla port once, successful approval clears the pending admission cache, failed whitelist mutation returns the request to PENDING, actor origin is recorded, and approve/deny races have one winner.
+- Recovery tests prove an interrupted approval finalizes when the exact profile is whitelisted, resets when it is absent, and resets safely when the whitelist check fails; recovery continuations run on the decision worker.
+- Decision persistence and approval continuations use a dedicated decision executor rather than the Minecraft/server thread or admission worker; CAS losers refresh the cache from their durable request snapshot.
+- The application still uses the repository compare-and-set claim/finalize/reset flow; outbox publication and Fabric startup ordering remain tracked by later issues.
+
 Still required before a public release:
 
 - Boot the produced jar on a clean dedicated Minecraft 1.21.1 server.

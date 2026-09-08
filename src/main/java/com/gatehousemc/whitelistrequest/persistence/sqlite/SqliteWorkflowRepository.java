@@ -168,7 +168,14 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 statement.setString(7, requestId.toString());
                 if (statement.executeUpdate() != 1) {
                     connection.rollback();
-                    return new DecisionClaim(DecisionClaim.ClaimOutcome.ALREADY_RESOLVED, Optional.of(request), token);
+                    WhitelistRequest current = findByIdInternal(requestId);
+                    if (current == null) {
+                        return new DecisionClaim(DecisionClaim.ClaimOutcome.NOT_FOUND, Optional.empty(), token);
+                    }
+                    DecisionClaim.ClaimOutcome outcome = current.status() == RequestStatus.RESOLVING
+                            ? DecisionClaim.ClaimOutcome.ALREADY_RESOLVING
+                            : DecisionClaim.ClaimOutcome.ALREADY_RESOLVED;
+                    return new DecisionClaim(outcome, Optional.of(current), token);
                 }
             }
             audit(requestId, "DECISION_CLAIMED", actor, null, null, "{\"action\":\"APPROVE\"}", now);
@@ -208,7 +215,14 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 statement.setString(8, requestId.toString());
                 if (statement.executeUpdate() != 1) {
                     connection.rollback();
-                    return new DecisionResultSnapshot(DecisionOutcome.ALREADY_RESOLVED, Optional.of(request), "Request is already resolved");
+                    WhitelistRequest current = findByIdInternal(requestId);
+                    if (current == null) {
+                        return new DecisionResultSnapshot(DecisionOutcome.NOT_FOUND, Optional.empty(), "Request not found");
+                    }
+                    DecisionOutcome outcome = current.status() == RequestStatus.RESOLVING
+                            ? DecisionOutcome.RESOLVING : DecisionOutcome.ALREADY_RESOLVED;
+                    return new DecisionResultSnapshot(outcome, Optional.of(current),
+                            "Request is already " + current.status().name().toLowerCase());
                 }
             }
             if (action == DecisionAction.BLOCK) {
@@ -264,7 +278,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
     }
 
     @Override
-    public synchronized boolean resetApproval(UUID requestId, UUID token, String error, Instant now) {
+    public synchronized boolean resetApproval(UUID requestId, UUID token, AdminPrincipal actor, String error, Instant now) {
         try {
             connection.setAutoCommit(false);
             try (PreparedStatement statement = connection.prepareStatement("UPDATE whitelist_requests SET status='PENDING', resolving_action=NULL, resolving_token=NULL, resolved_by_provider=NULL, resolved_by_external_id=NULL, resolved_by_display_name=NULL, resolution_reason=NULL, updated_at=? WHERE id=? AND status='RESOLVING' AND resolving_token=?")) {
@@ -276,7 +290,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                     return false;
                 }
             }
-            audit(requestId, "APPROVAL_FAILED", null, null, null, "{\"error\":\"" + escape(error) + "\"}", now);
+            audit(requestId, "APPROVAL_FAILED", actor, null, null, "{\"error\":\"" + escape(error) + "\"}", now);
             connection.commit();
             return true;
         } catch (SQLException exception) {

@@ -28,7 +28,7 @@ public interface WorkflowRepository extends AutoCloseable {
 
     boolean finalizeApproval(UUID requestId, UUID token, AdminPrincipal actor, String reason, Instant now);
 
-    boolean resetApproval(UUID requestId, UUID token, String error, Instant now);
+    boolean resetApproval(UUID requestId, UUID token, AdminPrincipal actor, String error, Instant now);
 
     List<WhitelistRequest> findResolvingApprovals();
 

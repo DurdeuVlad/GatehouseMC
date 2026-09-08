@@ -53,6 +53,10 @@ final class AdmissionWorker implements AutoCloseable {
         return queue.size();
     }
 
+    java.util.concurrent.Executor executor() {
+        return executor;
+    }
+
     @Override
     public void close() {
         running = false;
