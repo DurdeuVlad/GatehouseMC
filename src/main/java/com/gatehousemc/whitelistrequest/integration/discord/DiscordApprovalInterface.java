@@ -3,6 +3,8 @@ package com.gatehousemc.whitelistrequest.integration.discord;
 import com.gatehousemc.whitelistrequest.application.DecisionService;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.integration.common.ApprovalMessageRenderer;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
 import com.gatehousemc.whitelistrequest.port.ApprovalInterface;
 import com.gatehousemc.whitelistrequest.port.ProviderHealth;
 import net.dv8tion.jda.api.JDA;
@@ -90,7 +92,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String customId = event.getComponentId();
-        ParsedAction action = parse(customId);
+        CallbackActionParser.ParsedAction action = CallbackActionParser.parse(customId);
         if (action == null) {
             event.reply("Invalid whitelist request action.").setEphemeral(true).queue();
             return;
@@ -115,35 +117,18 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     }
 
     static String render(RequestView request) {
-        return "Whitelist request\n" +
-                "Player: " + request.identity().exactUsername() + "\n" +
-                "Offline UUID: " + request.identity().offlineUuid() + "\n" +
-                "Identity: OFFLINE / UNAUTHENTICATED\n" +
-                "Attempts: " + request.attemptCount() + "\n" +
-                "Request: " + request.id() + "\n" +
-                "Status: " + request.status();
+        return ApprovalMessageRenderer.render(request);
     }
 
     static ParsedAction parseAction(String value) {
-        return parse(value);
+        CallbackActionParser.ParsedAction parsed = CallbackActionParser.parse(value);
+        return parsed == null ? null : new ParsedAction(parsed.action(), parsed.requestId());
     }
 
-    private static ParsedAction parse(String value) {
-        if (value == null || !value.startsWith("wr:") || value.length() < 5) return null;
-        String[] parts = value.split(":", 3);
-        if (parts.length != 3) return null;
-        try {
-            DecisionAction action = switch (parts[1]) {
-                case "a" -> DecisionAction.APPROVE;
-                case "d" -> DecisionAction.DENY;
-                case "b" -> DecisionAction.BLOCK;
-                default -> null;
-            };
-            return action == null ? null : new ParsedAction(action, UUID.fromString(parts[2]));
-        } catch (IllegalArgumentException ignored) {
-            return null;
+    /** Thin subclass of the shared {@link CallbackActionParser.ParsedAction} for backward-compatible test access. */
+    static final class ParsedAction extends CallbackActionParser.ParsedAction {
+        ParsedAction(DecisionAction action, UUID requestId) {
+            super(action, requestId);
         }
     }
-
-    record ParsedAction(DecisionAction action, UUID requestId) {}
 }
