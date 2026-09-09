@@ -35,7 +35,7 @@ public final class ConfigLoader {
         }
         JsonElement parsed;
         try {
-            parsed = JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8));
+            parsed = new JsonParser().parse(Files.readString(path, StandardCharsets.UTF_8));
         } catch (RuntimeException error) {
             throw new IllegalArgumentException("Invalid JSON in config.json", error);
         }

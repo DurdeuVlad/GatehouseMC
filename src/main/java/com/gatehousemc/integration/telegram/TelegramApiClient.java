@@ -26,7 +26,7 @@ final class TelegramApiClient implements TelegramTransport {
         return client.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                 .thenApply(response -> {
                     if (response.statusCode() / 100 != 2) throw new IllegalStateException("Telegram HTTP " + response.statusCode());
-                    JsonObject body = JsonParser.parseString(response.body()).getAsJsonObject();
+                    JsonObject body = new JsonParser().parse(response.body()).getAsJsonObject();
                     if (!body.get("ok").getAsBoolean()) throw new IllegalStateException("Telegram API rejected request");
                     return body;
                 });

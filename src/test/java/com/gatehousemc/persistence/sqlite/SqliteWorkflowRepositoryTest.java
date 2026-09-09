@@ -110,7 +110,7 @@ class SqliteWorkflowRepositoryTest {
             try (Statement statement = database.connection().createStatement();
                  ResultSet result = statement.executeQuery("SELECT details_json FROM audit_log WHERE event_type='APPROVAL_FAILED'")) {
                 assertTrue(result.next());
-                assertDoesNotThrow(() -> JsonParser.parseString(result.getString(1)));
+                assertDoesNotThrow(() -> new JsonParser().parse(result.getString(1)));
             }
         }
     }

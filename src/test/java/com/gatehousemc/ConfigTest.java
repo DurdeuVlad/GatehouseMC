@@ -18,6 +18,10 @@ class ConfigTest {
         assertEquals("prefix-secret", EnvExpander.expand("prefix-${TOKEN}", Map.of("TOKEN", "secret")));
     }
 
+    private static com.google.gson.JsonElement parseJson(String json) {
+        return new JsonParser().parse(json);
+    }
+
     @Test
     void missingSecretIsActionable() {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
@@ -27,7 +31,7 @@ class ConfigTest {
 
     @Test
     void invalidEnabledDiscordProviderIsDisabledWithoutBreakingCore(@TempDir Path configDir) {
-        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+        ModConfig config = ConfigLoader.parse(parseJson("""
                 {
                   "discord": {
                     "enabled": true,
@@ -46,7 +50,7 @@ class ConfigTest {
 
     @Test
     void invalidEnabledTelegramProviderIsDisabledWithoutBreakingCore(@TempDir Path configDir) {
-        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+        ModConfig config = ConfigLoader.parse(parseJson("""
                 {
                   "telegram": {
                     "enabled": true,
@@ -64,7 +68,7 @@ class ConfigTest {
     @Test
     void duplicateRoutingProvidersAreRejected(@TempDir Path configDir) {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> ConfigLoader.parse(JsonParser.parseString("""
+                () -> ConfigLoader.parse(parseJson("""
                         { "routing": { "providers": ["discord", "discord"] } }
                         """).getAsJsonObject(), configDir));
 
@@ -74,7 +78,7 @@ class ConfigTest {
     @Test
     void blankDatabasePathIsRejected(@TempDir Path configDir) {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> ConfigLoader.parse(JsonParser.parseString("""
+                () -> ConfigLoader.parse(parseJson("""
                         { "database": { "path": "" } }
                         """).getAsJsonObject(), configDir));
 
@@ -83,7 +87,7 @@ class ConfigTest {
 
     @Test
     void invalidDiscordAllowlistIsDisabled(@TempDir Path configDir) {
-        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+        ModConfig config = ConfigLoader.parse(parseJson("""
                 {
                   "discord": {
                     "enabled": true,
@@ -101,7 +105,7 @@ class ConfigTest {
 
     @Test
     void malformedProviderFieldIsDisabled(@TempDir Path configDir) {
-        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+        ModConfig config = ConfigLoader.parse(parseJson("""
                 { "discord": { "enabled": {} } }
                 """).getAsJsonObject(), configDir);
 
@@ -135,7 +139,7 @@ class ConfigTest {
     void databaseDirectoryIsRejected(@TempDir Path configDir) throws IOException {
         Path databaseDirectory = Files.createDirectory(configDir.resolve("database"));
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> ConfigLoader.parse(JsonParser.parseString("""
+                () -> ConfigLoader.parse(parseJson("""
                         { "database": { "path": "%s" } }
                         """.formatted(databaseDirectory.toString().replace("\\", "\\\\"))).getAsJsonObject(), configDir));
 
