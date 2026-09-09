@@ -18,7 +18,7 @@ import java.util.concurrent.CompletionException;
 class RouterTest {
     @Test
     void primaryFailureFallsBackToTelegram() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "Alice"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("Alice"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeProvider discord = new FakeProvider("discord", true);
         FakeProvider telegram = new FakeProvider("telegram", false);
@@ -30,8 +30,21 @@ class RouterTest {
     }
 
     @Test
+    void startingProviderIsSkippedUntilHealthy() {
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("Alice"), RequestStatus.PENDING,
+                1, Instant.EPOCH, Instant.EPOCH, null, null, null);
+        FakeProvider starting = new FakeProvider("discord", false, ProviderHealth.STARTING);
+        FakeProvider telegram = new FakeProvider("telegram", false);
+        ApprovalInterfaceRouter router = new ApprovalInterfaceRouter(List.of(starting, telegram), RoutingMode.PRIMARY_FALLBACK);
+
+        List<PublicationRef> publications = router.publish(request).toCompletableFuture().join();
+
+        assertEquals(List.of("telegram"), publications.stream().map(PublicationRef::provider).toList());
+    }
+
+    @Test
     void fanoutExposesSuccessfulPublicationsWhenOneProviderFails() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "Alice"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("Alice"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeProvider discord = new FakeProvider("discord", false);
         FakeProvider telegram = new FakeProvider("telegram", true);
@@ -47,9 +60,15 @@ class RouterTest {
     private static final class FakeProvider implements ApprovalInterface {
         private final String id;
         private final boolean fails;
-        private FakeProvider(String id, boolean fails) { this.id = id; this.fails = fails; }
+        private final ProviderHealth health;
+        private FakeProvider(String id, boolean fails) { this(id, fails, ProviderHealth.HEALTHY); }
+        private FakeProvider(String id, boolean fails, ProviderHealth health) {
+            this.id = id;
+            this.fails = fails;
+            this.health = health;
+        }
         @Override public String id() { return id; }
-        @Override public ProviderHealth health() { return ProviderHealth.HEALTHY; }
+        @Override public ProviderHealth health() { return health; }
         @Override public java.util.concurrent.CompletionStage<PublicationRef> publish(RequestView request) {
             return fails ? CompletableFuture.failedFuture(new IllegalStateException("offline")) : CompletableFuture.completedFuture(new PublicationRef(id, "container", "message"));
         }

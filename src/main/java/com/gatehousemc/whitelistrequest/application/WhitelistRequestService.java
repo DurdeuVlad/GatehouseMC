@@ -3,13 +3,21 @@ package com.gatehousemc.whitelistrequest.application;
 import com.gatehousemc.whitelistrequest.domain.AttemptOutcome;
 import com.gatehousemc.whitelistrequest.domain.AttemptState;
 import com.gatehousemc.whitelistrequest.domain.PlayerIdentity;
+import com.gatehousemc.whitelistrequest.domain.RequestStatus;
+import com.gatehousemc.whitelistrequest.domain.WhitelistRequest;
 import com.gatehousemc.whitelistrequest.port.ClockPort;
 import com.gatehousemc.whitelistrequest.port.WorkflowRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class WhitelistRequestService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(WhitelistRequestService.class);
     private final WorkflowRepository repository;
     private final ClockPort clock;
     private final Duration denialCooldown;
@@ -40,5 +48,27 @@ public final class WhitelistRequestService {
 
     public RequestAdmissionCache cache() {
         return cache;
+    }
+
+    public void hydrateCache() {
+        repository.findByStatus(Optional.of(RequestStatus.PENDING), 500)
+                .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending()));
+        List<WhitelistRequest> blockedRequests = repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500);
+        for (WhitelistRequest request : blockedRequests) {
+            try {
+                if (repository.isBlocked(request.identity().normalizedUsername())) {
+                    cache.put(request.identity().normalizedUsername(), AdmissionState.blocked());
+                }
+            } catch (RuntimeException error) {
+                LOGGER.warn("Failed to check block status for {} during cache hydration", request.identity().normalizedUsername(), error);
+            }
+        }
+        repository.findByStatus(Optional.of(RequestStatus.DENIED), 500)
+                .forEach(request -> {
+                    Instant deniedUntil = request.resolvedAt().plus(denialCooldown);
+                    if (deniedUntil.isAfter(clock.now())) {
+                        cache.put(request.identity().normalizedUsername(), AdmissionState.deniedUntil(deniedUntil));
+                    }
+                });
     }
 }

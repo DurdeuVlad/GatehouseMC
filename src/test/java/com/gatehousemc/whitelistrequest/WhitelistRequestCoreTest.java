@@ -26,7 +26,7 @@ class WhitelistRequestCoreTest {
 
     @Test
     void normalizesWithoutChangingApprovalTarget() {
-        PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Alice");
+        PlayerIdentity identity = PlayerIdentity.of("Alice");
         assertEquals("alice", identity.normalizedUsername());
         assertEquals("Alice", identity.exactUsername());
     }
@@ -36,8 +36,8 @@ class WhitelistRequestCoreTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity first = PlayerIdentity.of(UUID.randomUUID(), "Alice");
-            PlayerIdentity caseVariant = PlayerIdentity.of(UUID.randomUUID(), "ALICE");
+            PlayerIdentity first = PlayerIdentity.of("Alice");
+            PlayerIdentity caseVariant = PlayerIdentity.of("ALICE");
 
             AttemptOutcome created = service.recordAttempt(first);
             AttemptOutcome repeated = service.recordAttempt(caseVariant);
@@ -49,7 +49,7 @@ class WhitelistRequestCoreTest {
             assertEquals("Alice", request.identity().exactUsername());
             assertEquals(first.offlineUuid(), request.identity().offlineUuid());
             assertEquals(2, request.attemptCount());
-            assertEquals(1, repository.readyOutbox(NOW, 10).size());
+            assertEquals(2, repository.readyOutbox(NOW, 10).size());
         }
     }
 
@@ -58,7 +58,7 @@ class WhitelistRequestCoreTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Bob");
+            PlayerIdentity identity = PlayerIdentity.of("Bob");
             service.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("bob").orElseThrow().id();
             DecisionService decisions = new DecisionService(repository, new FakeWhitelist(), clock, service.cache());
@@ -71,7 +71,8 @@ class WhitelistRequestCoreTest {
             AttemptOutcome afterCooldown = repository.recordAttempt(identity, later, Duration.ofDays(1));
             assertEquals(AttemptState.CREATED, afterCooldown.state());
             UUID secondId = repository.findActiveByName("bob").orElseThrow().id();
-            DecisionResult blocked = decisions.decide(secondId, DecisionAction.BLOCK, AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join();
+            DecisionService laterDecisions = new DecisionService(repository, new FakeWhitelist(), () -> later, service.cache());
+            DecisionResult blocked = laterDecisions.decide(secondId, DecisionAction.BLOCK, AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join();
             assertEquals(DecisionOutcome.BLOCKED, blocked.outcome());
             assertEquals(AttemptState.BLOCKED, service.recordAttempt(identity).state());
         }
@@ -82,13 +83,15 @@ class WhitelistRequestCoreTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Carol");
+            PlayerIdentity identity = PlayerIdentity.of("Carol");
             service.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("carol").orElseThrow().id();
             CompletableFuture<Void> whitelistResult = new CompletableFuture<>();
-            DecisionService decisions = new DecisionService(repository, new FakeWhitelist(whitelistResult), clock, service.cache());
+            FakeWhitelist whitelist = new FakeWhitelist(whitelistResult);
+            DecisionService decisions = new DecisionService(repository, whitelist, clock, service.cache());
 
             var approval = decisions.decide(requestId, DecisionAction.APPROVE, AdminPrincipal.console(), Optional.empty());
+            whitelist.addStarted.join();
             DecisionResult loser = decisions.decide(requestId, DecisionAction.DENY, AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join();
             assertEquals(DecisionOutcome.RESOLVING, loser.outcome());
             whitelistResult.complete(null);
@@ -103,11 +106,15 @@ class WhitelistRequestCoreTest {
 
     private static final class FakeWhitelist implements VanillaWhitelistPort {
         private final CompletableFuture<Void> addResult;
+        private final CompletableFuture<Void> addStarted = new CompletableFuture<>();
 
         private FakeWhitelist() { this(CompletableFuture.completedFuture(null)); }
         private FakeWhitelist(CompletableFuture<Void> addResult) { this.addResult = addResult; }
 
         @Override public CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity) { return CompletableFuture.completedFuture(false); }
-        @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) { return addResult; }
+        @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) {
+            addStarted.complete(null);
+            return addResult;
+        }
     }
 }

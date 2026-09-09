@@ -1,5 +1,6 @@
 package com.gatehousemc.whitelistrequest.domain;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -10,8 +11,8 @@ public record PlayerIdentity(UUID offlineUuid, String exactUsername, String norm
         Objects.requireNonNull(offlineUuid, "offlineUuid");
         Objects.requireNonNull(exactUsername, "exactUsername");
         Objects.requireNonNull(normalizedUsername, "normalizedUsername");
-        if (exactUsername.isBlank() || exactUsername.length() > 16) {
-            throw new IllegalArgumentException("Username must contain 1-16 characters");
+        if (!exactUsername.matches("[A-Za-z0-9_]{1,16}")) {
+            throw new IllegalArgumentException("Username must contain 1-16 ASCII letters, digits, or underscores");
         }
         String expected = exactUsername.toLowerCase(Locale.ROOT);
         if (!expected.equals(normalizedUsername)) {
@@ -19,8 +20,23 @@ public record PlayerIdentity(UUID offlineUuid, String exactUsername, String norm
         }
     }
 
-    public static PlayerIdentity of(UUID offlineUuid, String exactUsername) {
+    public static PlayerIdentity of(String exactUsername) {
         Objects.requireNonNull(exactUsername, "exactUsername");
+        return new PlayerIdentity(offlineUuidFor(exactUsername), exactUsername, exactUsername.toLowerCase(Locale.ROOT));
+    }
+
+    public static PlayerIdentity of(UUID offlineUuid, String exactUsername) {
+        Objects.requireNonNull(offlineUuid, "offlineUuid");
+        Objects.requireNonNull(exactUsername, "exactUsername");
+        UUID expected = offlineUuidFor(exactUsername);
+        if (!offlineUuid.equals(expected)) {
+            throw new IllegalArgumentException("offlineUuid must match the offline player UUID for " + exactUsername);
+        }
         return new PlayerIdentity(offlineUuid, exactUsername, exactUsername.toLowerCase(Locale.ROOT));
+    }
+
+    public static UUID offlineUuidFor(String exactUsername) {
+        Objects.requireNonNull(exactUsername, "exactUsername");
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + exactUsername).getBytes(StandardCharsets.UTF_8));
     }
 }

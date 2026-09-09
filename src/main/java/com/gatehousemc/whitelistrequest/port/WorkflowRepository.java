@@ -28,11 +28,13 @@ public interface WorkflowRepository extends AutoCloseable {
 
     boolean finalizeApproval(UUID requestId, UUID token, AdminPrincipal actor, String reason, Instant now);
 
-    boolean resetApproval(UUID requestId, UUID token, String error, Instant now);
+    boolean resetApproval(UUID requestId, UUID token, AdminPrincipal actor, String error, Instant now);
 
     List<WhitelistRequest> findResolvingApprovals();
 
     boolean unblock(String normalizedUsername, AdminPrincipal actor, String reason, Instant now);
+
+    boolean isBlocked(String normalizedUsername);
 
     List<OutboxEvent> readyOutbox(Instant now, int limit);
 

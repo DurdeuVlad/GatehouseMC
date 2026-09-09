@@ -3,6 +3,8 @@ package com.gatehousemc.whitelistrequest.integration.telegram;
 import com.gatehousemc.whitelistrequest.application.DecisionService;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.integration.common.ApprovalMessageRenderer;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
 import com.gatehousemc.whitelistrequest.port.ApprovalInterface;
 import com.gatehousemc.whitelistrequest.port.ProviderHealth;
 import com.google.gson.JsonArray;
@@ -22,7 +24,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     private final ModConfig.Telegram config;
     private final DecisionService decisions;
     private volatile ProviderHealth health = ProviderHealth.STOPPED;
-    private volatile TelegramApiClient api;
+    private volatile TelegramTransport api;
     private volatile ExecutorService poller;
     private volatile boolean running;
     private volatile long offset;
@@ -30,6 +32,14 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     public TelegramApprovalInterface(ModConfig.Telegram config, DecisionService decisions) {
         this.config = config;
         this.decisions = decisions;
+    }
+
+    /** Package-private constructor for fake-transport testing. */
+    TelegramApprovalInterface(ModConfig.Telegram config, DecisionService decisions, TelegramTransport transport) {
+        this.config = config;
+        this.decisions = decisions;
+        this.api = transport;
+        this.health = ProviderHealth.HEALTHY;
     }
 
     @Override
@@ -66,7 +76,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
 
     @Override
     public CompletionStage<PublicationRef> publish(RequestView request) {
-        TelegramApiClient current = api;
+        TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
         String payload = "{\"chat_id\":\"" + json(config.chatId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), false) + "}";
         return current.post("sendMessage", payload).thenApply(body -> {
@@ -77,7 +87,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
 
     @Override
     public CompletionStage<Void> update(PublicationRef publication, RequestView request) {
-        TelegramApiClient current = api;
+        TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
         String payload = "{\"chat_id\":\"" + json(publication.containerId()) + "\",\"message_id\":\"" + json(publication.messageId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status().isTerminal()) + "}";
         return current.post("editMessageText", payload).thenApply(ignored -> null);
@@ -107,7 +117,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         JsonObject message = callback.getAsJsonObject("message");
         String chatId = message.getAsJsonObject("chat").get("id").getAsString();
         String userId = from.get("id").getAsString();
-        ParsedAction action = parse(callback.get("data").getAsString());
+        CallbackActionParser.ParsedAction action = CallbackActionParser.parse(callback.get("data").getAsString());
         if (action == null || !config.chatId().equals(chatId) || !config.allowedUserIds().contains(userId)) {
             api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\",\"text\":\"Not authorized\",\"show_alert\":true}");
             return;
@@ -118,13 +128,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     }
 
     private static String render(RequestView request) {
-        return "Whitelist request\n" +
-                "Player: " + request.identity().exactUsername() + "\n" +
-                "Offline UUID: " + request.identity().offlineUuid() + "\n" +
-                "Identity: OFFLINE / UNAUTHENTICATED\n" +
-                "Attempts: " + request.attemptCount() + "\n" +
-                "Request: " + request.id() + "\n" +
-                "Status: " + request.status();
+        return ApprovalMessageRenderer.render(request);
     }
 
     private static String keyboard(UUID requestId, boolean disabled) {
@@ -135,24 +139,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
                 "{\"text\":\"🚫 Block\",\"callback_data\":\"wr:b:" + requestId + "\"}]]}";
     }
 
-    private static ParsedAction parse(String value) {
-        if (value == null || !value.startsWith("wr:")) return null;
-        String[] parts = value.split(":", 3);
-        if (parts.length != 3) return null;
-        try {
-            DecisionAction action = switch (parts[1]) {
-                case "a" -> DecisionAction.APPROVE;
-                case "d" -> DecisionAction.DENY;
-                case "b" -> DecisionAction.BLOCK;
-                default -> null;
-            };
-            return action == null ? null : new ParsedAction(action, UUID.fromString(parts[2]));
-        } catch (IllegalArgumentException ignored) { return null; }
-    }
-
     private static String json(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
     }
-
-    private record ParsedAction(DecisionAction action, UUID requestId) {}
 }

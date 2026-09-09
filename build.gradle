@@ -16,12 +16,9 @@ repositories {
 }
 
 loom {
-    splitEnvironmentSourceSets()
-
     mods {
         "whitelistrequest" {
             sourceSet sourceSets.main
-            sourceSet sourceSets.client
         }
     }
 }
@@ -47,7 +44,7 @@ processResources {
     inputs.property "version", project.version
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version, "loader_version": project.loader_version
+        expand "version": project.version, "loader_version": project.loader_version, "fabric_version": project.fabric_version, "minecraft_version": project.minecraft_version
     }
 }
 

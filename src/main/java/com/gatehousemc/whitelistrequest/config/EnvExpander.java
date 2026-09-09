@@ -11,6 +11,17 @@ public final class EnvExpander {
 
     public static String expand(String value, Map<String, String> environment) {
         Matcher matcher = PLACEHOLDER.matcher(value);
+        int searchFrom = 0;
+        int placeholderStart;
+        while ((placeholderStart = value.indexOf("${", searchFrom)) >= 0) {
+            matcher.region(placeholderStart, value.length());
+            if (!matcher.lookingAt()) {
+                throw new IllegalArgumentException("Malformed environment placeholder");
+            }
+            searchFrom = matcher.end();
+        }
+
+        matcher.reset();
         StringBuffer result = new StringBuffer();
         while (matcher.find()) {
             String replacement = environment.get(matcher.group(1));

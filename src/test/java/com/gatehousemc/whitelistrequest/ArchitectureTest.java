@@ -25,7 +25,7 @@ class ArchitectureTest {
         Path sourceRoot = Path.of("src/main/java/com/gatehousemc/whitelistrequest");
         try (Stream<Path> files = Files.walk(sourceRoot)) {
             files.filter(Files::isRegularFile)
-                    .filter(path -> CORE_PACKAGES.stream().anyMatch(path.toString()::contains))
+                    .filter(path -> CORE_PACKAGES.stream().anyMatch(pkg -> path.toString().replace('\\', '/').contains("/" + pkg + "/")))
                     .filter(path -> path.toString().endsWith(".java"))
                     .forEach(path -> {
                         try {

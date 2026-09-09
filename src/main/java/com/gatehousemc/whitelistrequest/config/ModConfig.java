@@ -14,9 +14,29 @@ public record ModConfig(Requests requests, Database database, Routing routing, D
     public record Discord(boolean enabled, String token, String guildId, String channelId,
                           List<String> allowedUserIds, List<String> allowedRoleIds) {
         public Discord { allowedUserIds = List.copyOf(allowedUserIds); allowedRoleIds = List.copyOf(allowedRoleIds); }
+
+        @Override
+        public String toString() {
+            return "Discord{" +
+                    "enabled=" + enabled +
+                    ", guildId='" + guildId + '\'' +
+                    ", channelId='" + channelId + '\'' +
+                    ", allowedUserIds=" + allowedUserIds +
+                    ", allowedRoleIds=" + allowedRoleIds +
+                    '}';
+        }
     }
     public record Telegram(boolean enabled, String token, String chatId, List<String> allowedUserIds) {
         public Telegram { allowedUserIds = List.copyOf(allowedUserIds); }
+
+        @Override
+        public String toString() {
+            return "Telegram{" +
+                    "enabled=" + enabled +
+                    ", chatId='" + chatId + '\'' +
+                    ", allowedUserIds=" + allowedUserIds +
+                    '}';
+        }
     }
 
     public static ModConfig defaults(Path configDir) {

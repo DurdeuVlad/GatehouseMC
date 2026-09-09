@@ -71,6 +71,6 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-The current repository includes pure core, SQLite component, router, configuration, Fabric/Mixin, command, Discord, Telegram, migration, packaged-runtime, and headless client foundations. `./gradlew test` and `./gradlew build` are green. A real Fabric server smoke path has proven rejection → persistence → approval → native whitelist → reconnect. The complete dedicated-server acceptance matrix in `docs/TESTING.md` remains a release gate and must be run before publishing a release.
+All unit, component, architecture, router, and fake-transport tests pass. A real Fabric 1.21.1 dedicated server has proven: rejection -> persistence -> approval -> native whitelist mutation -> reconnect -> restart persistence, and distinct player-facing messages for first-request, pending, denied, blocked, and degraded states. The production jar nests SQLite and JDA and runs on a clean server with no additional dependencies.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), and [`docs/OSS.md`](docs/OSS.md) for project policy and handoff status.

@@ -10,7 +10,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 
-final class TelegramApiClient {
+final class TelegramApiClient implements TelegramTransport {
     private final String baseUrl;
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -18,7 +18,7 @@ final class TelegramApiClient {
         this.baseUrl = "https://api.telegram.org/bot" + token + "/";
     }
 
-    CompletableFuture<JsonObject> post(String method, String payload) {
+    public CompletableFuture<JsonObject> post(String method, String payload) {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + method))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
