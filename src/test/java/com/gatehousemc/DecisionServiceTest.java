@@ -178,9 +178,9 @@ class DecisionServiceTest {
 
     @Test
     void decisionPersistenceRunsOnProvidedWorkerExecutor(@TempDir Path temp) throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "decision-worker"));
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
-             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database);
-             ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "decision-worker"))) {
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
             requests.recordAttempt(PlayerIdentity.of("WorkerPlayer"));
@@ -192,6 +192,8 @@ class DecisionServiceTest {
             assertEquals(DecisionOutcome.APPROVED, decisions.decide(requestId, DecisionAction.APPROVE,
                     AdminPrincipal.console(), Optional.empty()).toCompletableFuture().join().outcome());
             assertEquals("decision-worker", whitelist.addThread.get());
+        } finally {
+            executor.shutdownNow();
         }
     }
 
