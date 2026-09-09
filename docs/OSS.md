@@ -72,19 +72,52 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 ## 5. Branch/release policy
 
-Initial project can keep a simple model:
+### 5.1 Long-lived branches
+
+| Branch   | Minecraft | Status              | Notes |
+|----------|-----------|---------------------|-------|
+| `main`   | 1.21.1    | Active trunk        | Fast-forward mirror of `1.21.1`; all feature work merges here first |
+| `1.21.1` | 1.21.1    | LTS / maintenance   | Created from `main` at v1.0.0. Bug-fixes and security patches only. Merge-down from `main` cherry-picked by maintainer. |
+| `1.21.4` | 1.21.4    | Active development  | Created from `1.21.1` at v1.0.0. Receives same feature/fix PRs after acceptance on `main`/`1.21.1`. |
+
+Short-lived branches follow this naming convention:
 
 ```text
-master/main         active production trunk for Minecraft 1.21.1
-release/v*          release staging when needed
-feat/*              feature work
-fix/*               fixes
-docs/*              documentation
+feat/*      feature work (merges to main)
+fix/*       bug/security fixes (merges to main, then cherry-pick to version branches)
+docs/*      documentation-only changes
+chore/*     build, tooling, dependency bumps
 ```
 
-Do not create historical Minecraft branches until there is an explicit support commitment.
+### 5.2 Merge direction
 
-If additional Minecraft versions become LTS targets later, use a HeapHammer-style version-branch policy rather than an unbounded branch per game version.
+```
+feat/* ──► main ──► 1.21.1 ──cherry-pick──► 1.21.4
+                                fix/*  ─────────────►
+```
+
+- Features land on `main` first.
+- Bug-fixes that apply to all versions are cherry-picked to `1.21.1` and `1.21.4` individually.
+- Never merge `1.21.4` back into `main` or `1.21.1`.
+
+### 5.3 Adding future Minecraft versions
+
+When a new Minecraft version becomes a target:
+
+1. Create a branch named after the version (e.g. `1.22.1`) from the nearest existing version branch.
+2. Update `gradle.properties` with the new `minecraft_version`, `yarn_mappings`, and `fabric_version`.
+3. Verify the Mixin target (`PlayerManager#checkCanJoin`) exists in the new mapping set.
+4. Run `./gradlew clean test build` and boot a real dedicated server.
+5. Record verified version pins in `docs/RESEARCH.md`.
+6. Update this table.
+
+### 5.4 Branch deprecation
+
+A version branch is deprecated when the corresponding Minecraft release is no longer widely used in active servers. Deprecated branches receive no further commits; they are archived (not deleted) on GitHub.
+
+### 5.5 Release branches
+
+Releases are tagged directly on the relevant version branch (e.g. `git tag v1.0.0` on `1.21.1`). No separate `release/*` staging branches are needed unless the release workflow requires pre-release review.
 
 ---
 
