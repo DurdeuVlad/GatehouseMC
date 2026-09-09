@@ -82,7 +82,12 @@ public final class WhitelistRequestMod implements ModInitializer {
     public static Text handleWhitelistDenial(GameProfile profile) {
         FabricRuntime current = runtime;
         if (current == null) return Text.literal("You are not whitelisted on this server. Please contact a server administrator.");
-        return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
+        try {
+            return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
+        } catch (Exception error) {
+            LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
+            return Text.literal("You are not whitelisted on this server. The whitelist request service is temporarily unavailable. Please contact a server administrator.");
+        }
     }
 
     public static FabricRuntime runtime() {
