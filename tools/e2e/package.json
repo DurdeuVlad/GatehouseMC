@@ -9,6 +9,7 @@
     "minecraft-protocol": "1.66.2"
   },
   "scripts": {
-    "smoke": "node src/smoke.mjs"
+    "smoke": "node src/smoke.mjs",
+    "e2e": "node src/run-e2e.mjs"
   }
 }
