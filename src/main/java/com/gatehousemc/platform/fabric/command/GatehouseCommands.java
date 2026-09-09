@@ -7,7 +7,8 @@ import com.gatehousemc.platform.fabric.GatehouseMod;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.command.CommandSource;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.LiteralText;
@@ -16,6 +17,7 @@ import net.minecraft.text.Text;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 public final class GatehouseCommands {
@@ -37,7 +39,7 @@ public final class GatehouseCommands {
                 .then(CommandManager.literal("list")
                         .executes(context -> list(context, runtimeSupplier, Optional.empty()))
                         .then(CommandManager.argument("status", StringArgumentType.word())
-                                .suggests((context, builder) -> CommandSource.suggestMatching(new String[]{"pending", "approved", "denied", "blocked"}, builder))
+                                .suggests((context, builder) -> suggestMatching(new String[]{"pending", "approved", "denied", "blocked"}, builder))
                                 .executes(context -> list(context, runtimeSupplier, parseStatus(context.getArgument("status", String.class))))))
                 .then(CommandManager.literal("show")
                         .then(CommandManager.argument("request", StringArgumentType.word()).executes(context -> show(context, runtimeSupplier))))
@@ -183,5 +185,16 @@ public final class GatehouseCommands {
         Throwable cause = error;
         while (cause.getCause() != null) cause = cause.getCause();
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+    }
+
+    private static CompletableFuture<Suggestions> suggestMatching(
+            String[] candidates, SuggestionsBuilder builder) {
+        String remaining = builder.getRemaining().toLowerCase(Locale.ROOT);
+        for (String candidate : candidates) {
+            if (candidate.toLowerCase(Locale.ROOT).startsWith(remaining)) {
+                builder.suggest(candidate);
+            }
+        }
+        return builder.buildFuture();
     }
 }
