@@ -110,8 +110,12 @@ public final class FabricRuntime implements AutoCloseable {
                 .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending()));
         List<WhitelistRequest> blockedRequests = repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500);
         for (WhitelistRequest request : blockedRequests) {
-            if (repository.isBlocked(request.identity().normalizedUsername())) {
-                cache.put(request.identity().normalizedUsername(), AdmissionState.blocked());
+            try {
+                if (repository.isBlocked(request.identity().normalizedUsername())) {
+                    cache.put(request.identity().normalizedUsername(), AdmissionState.blocked());
+                }
+            } catch (RuntimeException error) {
+                WhitelistRequestMod.LOGGER.warn("Failed to check block status for {} during cache hydration", request.identity().normalizedUsername(), error);
             }
         }
         repository.findByStatus(Optional.of(RequestStatus.DENIED), 500)

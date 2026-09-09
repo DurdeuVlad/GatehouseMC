@@ -134,9 +134,14 @@ public final class WhitelistRequestCommands {
         if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
         ServerCommandSource source = context.getSource();
         runtime.commandExecutor().execute(() -> {
-            long pending = runtime.repository().pendingOutboxCount();
-            source.getServer().execute(() ->
-                    source.sendFeedback(() -> Text.literal("health=HEALTHY queue=" + runtime.queueSize() + " outbox=" + pending), false));
+            try {
+                long pending = runtime.repository().pendingOutboxCount();
+                source.getServer().execute(() ->
+                        source.sendFeedback(() -> Text.literal("health=HEALTHY queue=" + runtime.queueSize() + " outbox=" + pending), false));
+            } catch (RuntimeException error) {
+                source.getServer().execute(() ->
+                        source.sendFeedback(() -> Text.literal("health=DEGRADED queue=" + runtime.queueSize() + " outbox=unavailable: " + safeMessage(error)), false));
+            }
         });
         return 1;
     }

@@ -1,6 +1,7 @@
 package com.gatehousemc.whitelistrequest.persistence.sqlite;
 
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.port.StorageException;
 import com.gatehousemc.whitelistrequest.port.WorkflowRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +33,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                                          int retriesRemaining) {
         try {
             connection.setAutoCommit(false);
-            if (isBlocked(identity.normalizedUsername())) {
+            if (isBlockedInternal(identity.normalizedUsername())) {
                 audit(null, "ATTEMPT_BLOCKED", null, null, null, "{\"username\":\"" + escape(identity.exactUsername()) + "\"}", now);
                 connection.commit();
                 return AttemptOutcome.of(AttemptState.BLOCKED, null);
@@ -318,7 +319,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 return requests;
             }
         } catch (SQLException exception) {
-            return List.of();
+            throw new StorageException("Failed to query resolving approvals", exception);
         }
     }
 
@@ -349,7 +350,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
         try {
             return isBlockedInternal(normalizedUsername);
         } catch (SQLException exception) {
-            return false;
+            throw new StorageException("Failed to check block status for " + normalizedUsername, exception);
         }
     }
 
@@ -415,7 +416,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 return result.next() ? result.getLong(1) : 0;
             }
         } catch (SQLException exception) {
-            return -1;
+            throw new StorageException("Failed to count pending outbox events", exception);
         }
     }
 
