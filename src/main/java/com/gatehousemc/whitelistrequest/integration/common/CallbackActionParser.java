@@ -12,7 +12,7 @@ public final class CallbackActionParser {
     private CallbackActionParser() {}
 
     /**
-     * Parses a callback value of the form {@code wr:<a|d|b>:<uuid>}.
+     * Parses a callback value of the form {@code wr:<a|d|b|u>:<uuid>}.
      *
      * @return the parsed action, or {@code null} if the value is malformed.
      */
@@ -25,6 +25,7 @@ public final class CallbackActionParser {
                 case "a" -> DecisionAction.APPROVE;
                 case "d" -> DecisionAction.DENY;
                 case "b" -> DecisionAction.BLOCK;
+                case "u" -> DecisionAction.UNDO;
                 default -> null;
             };
             return action == null ? null : new ParsedAction(action, UUID.fromString(parts[2]));

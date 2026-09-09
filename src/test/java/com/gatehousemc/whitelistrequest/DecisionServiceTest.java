@@ -197,6 +197,7 @@ class DecisionServiceTest {
 
     private static class CountingWhitelist implements VanillaWhitelistPort {
         protected final AtomicInteger addCalls = new AtomicInteger();
+        protected final AtomicInteger removeCalls = new AtomicInteger();
         protected final AtomicReference<String> addThread = new AtomicReference<>();
 
         @Override public CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity) {
@@ -206,6 +207,11 @@ class DecisionServiceTest {
         @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) {
             addCalls.incrementAndGet();
             addThread.set(Thread.currentThread().getName());
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
+            removeCalls.incrementAndGet();
             return CompletableFuture.completedFuture(null);
         }
     }
@@ -224,6 +230,10 @@ class DecisionServiceTest {
         }
 
         @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
             return CompletableFuture.completedFuture(null);
         }
     }

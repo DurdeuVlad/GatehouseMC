@@ -63,6 +63,10 @@ class DecisionConcurrencyTest {
             return result;
         }
 
+        @Override public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         private void complete() {
             result.complete(null);
         }

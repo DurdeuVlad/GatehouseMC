@@ -28,6 +28,14 @@ public final class FabricVanillaWhitelistAdapter implements VanillaWhitelistPort
         });
     }
 
+    @Override
+    public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
+        return onServerThread(() -> {
+            server.getPlayerManager().getWhitelist().remove(profile(identity));
+            return null;
+        });
+    }
+
     private GameProfile profile(PlayerIdentity identity) {
         return new GameProfile(identity.offlineUuid(), identity.exactUsername());
     }

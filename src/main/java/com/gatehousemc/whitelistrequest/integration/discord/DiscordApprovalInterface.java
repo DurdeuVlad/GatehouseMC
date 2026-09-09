@@ -3,6 +3,7 @@ package com.gatehousemc.whitelistrequest.integration.discord;
 import com.gatehousemc.whitelistrequest.application.DecisionService;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.integration.common.ApprovalMessageRenderer;
 import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
 import com.gatehousemc.whitelistrequest.port.ApprovalInterface;
@@ -94,18 +95,18 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         String customId = event.getComponentId();
         CallbackActionParser.ParsedAction action = CallbackActionParser.parse(customId);
         if (action == null) {
-            event.reply("Invalid whitelist request action.").setEphemeral(true).queue();
+            event.reply(Messages.get("provider.invalid_action")).setEphemeral(true).queue();
             return;
         }
         if (!authorized(event)) {
-            event.reply("You are not authorized to resolve whitelist requests.").setEphemeral(true).queue();
+            event.reply(Messages.get("provider.not_authorized")).setEphemeral(true).queue();
             return;
         }
         event.deferReply(true).queue();
         decisions.decide(action.requestId(), action.action(),
                         new AdminPrincipal("discord", event.getUser().getId(), event.getUser().getEffectiveName()), Optional.empty())
                 .thenAccept(result -> event.getHook().sendMessage(result.message()).setEphemeral(true).queue())
-                .exceptionally(error -> { event.getHook().sendMessage("Decision failed.").setEphemeral(true).queue(); return null; });
+                .exceptionally(error -> { event.getHook().sendMessage(Messages.get("provider.decision_failed")).setEphemeral(true).queue(); return null; });
     }
 
     private boolean authorized(ButtonInteractionEvent event) {

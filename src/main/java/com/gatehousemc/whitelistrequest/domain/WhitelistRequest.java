@@ -58,9 +58,10 @@ public record WhitelistRequest(
 
     private static void requireResolvingMetadata(Instant resolvedAt, AdminPrincipal resolvedBy,
                                                  DecisionAction resolvingAction, UUID resolvingToken) {
-        if (resolvedAt != null || resolvedBy == null || resolvingAction != DecisionAction.APPROVE
+        if (resolvedAt != null || resolvedBy == null
+                || (resolvingAction != DecisionAction.APPROVE && resolvingAction != DecisionAction.UNDO)
                 || resolvingToken == null) {
-            throw new IllegalArgumentException("RESOLVING request requires an approval claim");
+            throw new IllegalArgumentException("RESOLVING request requires an approval or undo claim");
         }
     }
 

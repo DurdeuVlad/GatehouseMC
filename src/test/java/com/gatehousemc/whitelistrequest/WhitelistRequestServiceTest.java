@@ -90,5 +90,9 @@ class WhitelistRequestServiceTest {
         @Override public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) {
             return CompletableFuture.completedFuture(null);
         }
+
+        @Override public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
+            return CompletableFuture.completedFuture(null);
+        }
     }
 }

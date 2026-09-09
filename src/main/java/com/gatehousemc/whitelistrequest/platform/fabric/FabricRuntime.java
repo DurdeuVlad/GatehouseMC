@@ -3,6 +3,7 @@ package com.gatehousemc.whitelistrequest.platform.fabric;
 import com.gatehousemc.whitelistrequest.application.*;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.persistence.sqlite.SqliteDatabase;
 import com.gatehousemc.whitelistrequest.persistence.sqlite.SqliteWorkflowRepository;
 import com.gatehousemc.whitelistrequest.port.ClockPort;
@@ -155,10 +156,10 @@ public final class FabricRuntime implements AutoCloseable {
         AdmissionState known = cache.get(identity.normalizedUsername());
         if (!worker.offer(identity)) return messagesUnavailable(identity.exactUsername());
         return switch (known.kind()) {
-            case BLOCKED -> Text.literal("Whitelist requests for this username are blocked. Please contact a server administrator.");
-            case DENIED -> Text.literal("Your whitelist request was denied recently. Please contact a server administrator if you need another review.");
-            case PENDING -> Text.literal("Your whitelist request is still pending. Player: " + identity.exactUsername() + ". Ask a server administrator to approve it, then reconnect.");
-            case UNKNOWN -> Text.literal("You are not whitelisted on this server. A whitelist request has been queued automatically. Player: " + identity.exactUsername() + ". Ask a server administrator to approve the request, then reconnect.");
+            case BLOCKED -> Text.literal(Messages.get("reject.blocked"));
+            case DENIED -> Text.literal(Messages.get("reject.denied"));
+            case PENDING -> Text.literal(Messages.get("reject.pending", identity.exactUsername()));
+            case UNKNOWN -> Text.literal(Messages.get("reject.unknown", identity.exactUsername()));
             case DEGRADED -> messagesUnavailable(identity.exactUsername());
         };
     }
@@ -175,7 +176,7 @@ public final class FabricRuntime implements AutoCloseable {
     public Optional<WhitelistRequest> active(String username) { return repository == null ? Optional.empty() : repository.findActiveByName(username.toLowerCase(java.util.Locale.ROOT)); }
 
     private static Text messagesUnavailable(String username) {
-        return Text.literal("You are not whitelisted on this server. The whitelist request service is temporarily unavailable. Please contact a server administrator.");
+        return Text.literal(Messages.get("reject.unavailable"));
     }
 
     @Override

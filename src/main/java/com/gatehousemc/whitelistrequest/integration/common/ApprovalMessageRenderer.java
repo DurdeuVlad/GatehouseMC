@@ -1,6 +1,7 @@
 package com.gatehousemc.whitelistrequest.integration.common;
 
 import com.gatehousemc.whitelistrequest.domain.RequestView;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 
 /**
  * Shared plain-text rendering of a whitelist request summary for approval messages.
@@ -10,12 +11,12 @@ public final class ApprovalMessageRenderer {
     private ApprovalMessageRenderer() {}
 
     public static String render(RequestView request) {
-        return "Whitelist request\n" +
-                "Player: " + request.identity().exactUsername() + "\n" +
-                "Offline UUID: " + request.identity().offlineUuid() + "\n" +
-                "Identity: OFFLINE / UNAUTHENTICATED\n" +
-                "Attempts: " + request.attemptCount() + "\n" +
-                "Request: " + request.id() + "\n" +
-                "Status: " + request.status();
+        return Messages.get("request.title") + "\n" +
+                Messages.get("request.player") + ": " + request.identity().exactUsername() + "\n" +
+                Messages.get("request.offline_uuid") + ": " + request.identity().offlineUuid() + "\n" +
+                Messages.get("request.identity") + "\n" +
+                Messages.get("request.attempts") + ": " + request.attemptCount() + "\n" +
+                Messages.get("request.id") + ": " + request.id() + "\n" +
+                Messages.get("request.status") + ": " + request.status();
     }
 }

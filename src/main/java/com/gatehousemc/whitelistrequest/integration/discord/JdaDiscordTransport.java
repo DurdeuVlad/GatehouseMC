@@ -1,5 +1,6 @@
 package com.gatehousemc.whitelistrequest.integration.discord;
 
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -51,9 +52,10 @@ final class JdaDiscordTransport implements DiscordTransport {
 
     private static Button[] actionButtons(UUID requestId, boolean disabled) {
         return new Button[]{
-                Button.success("wr:a:" + requestId, "Approve").withDisabled(disabled),
-                Button.danger("wr:d:" + requestId, "Deny").withDisabled(disabled),
-                Button.secondary("wr:b:" + requestId, "Block").withDisabled(disabled)
+                Button.success("wr:a:" + requestId, Messages.get("button.approve")).withDisabled(disabled),
+                Button.danger("wr:d:" + requestId, Messages.get("button.deny")).withDisabled(disabled),
+                Button.secondary("wr:b:" + requestId, Messages.get("button.block")).withDisabled(disabled),
+                Button.secondary("wr:u:" + requestId, Messages.get("button.undo")).withDisabled(disabled)
         };
     }
 }

@@ -114,7 +114,8 @@ class ConfigTest {
         ModConfig config = new ModConfig(defaults.requests(), defaults.database(), defaults.routing(),
                 new ModConfig.Discord(true, "discord-secret", "123456789012345678", "123456789012345678",
                         List.of("123456789012345678"), List.of()),
-                new ModConfig.Telegram(true, "telegram-secret", "-1001234567890", List.of("123456789")));
+                new ModConfig.Telegram(true, "telegram-secret", "-1001234567890", List.of("123456789")),
+                "en_us");
 
         assertFalse(config.toString().contains("discord-secret"));
         assertFalse(config.toString().contains("telegram-secret"));

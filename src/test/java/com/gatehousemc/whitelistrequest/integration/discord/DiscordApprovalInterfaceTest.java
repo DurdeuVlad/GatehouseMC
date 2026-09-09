@@ -58,6 +58,10 @@ class DiscordApprovalInterfaceTest {
 
         DiscordApprovalInterface.ParsedAction block = DiscordApprovalInterface.parseAction("wr:b:" + id);
         assertEquals(DecisionAction.BLOCK, block.action());
+
+        DiscordApprovalInterface.ParsedAction undo = DiscordApprovalInterface.parseAction("wr:u:" + id);
+        assertEquals(DecisionAction.UNDO, undo.action());
+        assertEquals(id, undo.requestId());
     }
 
     @Test

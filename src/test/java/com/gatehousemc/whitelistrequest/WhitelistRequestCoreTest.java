@@ -116,5 +116,8 @@ class WhitelistRequestCoreTest {
             addStarted.complete(null);
             return addResult;
         }
+        @Override public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
+            return CompletableFuture.completedFuture(null);
+        }
     }
 }

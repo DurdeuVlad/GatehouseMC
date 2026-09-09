@@ -1,6 +1,7 @@
 package com.gatehousemc.whitelistrequest.application;
 
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.port.ClockPort;
 import com.gatehousemc.whitelistrequest.port.VanillaWhitelistPort;
 import com.gatehousemc.whitelistrequest.port.WorkflowRepository;
@@ -52,10 +53,13 @@ public final class DecisionService {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(reason, "reason");
         String cleanReason = reason.orElse("").trim();
-        if (action != DecisionAction.APPROVE) {
-            return CompletableFuture.supplyAsync(() -> decideTerminal(requestId, action, actor, cleanReason), decisionExecutor);
+        if (action == DecisionAction.APPROVE) {
+            return claimAndApprove(requestId, actor, cleanReason);
         }
-        return claimAndApprove(requestId, actor, cleanReason);
+        if (action == DecisionAction.UNDO) {
+            return undoAsync(requestId, actor, cleanReason);
+        }
+        return CompletableFuture.supplyAsync(() -> decideTerminal(requestId, action, actor, cleanReason), decisionExecutor);
     }
 
     private CompletionStage<DecisionResult> claimAndApprove(UUID requestId, AdminPrincipal actor, String reason) {
@@ -98,6 +102,16 @@ public final class DecisionService {
             }
             recoveries.add(recovery);
         }
+        for (WhitelistRequest request : repository.findResolvingUndos()) {
+            CompletableFuture<Void> recovery;
+            try {
+                recovery = vanillaWhitelist.isWhitelisted(request.identity())
+                        .handleAsync((allowed, error) -> recoverUndo(request, allowed, error), decisionExecutor);
+            } catch (Throwable error) {
+                recovery = CompletableFuture.completedFuture(recoverUndo(request, false, error));
+            }
+            recoveries.add(recovery);
+        }
         return CompletableFuture.allOf(recoveries.toArray(CompletableFuture[]::new));
     }
 
@@ -108,6 +122,73 @@ public final class DecisionService {
         return new DecisionResult(result.outcome(), result.request(), result.message());
     }
 
+    /**
+     * Reverses a prior terminal decision, returning the request to PENDING.
+     * For APPROVED, also removes the player from the vanilla whitelist using
+     * the same crash-aware claim/finalize pattern as approval: the request is
+     * first moved to RESOLVING (claim), then the whitelist is mutated, then the
+     * request is finalized to PENDING. If the whitelist mutation fails, the
+     * request is reset back to APPROVED.
+     */
+    private CompletionStage<DecisionResult> undoAsync(UUID requestId, AdminPrincipal actor, String reason) {
+        return CompletableFuture.supplyAsync(() -> {
+            Optional<WhitelistRequest> existing = repository.findById(requestId);
+            if (existing.isEmpty()) return DecisionResult.of(DecisionOutcome.NOT_FOUND, null, Messages.get("decision.not_found"));
+            WhitelistRequest request = existing.get();
+            if (request.status() == RequestStatus.PENDING) {
+                return DecisionResult.of(DecisionOutcome.ALREADY_PENDING, request, Messages.get("decision.already_pending"));
+            }
+            if (request.status() == RequestStatus.RESOLVING) {
+                return DecisionResult.of(DecisionOutcome.RESOLVING, request, Messages.get("decision.already_resolving"));
+            }
+            // APPROVED needs the crash-aware two-phase flow (claim -> whitelist removal -> finalize).
+            // DENIED and BLOCKED are pure database state changes handled by repository.reopen().
+            if (request.status() == RequestStatus.APPROVED) return null;
+            WorkflowRepository.DecisionResultSnapshot result = repository.reopen(requestId, actor, reason, clock.now());
+            result.request().ifPresent(this::refreshCache);
+            return new DecisionResult(DecisionOutcome.UNDONE, result.request(), result.message());
+        }, decisionExecutor).thenCompose(preflight -> {
+            if (preflight != null) return CompletableFuture.completedFuture(preflight);
+            return undoClaimAndFinalize(requestId, actor, reason);
+        });
+    }
+
+    private CompletionStage<DecisionResult> undoClaimAndFinalize(UUID requestId, AdminPrincipal actor, String reason) {
+        UUID token = UUID.randomUUID();
+        return CompletableFuture.supplyAsync(() -> repository.claimUndo(requestId, actor, reason, clock.now(), token), decisionExecutor)
+                .thenCompose(claim -> {
+                    if (claim.outcome() != DecisionOutcome.RESOLVING) {
+                        claim.request().ifPresent(this::refreshCache);
+                        return CompletableFuture.completedFuture(new DecisionResult(claim.outcome(), claim.request(), claim.message()));
+                    }
+                    WhitelistRequest request = claim.request().orElseThrow();
+                    try {
+                        return vanillaWhitelist.removeExactProfile(request.identity())
+                                .handleAsync((ignored, error) -> completeUndo(request, actor, reason, token, error), decisionExecutor);
+                    } catch (Throwable error) {
+                        return CompletableFuture.completedFuture(completeUndo(request, actor, reason, token, error));
+                    }
+                });
+    }
+
+    private DecisionResult completeUndo(WhitelistRequest request, AdminPrincipal actor, String reason,
+                                          UUID token, Throwable error) {
+        if (error != null) {
+            String failure = safeMessage(error);
+            repository.resetUndo(request.id(), token, actor, failure, clock.now());
+            WhitelistRequest current = repository.findById(request.id()).orElse(request);
+            refreshCache(current);
+            return DecisionResult.of(DecisionOutcome.FAILED, current, Messages.get("decision.undo_whitelist_failed", failure));
+        }
+        WorkflowRepository.DecisionResultSnapshot result = repository.finalizeUndo(request.id(), token, actor, reason, clock.now());
+        WhitelistRequest current = repository.findById(request.id()).orElse(request);
+        refreshCache(current);
+        if (result.outcome() != DecisionOutcome.UNDONE) {
+            return new DecisionResult(result.outcome(), Optional.of(current), result.message());
+        }
+        return DecisionResult.of(DecisionOutcome.UNDONE, current, Messages.get("decision.undone"));
+    }
+
     private DecisionResult completeApproval(WhitelistRequest request, AdminPrincipal actor, String reason,
                                             UUID token, Throwable error) {
         if (error != null) {
@@ -115,7 +196,7 @@ public final class DecisionService {
             boolean reset = repository.resetApproval(request.id(), token, actor, failure, clock.now());
             WhitelistRequest current = repository.findById(request.id()).orElse(request);
             if (reset || current.status() != RequestStatus.RESOLVING) refreshCache(current);
-            return DecisionResult.of(DecisionOutcome.FAILED, current, "Whitelist mutation failed: " + failure);
+            return DecisionResult.of(DecisionOutcome.FAILED, current, Messages.get("decision.whitelist_mutation_failed", failure));
         }
 
         boolean finalized = repository.finalizeApproval(request.id(), token, actor, reason, clock.now());
@@ -123,10 +204,10 @@ public final class DecisionService {
         if (!finalized) {
             refreshCache(current);
             return DecisionResult.of(DecisionOutcome.FAILED, current,
-                    "Approval completed outside the expected state transition");
+                    Messages.get("decision.approval_state_error"));
         }
         refreshCache(current);
-        return DecisionResult.of(DecisionOutcome.APPROVED, current, "Request approved");
+        return DecisionResult.of(DecisionOutcome.APPROVED, current, Messages.get("decision.approved"));
     }
 
     private Void recover(WhitelistRequest request, Boolean allowed, Throwable error) {
@@ -145,6 +226,24 @@ public final class DecisionService {
         return null;
     }
 
+    private Void recoverUndo(WhitelistRequest request, Boolean stillWhitelisted, Throwable error) {
+        UUID token = request.resolvingToken();
+        if (token == null) return null;
+        AdminPrincipal actor = request.resolvedBy() == null ? AdminPrincipal.console() : request.resolvedBy();
+        if (error != null) {
+            repository.resetUndo(request.id(), token, actor,
+                    "Undo recovery check failed: " + safeMessage(error), clock.now());
+        } else if (Boolean.FALSE.equals(stillWhitelisted)) {
+            // Whitelist removal succeeded; finalize the undo.
+            repository.finalizeUndo(request.id(), token, actor, request.resolutionReason(), clock.now());
+        } else {
+            // Player is still whitelisted; the removal did not complete. Roll back to APPROVED.
+            repository.resetUndo(request.id(), token, actor, "Recovered unresolved undo", clock.now());
+        }
+        repository.findById(request.id()).ifPresent(this::refreshCache);
+        return null;
+    }
+
     private void refreshCache(WhitelistRequest request) {
         switch (request.status()) {
             case PENDING, RESOLVING -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending());
@@ -158,9 +257,9 @@ public final class DecisionService {
     private DecisionResult claimResult(DecisionClaim claim) {
         claim.request().ifPresent(this::refreshCache);
         return switch (claim.outcome()) {
-            case NOT_FOUND -> DecisionResult.of(DecisionOutcome.NOT_FOUND, null, "Request not found");
-            case ALREADY_RESOLVING -> DecisionResult.of(DecisionOutcome.RESOLVING, claim.request().orElse(null), "Request is already resolving");
-            case ALREADY_RESOLVED -> DecisionResult.of(DecisionOutcome.ALREADY_RESOLVED, claim.request().orElse(null), "Request is already resolved");
+            case NOT_FOUND -> DecisionResult.of(DecisionOutcome.NOT_FOUND, null, Messages.get("decision.not_found"));
+            case ALREADY_RESOLVING -> DecisionResult.of(DecisionOutcome.RESOLVING, claim.request().orElse(null), Messages.get("decision.already_resolving"));
+            case ALREADY_RESOLVED -> DecisionResult.of(DecisionOutcome.ALREADY_RESOLVED, claim.request().orElse(null), Messages.get("decision.already_resolved"));
             case CLAIMED -> throw new IllegalStateException("claimed result must not use claimResult");
         };
     }

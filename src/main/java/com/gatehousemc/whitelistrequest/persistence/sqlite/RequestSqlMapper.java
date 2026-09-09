@@ -70,6 +70,16 @@ final class RequestSqlMapper {
         }
     }
 
+    List<WhitelistRequest> findResolvingUndos() throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement("SELECT * FROM whitelist_requests WHERE status='RESOLVING' AND resolving_action='UNDO'")) {
+            try (ResultSet result = statement.executeQuery()) {
+                List<WhitelistRequest> requests = new java.util.ArrayList<>();
+                while (result.next()) requests.add(readRequest(result));
+                return requests;
+            }
+        }
+    }
+
     void insert(WhitelistRequest request) throws SQLException {
         try (PreparedStatement statement = tx.connection().prepareStatement(
                 "INSERT INTO whitelist_requests(id, normalized_name, requested_name, requested_uuid, status, created_at, updated_at, first_attempt_at, last_attempt_at, attempt_count) VALUES (?,?,?,?,?,?,?,?,?,?)")) {
@@ -143,6 +153,53 @@ final class RequestSqlMapper {
     boolean resetApproval(UUID requestId, UUID token, Instant now) throws SQLException {
         try (PreparedStatement statement = tx.connection().prepareStatement(
                 "UPDATE whitelist_requests SET status='PENDING', resolving_action=NULL, resolving_token=NULL, resolved_by_provider=NULL, resolved_by_external_id=NULL, resolved_by_display_name=NULL, resolution_reason=NULL, updated_at=? WHERE id=? AND status='RESOLVING' AND resolving_token=?")) {
+            statement.setLong(1, SqliteWorkflowRepository.millis(now));
+            statement.setString(2, requestId.toString());
+            statement.setString(3, token.toString());
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    boolean reopen(UUID requestId, AdminPrincipal actor, String reason, Instant now) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "UPDATE whitelist_requests SET status='PENDING', resolved_at=NULL, resolved_by_provider=NULL, resolved_by_external_id=NULL, resolved_by_display_name=NULL, resolution_reason=NULL, resolving_action=NULL, resolving_token=NULL, updated_at=? " +
+                        "WHERE id=? AND status IN ('APPROVED','DENIED','BLOCKED')")) {
+            statement.setLong(1, SqliteWorkflowRepository.millis(now));
+            statement.setString(2, requestId.toString());
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    boolean claimUndo(UUID requestId, AdminPrincipal actor, String reason, Instant now, UUID token) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "UPDATE whitelist_requests SET status='RESOLVING', resolving_action='UNDO', resolving_token=?, resolved_at=NULL, resolved_by_provider=?, resolved_by_external_id=?, resolved_by_display_name=?, resolution_reason=?, updated_at=? " +
+                        "WHERE id=? AND status='APPROVED'")) {
+            statement.setString(1, token.toString());
+            statement.setString(2, actor.provider());
+            statement.setString(3, actor.externalId());
+            statement.setString(4, actor.displayName());
+            statement.setString(5, reason);
+            statement.setLong(6, SqliteWorkflowRepository.millis(now));
+            statement.setString(7, requestId.toString());
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    boolean finalizeUndo(UUID requestId, UUID token, AdminPrincipal actor, String reason, Instant now) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "UPDATE whitelist_requests SET status='PENDING', resolved_at=NULL, resolved_by_provider=NULL, resolved_by_external_id=NULL, resolved_by_display_name=NULL, resolution_reason=NULL, resolving_action=NULL, resolving_token=NULL, updated_at=? " +
+                        "WHERE id=? AND status='RESOLVING' AND resolving_action='UNDO' AND resolving_token=?")) {
+            statement.setLong(1, SqliteWorkflowRepository.millis(now));
+            statement.setString(2, requestId.toString());
+            statement.setString(3, token.toString());
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    boolean resetUndo(UUID requestId, UUID token, Instant now) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "UPDATE whitelist_requests SET status='APPROVED', resolving_action=NULL, resolving_token=NULL, resolved_by_provider=NULL, resolved_by_external_id=NULL, resolved_by_display_name=NULL, resolution_reason=NULL, updated_at=? " +
+                        "WHERE id=? AND status='RESOLVING' AND resolving_action='UNDO' AND resolving_token=?")) {
             statement.setLong(1, SqliteWorkflowRepository.millis(now));
             statement.setString(2, requestId.toString());
             statement.setString(3, token.toString());

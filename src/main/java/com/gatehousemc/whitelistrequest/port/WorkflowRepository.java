@@ -32,6 +32,16 @@ public interface WorkflowRepository extends AutoCloseable {
 
     List<WhitelistRequest> findResolvingApprovals();
 
+    List<WhitelistRequest> findResolvingUndos();
+
+    DecisionResultSnapshot reopen(UUID requestId, AdminPrincipal actor, String reason, Instant now);
+
+    DecisionResultSnapshot claimUndo(UUID requestId, AdminPrincipal actor, String reason, Instant now, UUID token);
+
+    boolean resetUndo(UUID requestId, UUID token, AdminPrincipal actor, String error, Instant now);
+
+    DecisionResultSnapshot finalizeUndo(UUID requestId, UUID token, AdminPrincipal actor, String reason, Instant now);
+
     boolean unblock(String normalizedUsername, AdminPrincipal actor, String reason, Instant now);
 
     boolean isBlocked(String normalizedUsername);

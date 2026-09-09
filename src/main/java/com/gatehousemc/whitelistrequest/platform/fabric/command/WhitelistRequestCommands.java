@@ -1,6 +1,7 @@
 package com.gatehousemc.whitelistrequest.platform.fabric.command;
 
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.platform.fabric.FabricRuntime;
 import com.gatehousemc.whitelistrequest.platform.fabric.WhitelistRequestMod;
 import com.mojang.brigadier.CommandDispatcher;
@@ -35,6 +36,7 @@ public final class WhitelistRequestCommands {
                 .then(decision("approve", DecisionAction.APPROVE, runtimeSupplier))
                 .then(decision("deny", DecisionAction.DENY, runtimeSupplier))
                 .then(decision("block", DecisionAction.BLOCK, runtimeSupplier))
+                .then(decision("undo", DecisionAction.UNDO, runtimeSupplier))
                 .then(CommandManager.literal("unblock")
                         .then(CommandManager.argument("username", StringArgumentType.word())
                                 .executes(context -> unblock(context, runtimeSupplier))
@@ -43,7 +45,7 @@ public final class WhitelistRequestCommands {
                 .then(CommandManager.literal("status").executes(context -> status(context, runtimeSupplier)))
                 .then(CommandManager.literal("reload").executes(context -> {
                     WhitelistRequestMod.reloadAsync();
-                    return feedback(context, "Whitelist Request reload started; check server logs for completion");
+                    return feedback(context, Messages.get("command.reload_started"));
                 })));
     }
 
@@ -58,13 +60,13 @@ public final class WhitelistRequestCommands {
 
     private static int list(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier, Optional<RequestStatus> status) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        if (runtime == null || runtime.degraded()) return fail(context, Messages.get("command.not_available"));
         ServerCommandSource source = context.getSource();
         runtime.commandExecutor().execute(() -> {
             var requests = runtime.repository().findByStatus(status, 50);
             source.getServer().execute(() -> {
                 if (requests.isEmpty()) {
-                    source.sendFeedback(() -> Text.literal("No requests found"), false);
+                    source.sendFeedback(() -> Text.literal(Messages.get("command.no_requests")), false);
                 } else {
                     for (WhitelistRequest request : requests) {
                         source.sendFeedback(() -> Text.literal(shortId(request.id()) + " " + request.status() + " " + request.identity().exactUsername() + " attempts=" + request.attemptCount()), false);
@@ -77,14 +79,14 @@ public final class WhitelistRequestCommands {
 
     private static int show(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        if (runtime == null || runtime.degraded()) return fail(context, Messages.get("command.not_available"));
         ServerCommandSource source = context.getSource();
         String key = context.getArgument("request", String.class);
         runtime.commandExecutor().execute(() -> {
             Optional<WhitelistRequest> request = resolve(runtime, key);
             source.getServer().execute(() -> {
                 if (request.isEmpty()) {
-                    source.sendError(Text.literal("Request not found"));
+                    source.sendError(Text.literal(Messages.get("command.request_not_found")));
                 } else {
                     WhitelistRequest value = request.get();
                     source.sendFeedback(() -> Text.literal(value.id() + " " + value.status() + " player=" + value.identity().exactUsername() + " uuid=" + value.identity().offlineUuid() + " attempts=" + value.attemptCount()), false);
@@ -96,19 +98,19 @@ public final class WhitelistRequestCommands {
 
     private static int decide(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier, DecisionAction action, String reason) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        if (runtime == null || runtime.degraded()) return fail(context, Messages.get("command.not_available"));
         ServerCommandSource source = context.getSource();
         String key = context.getArgument("request", String.class);
         runtime.commandExecutor().execute(() -> {
             Optional<WhitelistRequest> request = resolve(runtime, key);
             if (request.isEmpty()) {
-                source.getServer().execute(() -> source.sendError(Text.literal("Request not found")));
+                source.getServer().execute(() -> source.sendError(Text.literal(Messages.get("command.request_not_found"))));
                 return;
             }
             runtime.decisions().decide(request.get().id(), action, AdminPrincipal.console(), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
                     .thenAcceptAsync(result -> source.sendFeedback(() -> Text.literal(result.message()), false), source.getServer()::execute)
                     .exceptionallyAsync(error -> {
-                        source.getServer().execute(() -> source.sendError(Text.literal("Decision failed: " + safeMessage(error))));
+                        source.getServer().execute(() -> source.sendError(Text.literal(Messages.get("command.decision_failed", safeMessage(error)))));
                         return null;
                     }, source.getServer()::execute);
         });
@@ -117,29 +119,29 @@ public final class WhitelistRequestCommands {
 
     private static int unblock(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        if (runtime == null || runtime.degraded()) return fail(context, Messages.get("command.not_available"));
         ServerCommandSource source = context.getSource();
         String username = context.getArgument("username", String.class).toLowerCase(Locale.ROOT);
         runtime.commandExecutor().execute(() -> {
             boolean removed = runtime.decisions().unblock(username, AdminPrincipal.console(), "");
             source.getServer().execute(() ->
-                    source.sendFeedback(() -> Text.literal(removed ? "Unblocked " + username : "No block exists for " + username), false));
+                    source.sendFeedback(() -> Text.literal(removed ? Messages.get("command.unblocked", username) : Messages.get("command.no_block", username)), false));
         });
         return 1;
     }
 
     private static int status(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
-        if (runtime == null || runtime.degraded()) return fail(context, "Whitelist Request is not available");
+        if (runtime == null || runtime.degraded()) return fail(context, Messages.get("command.not_available"));
         ServerCommandSource source = context.getSource();
         runtime.commandExecutor().execute(() -> {
             try {
                 long pending = runtime.repository().pendingOutboxCount();
                 source.getServer().execute(() ->
-                        source.sendFeedback(() -> Text.literal("health=HEALTHY queue=" + runtime.queueSize() + " outbox=" + pending), false));
+                        source.sendFeedback(() -> Text.literal(Messages.get("command.health_healthy", runtime.queueSize(), pending)), false));
             } catch (RuntimeException error) {
                 source.getServer().execute(() ->
-                        source.sendFeedback(() -> Text.literal("health=DEGRADED queue=" + runtime.queueSize() + " outbox=unavailable: " + safeMessage(error)), false));
+                        source.sendFeedback(() -> Text.literal(Messages.get("command.health_degraded", runtime.queueSize(), safeMessage(error))), false));
             }
         });
         return 1;

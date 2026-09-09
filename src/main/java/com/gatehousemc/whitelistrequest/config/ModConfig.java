@@ -5,7 +5,7 @@ import com.gatehousemc.whitelistrequest.port.RoutingMode;
 import java.nio.file.Path;
 import java.util.List;
 
-public record ModConfig(Requests requests, Database database, Routing routing, Discord discord, Telegram telegram) {
+public record ModConfig(Requests requests, Database database, Routing routing, Discord discord, Telegram telegram, String language) {
     public record Requests(long denialCooldownMinutes, int queueCapacity, int commandPermissionLevel) {}
     public record Database(Path path, int busyTimeoutMs) {}
     public record Routing(RoutingMode mode, List<String> providers) {
@@ -45,7 +45,8 @@ public record ModConfig(Requests requests, Database database, Routing routing, D
                 new Database(configDir.resolve("requests.sqlite"), 5000),
                 new Routing(RoutingMode.PRIMARY_FALLBACK, List.of("discord", "telegram")),
                 new Discord(false, "", "", "", List.of(), List.of()),
-                new Telegram(false, "", "", List.of())
+                new Telegram(false, "", "", List.of()),
+                "en_us"
         );
     }
 
@@ -58,6 +59,7 @@ public record ModConfig(Requests requests, Database database, Routing routing, D
                 ", providers=" + routing.providers +
                 ", discordEnabled=" + discord.enabled +
                 ", telegramEnabled=" + telegram.enabled +
+                ", language=" + language +
                 '}';
     }
 }

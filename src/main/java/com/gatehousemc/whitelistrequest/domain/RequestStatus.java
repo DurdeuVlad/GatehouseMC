@@ -21,7 +21,7 @@ public enum RequestStatus {
         return switch (this) {
             case PENDING -> target == RESOLVING || target == DENIED || target == BLOCKED;
             case RESOLVING -> target == PENDING || target == APPROVED;
-            case APPROVED, DENIED, BLOCKED -> false;
+            case APPROVED, DENIED, BLOCKED -> target == PENDING;
         };
     }
 

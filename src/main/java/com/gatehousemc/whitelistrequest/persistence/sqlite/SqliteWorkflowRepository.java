@@ -254,6 +254,136 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
     }
 
     @Override
+    public synchronized List<WhitelistRequest> findResolvingUndos() {
+        try {
+            return requests.findResolvingUndos();
+        } catch (SQLException exception) {
+            throw new StorageException("Failed to query resolving undos", exception);
+        }
+    }
+
+    @Override
+    public synchronized DecisionResultSnapshot reopen(UUID requestId, AdminPrincipal actor, String reason, Instant now) {
+        try {
+            tx.begin();
+            WhitelistRequest request = requests.findById(requestId);
+            if (request == null) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.NOT_FOUND, Optional.empty(), "Request not found");
+            }
+            if (request.status() == RequestStatus.PENDING) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.ALREADY_PENDING, Optional.of(request), "Request is already pending");
+            }
+            if (request.status() == RequestStatus.RESOLVING) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(request), "Request is currently resolving");
+            }
+            boolean wasBlocked = request.status() == RequestStatus.BLOCKED;
+            if (!requests.reopen(requestId, actor, reason, now)) {
+                tx.rollbackQuietly();
+                WhitelistRequest current = requests.findById(requestId);
+                if (current == null) return new DecisionResultSnapshot(DecisionOutcome.NOT_FOUND, Optional.empty(), "Request not found");
+                DecisionOutcome outcome = current.status() == RequestStatus.PENDING
+                        ? DecisionOutcome.ALREADY_PENDING : DecisionOutcome.ALREADY_RESOLVED;
+                return new DecisionResultSnapshot(outcome, Optional.of(current), "Request is " + current.status().name().toLowerCase());
+            }
+            if (wasBlocked) {
+                blocks.removeBlock(request.identity().normalizedUsername());
+            }
+            audit.record(requestId, "REQUEST_REOPENED", actor, AuditStore.emptyJson(), now);
+            outbox.insert("REQUEST_UPDATED", requestId, now);
+            tx.commit();
+            WhitelistRequest reopened = requests.findById(requestId);
+            return new DecisionResultSnapshot(DecisionOutcome.UNDONE, Optional.of(reopened), "Request reopened");
+        } catch (SQLException exception) {
+            tx.rollbackQuietly();
+            return new DecisionResultSnapshot(DecisionOutcome.FAILED, Optional.empty(), "Database error while reopening request");
+        } finally {
+            tx.resetAutoCommit();
+        }
+    }
+
+    @Override
+    public synchronized DecisionResultSnapshot claimUndo(UUID requestId, AdminPrincipal actor, String reason, Instant now, UUID token) {
+        try {
+            tx.begin();
+            WhitelistRequest request = requests.findById(requestId);
+            if (request == null) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.NOT_FOUND, Optional.empty(), "Request not found");
+            }
+            if (request.status() == RequestStatus.PENDING) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.ALREADY_PENDING, Optional.of(request), "Request is already pending");
+            }
+            if (request.status() == RequestStatus.RESOLVING) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(request), "Request is currently resolving");
+            }
+            if (!requests.claimUndo(requestId, actor, reason, now, token)) {
+                tx.rollbackQuietly();
+                WhitelistRequest current = requests.findById(requestId);
+                if (current == null) return new DecisionResultSnapshot(DecisionOutcome.NOT_FOUND, Optional.empty(), "Request not found");
+                DecisionOutcome outcome = current.status() == RequestStatus.PENDING
+                        ? DecisionOutcome.ALREADY_PENDING : DecisionOutcome.ALREADY_RESOLVED;
+                return new DecisionResultSnapshot(outcome, Optional.of(current), "Request is " + current.status().name().toLowerCase());
+            }
+            audit.record(requestId, "UNDO_CLAIMED", actor, AuditStore.jsonField("action", "UNDO"), now);
+            tx.commit();
+            return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(requests.findById(requestId)), "Undo claimed");
+        } catch (SQLException exception) {
+            tx.rollbackQuietly();
+            return new DecisionResultSnapshot(DecisionOutcome.FAILED, Optional.empty(), "Database error while claiming undo");
+        } finally {
+            tx.resetAutoCommit();
+        }
+    }
+
+    @Override
+    public synchronized boolean resetUndo(UUID requestId, UUID token, AdminPrincipal actor, String error, Instant now) {
+        try {
+            tx.begin();
+            if (!requests.resetUndo(requestId, token, now)) {
+                tx.rollbackQuietly();
+                return false;
+            }
+            audit.record(requestId, "UNDO_FAILED", actor, AuditStore.jsonField("error", error), now);
+            outbox.insert("REQUEST_UPDATED", requestId, now);
+            tx.commit();
+            return true;
+        } catch (SQLException exception) {
+            tx.rollbackQuietly();
+            return false;
+        } finally {
+            tx.resetAutoCommit();
+        }
+    }
+
+    @Override
+    public synchronized DecisionResultSnapshot finalizeUndo(UUID requestId, UUID token, AdminPrincipal actor, String reason, Instant now) {
+        try {
+            tx.begin();
+            if (!requests.finalizeUndo(requestId, token, actor, reason, now)) {
+                tx.rollbackQuietly();
+                WhitelistRequest current = requests.findById(requestId);
+                if (current == null) return new DecisionResultSnapshot(DecisionOutcome.NOT_FOUND, Optional.empty(), "Request not found");
+                return new DecisionResultSnapshot(DecisionOutcome.ALREADY_RESOLVED, Optional.of(current), "Request is " + current.status().name().toLowerCase());
+            }
+            audit.record(requestId, "REQUEST_UNDONE", actor, AuditStore.emptyJson(), now);
+            outbox.insert("REQUEST_UPDATED", requestId, now);
+            tx.commit();
+            WhitelistRequest undone = requests.findById(requestId);
+            return new DecisionResultSnapshot(DecisionOutcome.UNDONE, Optional.of(undone), "Request reopened");
+        } catch (SQLException exception) {
+            tx.rollbackQuietly();
+            return new DecisionResultSnapshot(DecisionOutcome.FAILED, Optional.empty(), "Database error while finalizing undo");
+        } finally {
+            tx.resetAutoCommit();
+        }
+    }
+
+    @Override
     public synchronized boolean unblock(String normalizedUsername, AdminPrincipal actor, String reason, Instant now) {
         try {
             tx.begin();

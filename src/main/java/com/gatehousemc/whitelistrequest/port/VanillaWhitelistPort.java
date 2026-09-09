@@ -8,4 +8,6 @@ public interface VanillaWhitelistPort {
     CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity);
 
     CompletableFuture<Void> addExactProfile(PlayerIdentity identity);
+
+    CompletableFuture<Void> removeExactProfile(PlayerIdentity identity);
 }

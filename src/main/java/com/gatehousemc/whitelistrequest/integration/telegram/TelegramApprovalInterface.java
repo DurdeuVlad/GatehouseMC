@@ -3,6 +3,7 @@ package com.gatehousemc.whitelistrequest.integration.telegram;
 import com.gatehousemc.whitelistrequest.application.DecisionService;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
 import com.gatehousemc.whitelistrequest.domain.*;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.integration.common.ApprovalMessageRenderer;
 import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
 import com.gatehousemc.whitelistrequest.port.ApprovalInterface;
@@ -119,7 +120,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         String userId = from.get("id").getAsString();
         CallbackActionParser.ParsedAction action = CallbackActionParser.parse(callback.get("data").getAsString());
         if (action == null || !config.chatId().equals(chatId) || !config.allowedUserIds().contains(userId)) {
-            api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\",\"text\":\"Not authorized\",\"show_alert\":true}");
+            api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\",\"text\":\"" + json(Messages.get("provider.not_authorized_telegram")) + "\",\"show_alert\":true}");
             return;
         }
         api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
@@ -134,9 +135,10 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     private static String keyboard(UUID requestId, boolean disabled) {
         if (disabled) return "{\"inline_keyboard\":[]}";
         return "{\"inline_keyboard\":[[" +
-                "{\"text\":\"✅ Approve\",\"callback_data\":\"wr:a:" + requestId + "\"}," +
-                "{\"text\":\"❌ Deny\",\"callback_data\":\"wr:d:" + requestId + "\"}," +
-                "{\"text\":\"🚫 Block\",\"callback_data\":\"wr:b:" + requestId + "\"}]]}";
+                "{\"text\":\"✅ " + json(Messages.get("button.approve")) + "\",\"callback_data\":\"wr:a:" + requestId + "\"}," +
+                "{\"text\":\"❌ " + json(Messages.get("button.deny")) + "\",\"callback_data\":\"wr:d:" + requestId + "\"}," +
+                "{\"text\":\"🚫 " + json(Messages.get("button.block")) + "\",\"callback_data\":\"wr:b:" + requestId + "\"}]," +
+                "[{\"text\":\"↩ " + json(Messages.get("button.undo")) + "\",\"callback_data\":\"wr:u:" + requestId + "\"}]]}";
     }
 
     private static String json(String value) {

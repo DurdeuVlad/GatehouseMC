@@ -2,6 +2,7 @@ package com.gatehousemc.whitelistrequest.platform.fabric;
 
 import com.gatehousemc.whitelistrequest.config.ConfigLoader;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
+import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.platform.fabric.command.WhitelistRequestCommands;
 import com.mojang.authlib.GameProfile;
 import net.fabricmc.api.ModInitializer;
@@ -60,6 +61,7 @@ public final class WhitelistRequestMod implements ModInitializer {
         ModConfig config = null;
         try {
             config = ConfigLoader.loadOrDefault(configDir);
+            Messages.load(config.language());
             FabricRuntime started = FabricRuntime.start(server, config);
             synchronized (RUNTIME_LOCK) {
                 if (STOPPING.get() || runtime != null) {
@@ -73,6 +75,7 @@ public final class WhitelistRequestMod implements ModInitializer {
             synchronized (RUNTIME_LOCK) {
                 if (!STOPPING.get() && runtime == null) {
                     LOGGER.error("storage.degraded: whitelist request persistence is unavailable", error);
+                    if (config != null) Messages.load(config.language());
                     runtime = FabricRuntime.degraded(server, config == null ? ModConfig.defaults(configDir) : config);
                 }
             }
@@ -81,12 +84,12 @@ public final class WhitelistRequestMod implements ModInitializer {
 
     public static Text handleWhitelistDenial(GameProfile profile) {
         FabricRuntime current = runtime;
-        if (current == null) return Text.literal("You are not whitelisted on this server. Please contact a server administrator.");
+        if (current == null) return Text.literal(Messages.get("reject.not_whitelisted"));
         try {
             return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
         } catch (Exception error) {
             LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
-            return Text.literal("You are not whitelisted on this server. The whitelist request service is temporarily unavailable. Please contact a server administrator.");
+            return Text.literal(Messages.get("reject.unavailable"));
         }
     }
 
@@ -110,6 +113,7 @@ public final class WhitelistRequestMod implements ModInitializer {
             Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
             try {
                 ModConfig next = ConfigLoader.loadOrDefault(configDir);
+                Messages.load(next.language());
                 if (!samePath(current.config().database().path(), next.database().path())) {
                     LOGGER.warn("Config reload rejected: database.path changes require a server restart");
                     return;

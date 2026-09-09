@@ -98,9 +98,12 @@ public final class ConfigLoader {
         ModConfig.Discord discordConfig = parseDiscord(discord, defaults.discord());
         ModConfig.Telegram telegramConfig = parseTelegram(telegram, defaults.telegram());
 
+        String language = stringValue(root, "language", defaults.language()).trim().toLowerCase(Locale.ROOT);
+        if (language.isEmpty()) language = "en_us";
+
         return new ModConfig(new ModConfig.Requests(cooldown, queue, permission),
                 new ModConfig.Database(dbPath, busyTimeout),
-                new ModConfig.Routing(mode, providers), discordConfig, telegramConfig);
+                new ModConfig.Routing(mode, providers), discordConfig, telegramConfig, language);
     }
 
     private static JsonObject providerObject(JsonObject root, String provider) {
@@ -271,7 +274,8 @@ public final class ConfigLoader {
                 "  \"database\": { \"path\": \"" + configDir.resolve("requests.sqlite").toString().replace("\\", "\\\\") + "\", \"busyTimeoutMs\": 5000 },\n" +
                 "  \"routing\": { \"mode\": \"PRIMARY_FALLBACK\", \"providers\": [\"discord\", \"telegram\"] },\n" +
                 "  \"discord\": { \"enabled\": false, \"token\": \"\", \"guildId\": \"\", \"channelId\": \"\", \"allowedUserIds\": [], \"allowedRoleIds\": [] },\n" +
-                "  \"telegram\": { \"enabled\": false, \"token\": \"\", \"chatId\": \"\", \"allowedUserIds\": [] }\n" +
+                "  \"telegram\": { \"enabled\": false, \"token\": \"\", \"chatId\": \"\", \"allowedUserIds\": [] },\n" +
+                "  \"language\": \"en_us\"\n" +
                 "}\n";
     }
 }

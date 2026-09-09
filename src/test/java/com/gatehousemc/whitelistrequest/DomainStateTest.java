@@ -25,6 +25,10 @@ class DomainStateTest {
         assertDoesNotThrow(() -> RequestStatus.requireTransition(RequestStatus.RESOLVING, RequestStatus.APPROVED));
         assertDoesNotThrow(() -> RequestStatus.requireTransition(RequestStatus.PENDING, RequestStatus.DENIED));
         assertDoesNotThrow(() -> RequestStatus.requireTransition(RequestStatus.PENDING, RequestStatus.BLOCKED));
+        // Undo: terminal states can transition back to PENDING.
+        assertDoesNotThrow(() -> RequestStatus.requireTransition(RequestStatus.APPROVED, RequestStatus.PENDING));
+        assertDoesNotThrow(() -> RequestStatus.requireTransition(RequestStatus.DENIED, RequestStatus.PENDING));
+        assertDoesNotThrow(() -> RequestStatus.requireTransition(RequestStatus.BLOCKED, RequestStatus.PENDING));
     }
 
     @Test
@@ -32,9 +36,9 @@ class DomainStateTest {
         assertThrows(IllegalStateException.class,
                 () -> RequestStatus.requireTransition(RequestStatus.PENDING, RequestStatus.APPROVED));
         assertThrows(IllegalStateException.class,
-                () -> RequestStatus.requireTransition(RequestStatus.APPROVED, RequestStatus.PENDING));
-        assertThrows(IllegalStateException.class,
                 () -> RequestStatus.requireTransition(RequestStatus.DENIED, RequestStatus.APPROVED));
+        assertThrows(IllegalStateException.class,
+                () -> RequestStatus.requireTransition(RequestStatus.APPROVED, RequestStatus.DENIED));
     }
 
     @Test
@@ -43,6 +47,14 @@ class DomainStateTest {
                 UUID.randomUUID(), IDENTITY, RequestStatus.RESOLVING,
                 NOW, NOW, NOW, NOW, 1,
                 null, ACTOR, null, DecisionAction.APPROVE, UUID.randomUUID()));
+    }
+
+    @Test
+    void acceptsAResolvingUndoClaim() {
+        assertDoesNotThrow(() -> new WhitelistRequest(
+                UUID.randomUUID(), IDENTITY, RequestStatus.RESOLVING,
+                NOW, NOW, NOW, NOW, 1,
+                null, ACTOR, null, DecisionAction.UNDO, UUID.randomUUID()));
     }
 
     @Test
