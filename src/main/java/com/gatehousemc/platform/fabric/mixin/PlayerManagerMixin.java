@@ -4,7 +4,7 @@ import com.gatehousemc.platform.fabric.GatehouseMod;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
+import net.minecraft.text.TranslatableText;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,7 +18,7 @@ public abstract class PlayerManagerMixin {
     private void gatehousemc$afterCheckCanJoin(SocketAddress address, GameProfile profile,
                                                     CallbackInfoReturnable<Text> callback) {
         Text result = callback.getReturnValue();
-        if (result == null || !(result.getContent() instanceof TranslatableTextContent translatable)) return;
+        if (result == null || !(result instanceof TranslatableText translatable)) return;
         if (!"multiplayer.disconnect.not_whitelisted".equals(translatable.getKey())) return;
         callback.setReturnValue(GatehouseMod.handleWhitelistDenial(profile));
     }

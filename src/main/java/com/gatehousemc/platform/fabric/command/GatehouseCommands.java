@@ -10,6 +10,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.command.CommandSource;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
 
 import java.util.Locale;
@@ -73,10 +74,10 @@ public final class GatehouseCommands {
             var requests = runtime.repository().findByStatus(status, 50);
             source.getServer().execute(() -> {
                 if (requests.isEmpty()) {
-                    source.sendFeedback(Text.literal(Messages.get("command.no_requests")), false);
+                    source.sendFeedback(new LiteralText(Messages.get("command.no_requests")), false);
                 } else {
                     for (WhitelistRequest request : requests) {
-                        source.sendFeedback(Text.literal(shortId(request.id()) + " " + request.status() + " " + request.identity().exactUsername() + " attempts=" + request.attemptCount()), false);
+                        source.sendFeedback(new LiteralText(shortId(request.id()) + " " + request.status() + " " + request.identity().exactUsername() + " attempts=" + request.attemptCount()), false);
                     }
                 }
             });
@@ -93,10 +94,10 @@ public final class GatehouseCommands {
             Optional<WhitelistRequest> request = resolve(runtime, key);
             source.getServer().execute(() -> {
                 if (request.isEmpty()) {
-                    source.sendError(Text.literal(Messages.get("command.request_not_found")));
+                    source.sendError(new LiteralText(Messages.get("command.request_not_found")));
                 } else {
                     WhitelistRequest value = request.get();
-                    source.sendFeedback(Text.literal(value.id() + " " + value.status() + " player=" + value.identity().exactUsername() + " uuid=" + value.identity().offlineUuid() + " attempts=" + value.attemptCount()), false);
+                    source.sendFeedback(new LiteralText(value.id() + " " + value.status() + " player=" + value.identity().exactUsername() + " uuid=" + value.identity().offlineUuid() + " attempts=" + value.attemptCount()), false);
                 }
             });
         });
@@ -111,13 +112,13 @@ public final class GatehouseCommands {
         runtime.commandExecutor().execute(() -> {
             Optional<WhitelistRequest> request = resolve(runtime, key);
             if (request.isEmpty()) {
-                source.getServer().execute(() -> source.sendError(Text.literal(Messages.get("command.request_not_found"))));
+                source.getServer().execute(() -> source.sendError(new LiteralText(Messages.get("command.request_not_found"))));
                 return;
             }
             runtime.decisions().decide(request.get().id(), action, principalOf(source), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
-                    .thenAcceptAsync(result -> source.sendFeedback(Text.literal(result.message()), false), source.getServer()::execute)
+                    .thenAcceptAsync(result -> source.sendFeedback(new LiteralText(result.message()), false), source.getServer()::execute)
                     .exceptionallyAsync(error -> {
-                        source.getServer().execute(() -> source.sendError(Text.literal(Messages.get("command.decision_failed", safeMessage(error)))));
+                        source.getServer().execute(() -> source.sendError(new LiteralText(Messages.get("command.decision_failed", safeMessage(error)))));
                         return null;
                     }, source.getServer()::execute);
         });
@@ -132,7 +133,7 @@ public final class GatehouseCommands {
         runtime.commandExecutor().execute(() -> {
             boolean removed = runtime.decisions().unblock(username, principalOf(source), "");
             source.getServer().execute(() ->
-                    source.sendFeedback(Text.literal(removed ? Messages.get("command.unblocked", username, source.getName()) : Messages.get("command.no_block", username)), false));
+                    source.sendFeedback(new LiteralText(removed ? Messages.get("command.unblocked", username, source.getName()) : Messages.get("command.no_block", username)), false));
         });
         return 1;
     }
@@ -145,10 +146,10 @@ public final class GatehouseCommands {
             try {
                 long pending = runtime.repository().pendingOutboxCount();
                 source.getServer().execute(() ->
-                        source.sendFeedback(Text.literal(Messages.get("command.health_healthy", runtime.queueSize(), pending)), false));
+                        source.sendFeedback(new LiteralText(Messages.get("command.health_healthy", runtime.queueSize(), pending)), false));
             } catch (RuntimeException error) {
                 source.getServer().execute(() ->
-                        source.sendFeedback(Text.literal(Messages.get("command.health_degraded", runtime.queueSize(), safeMessage(error))), false));
+                        source.sendFeedback(new LiteralText(Messages.get("command.health_degraded", runtime.queueSize(), safeMessage(error))), false));
             }
         });
         return 1;
@@ -175,8 +176,8 @@ public final class GatehouseCommands {
     }
 
     private static String shortId(UUID id) { return id.toString().substring(0, 8); }
-    private static int feedback(CommandContext<ServerCommandSource> context, String message) { context.getSource().sendFeedback(Text.literal(message), false); return 1; }
-    private static int fail(CommandContext<ServerCommandSource> context, String message) { context.getSource().sendError(Text.literal(message)); return 0; }
+    private static int feedback(CommandContext<ServerCommandSource> context, String message) { context.getSource().sendFeedback(new LiteralText(message), false); return 1; }
+    private static int fail(CommandContext<ServerCommandSource> context, String message) { context.getSource().sendError(new LiteralText(message)); return 0; }
 
     private static String safeMessage(Throwable error) {
         Throwable cause = error;

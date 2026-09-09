@@ -14,6 +14,7 @@ import com.gatehousemc.application.OutboxWorker;
 import com.gatehousemc.integration.discord.DiscordApprovalInterface;
 import com.gatehousemc.integration.telegram.TelegramApprovalInterface;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
 
 import java.io.IOException;
@@ -156,10 +157,10 @@ public final class FabricRuntime implements AutoCloseable {
         AdmissionState known = cache.get(identity.normalizedUsername());
         if (!worker.offer(identity)) return messagesUnavailable(identity.exactUsername());
         return switch (known.kind()) {
-            case BLOCKED -> Text.literal(Messages.get("reject.blocked"));
-            case DENIED -> Text.literal(Messages.get("reject.denied"));
-            case PENDING -> Text.literal(Messages.get("reject.pending", identity.exactUsername()));
-            case UNKNOWN -> Text.literal(Messages.get("reject.unknown", identity.exactUsername()));
+            case BLOCKED -> new LiteralText(Messages.get("reject.blocked"));
+            case DENIED -> new LiteralText(Messages.get("reject.denied"));
+            case PENDING -> new LiteralText(Messages.get("reject.pending", identity.exactUsername()));
+            case UNKNOWN -> new LiteralText(Messages.get("reject.unknown", identity.exactUsername()));
             case DEGRADED -> messagesUnavailable(identity.exactUsername());
         };
     }
@@ -176,7 +177,7 @@ public final class FabricRuntime implements AutoCloseable {
     public Optional<WhitelistRequest> active(String username) { return repository == null ? Optional.empty() : repository.findActiveByName(username.toLowerCase(java.util.Locale.ROOT)); }
 
     private static Text messagesUnavailable(String username) {
-        return Text.literal(Messages.get("reject.unavailable"));
+        return new LiteralText(Messages.get("reject.unavailable"));
     }
 
     @Override

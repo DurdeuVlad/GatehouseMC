@@ -6,9 +6,10 @@ import com.gatehousemc.i18n.Messages;
 import com.gatehousemc.platform.fabric.command.GatehouseCommands;
 import com.mojang.authlib.GameProfile;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,7 @@ public final class GatehouseMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
+        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) ->
                 GatehouseCommands.register(dispatcher, () -> runtime));
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             synchronized (RUNTIME_LOCK) {
@@ -99,12 +100,12 @@ public final class GatehouseMod implements ModInitializer {
 
     public static Text handleWhitelistDenial(GameProfile profile) {
         FabricRuntime current = runtime;
-        if (current == null) return Text.literal(Messages.get("reject.not_whitelisted"));
+        if (current == null) return new LiteralText(Messages.get("reject.not_whitelisted"));
         try {
             return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
         } catch (Exception error) {
             LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
-            return Text.literal(Messages.get("reject.unavailable"));
+            return new LiteralText(Messages.get("reject.unavailable"));
         }
     }
 
