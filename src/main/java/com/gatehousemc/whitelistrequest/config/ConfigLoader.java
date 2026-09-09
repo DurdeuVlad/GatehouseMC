@@ -80,7 +80,7 @@ public final class ConfigLoader {
             mode = RoutingMode.valueOf(stringValue(routing, "mode", defaults.routing().mode().name())
                     .trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("routing.mode must be PRIMARY_FALLBACK, FANOUT, or FIRST_SUCCESS", exception);
+            throw new IllegalArgumentException("routing.mode must be PRIMARY_FALLBACK or FANOUT", exception);
         }
         List<String> providers = strings(routing, "providers", defaults.routing().providers()).stream()
                 .map(provider -> provider.trim().toLowerCase(Locale.ROOT))

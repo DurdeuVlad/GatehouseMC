@@ -134,10 +134,4 @@ public final class WhitelistRequestMod implements ModInitializer {
     private static boolean samePath(Path left, Path right) {
         return Objects.equals(left.toAbsolutePath().normalize(), right.toAbsolutePath().normalize());
     }
-
-    private static String safeMessage(Throwable error) {
-        Throwable cause = error;
-        while (cause.getCause() != null) cause = cause.getCause();
-        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
-    }
 }

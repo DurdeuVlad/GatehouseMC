@@ -16,12 +16,9 @@ repositories {
 }
 
 loom {
-    splitEnvironmentSourceSets()
-
     mods {
         "whitelistrequest" {
             sourceSet sourceSets.main
-            sourceSet sourceSets.client
         }
     }
 }
