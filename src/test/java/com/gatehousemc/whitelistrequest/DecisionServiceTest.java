@@ -42,7 +42,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Alice");
+            PlayerIdentity identity = PlayerIdentity.of("Alice");
             requests.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("alice").orElseThrow().id();
             CountingWhitelist whitelist = new CountingWhitelist();
@@ -64,7 +64,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "LosingApproval"));
+            requests.recordAttempt(PlayerIdentity.of("LosingApproval"));
             UUID requestId = repository.findActiveByName("losingapproval").orElseThrow().id();
             DecisionService decisions = new DecisionService(repository, new CountingWhitelist(), () -> NOW, cache);
             assertEquals(DecisionOutcome.APPROVED, decisions.decide(requestId, DecisionAction.APPROVE,
@@ -83,7 +83,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "Bob"));
+            requests.recordAttempt(PlayerIdentity.of("Bob"));
             UUID requestId = repository.findActiveByName("bob").orElseThrow().id();
             DecisionService decisions = new DecisionService(repository, new FailingWhitelist(), () -> NOW, cache);
 
@@ -102,7 +102,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "Carol"));
+            requests.recordAttempt(PlayerIdentity.of("Carol"));
             UUID requestId = repository.findActiveByName("carol").orElseThrow().id();
             AdminPrincipal actor = new AdminPrincipal("discord", "user-123", "Moderator");
             DecisionService decisions = new DecisionService(repository, new CountingWhitelist(), () -> NOW, cache);
@@ -125,7 +125,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "RecoveredPlayer"));
+            requests.recordAttempt(PlayerIdentity.of("RecoveredPlayer"));
             UUID requestId = repository.findActiveByName("recoveredplayer").orElseThrow().id();
             repository.claimApproval(requestId, AdminPrincipal.console(), "", NOW, UUID.randomUUID());
             DecisionService decisions = new DecisionService(repository, new RecoveryWhitelist(true, null), () -> NOW, cache);
@@ -145,7 +145,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "UnrecoverPlayer"));
+            requests.recordAttempt(PlayerIdentity.of("UnrecoverPlayer"));
             UUID requestId = repository.findActiveByName("unrecoverplayer").orElseThrow().id();
             repository.claimApproval(requestId, AdminPrincipal.console(), "", NOW, UUID.randomUUID());
             DecisionService decisions = new DecisionService(repository, new RecoveryWhitelist(false, null), () -> NOW, cache);
@@ -163,7 +163,7 @@ class DecisionServiceTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "FailedRecovery"));
+            requests.recordAttempt(PlayerIdentity.of("FailedRecovery"));
             UUID requestId = repository.findActiveByName("failedrecovery").orElseThrow().id();
             repository.claimApproval(requestId, AdminPrincipal.console(), "", NOW, UUID.randomUUID());
             DecisionService decisions = new DecisionService(repository,
@@ -183,7 +183,7 @@ class DecisionServiceTest {
              ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "decision-worker"))) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "WorkerPlayer"));
+            requests.recordAttempt(PlayerIdentity.of("WorkerPlayer"));
             UUID requestId = repository.findActiveByName("workerplayer").orElseThrow().id();
             CountingWhitelist whitelist = new CountingWhitelist();
             DecisionService decisions = new DecisionService(repository, whitelist, () -> NOW, cache,

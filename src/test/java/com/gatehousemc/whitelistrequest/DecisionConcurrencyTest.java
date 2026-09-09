@@ -32,7 +32,7 @@ class DecisionConcurrencyTest {
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
             WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
-            requests.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "RacePlayer"));
+            requests.recordAttempt(PlayerIdentity.of("RacePlayer"));
             UUID requestId = repository.findActiveByName("raceplayer").orElseThrow().id();
             BlockingWhitelist whitelist = new BlockingWhitelist();
             DecisionService decisions = new DecisionService(repository, whitelist, () -> NOW, cache);

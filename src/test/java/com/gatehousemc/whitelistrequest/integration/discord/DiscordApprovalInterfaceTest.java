@@ -17,7 +17,7 @@ class DiscordApprovalInterfaceTest {
     @Test
     void publishReturnsPublicationRefWithMessageId() {
         UUID requestId = UUID.randomUUID();
-        RequestView request = new RequestView(requestId, PlayerIdentity.of(UUID.randomUUID(), "TestPlayer"), RequestStatus.PENDING,
+        RequestView request = new RequestView(requestId, PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeDiscordTransport transport = new FakeDiscordTransport();
         transport.nextMessageId = "msg123";
@@ -37,7 +37,7 @@ class DiscordApprovalInterfaceTest {
 
     @Test
     void publishFailsWhenTransportUnavailable() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "TestPlayer"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "channel1", List.of(), List.of());
         DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, null);

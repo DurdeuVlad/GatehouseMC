@@ -20,8 +20,18 @@ public record PlayerIdentity(UUID offlineUuid, String exactUsername, String norm
         }
     }
 
-    public static PlayerIdentity of(UUID offlineUuid, String exactUsername) {
+    public static PlayerIdentity of(String exactUsername) {
         Objects.requireNonNull(exactUsername, "exactUsername");
+        return new PlayerIdentity(offlineUuidFor(exactUsername), exactUsername, exactUsername.toLowerCase(Locale.ROOT));
+    }
+
+    public static PlayerIdentity of(UUID offlineUuid, String exactUsername) {
+        Objects.requireNonNull(offlineUuid, "offlineUuid");
+        Objects.requireNonNull(exactUsername, "exactUsername");
+        UUID expected = offlineUuidFor(exactUsername);
+        if (!offlineUuid.equals(expected)) {
+            throw new IllegalArgumentException("offlineUuid must match the offline player UUID for " + exactUsername);
+        }
         return new PlayerIdentity(offlineUuid, exactUsername, exactUsername.toLowerCase(Locale.ROOT));
     }
 

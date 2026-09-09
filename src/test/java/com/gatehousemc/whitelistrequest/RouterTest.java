@@ -18,7 +18,7 @@ import java.util.concurrent.CompletionException;
 class RouterTest {
     @Test
     void primaryFailureFallsBackToTelegram() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "Alice"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("Alice"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeProvider discord = new FakeProvider("discord", true);
         FakeProvider telegram = new FakeProvider("telegram", false);
@@ -31,7 +31,7 @@ class RouterTest {
 
     @Test
     void startingProviderIsSkippedUntilHealthy() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "Alice"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("Alice"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeProvider starting = new FakeProvider("discord", false, ProviderHealth.STARTING);
         FakeProvider telegram = new FakeProvider("telegram", false);
@@ -44,7 +44,7 @@ class RouterTest {
 
     @Test
     void fanoutExposesSuccessfulPublicationsWhenOneProviderFails() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "Alice"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("Alice"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeProvider discord = new FakeProvider("discord", false);
         FakeProvider telegram = new FakeProvider("telegram", true);

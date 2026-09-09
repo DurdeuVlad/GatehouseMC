@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DomainStateTest {
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
-    private static final PlayerIdentity IDENTITY = PlayerIdentity.of(UUID.randomUUID(), "Alice");
+    private static final PlayerIdentity IDENTITY = PlayerIdentity.of("Alice");
     private static final AdminPrincipal ACTOR = AdminPrincipal.console();
 
     @Test
@@ -64,7 +64,7 @@ class DomainStateTest {
     @Test
     void rejectsMinecraftInvalidUsername() {
         assertThrows(IllegalArgumentException.class,
-                () -> PlayerIdentity.of(UUID.randomUUID(), "A B C!"));
+                () -> PlayerIdentity.of("A B C!"));
     }
 
     @Test

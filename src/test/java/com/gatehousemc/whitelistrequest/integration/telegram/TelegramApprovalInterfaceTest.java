@@ -18,7 +18,7 @@ class TelegramApprovalInterfaceTest {
     @Test
     void publishReturnsPublicationRefWithMessageId() {
         UUID requestId = UUID.randomUUID();
-        RequestView request = new RequestView(requestId, PlayerIdentity.of(UUID.randomUUID(), "TestPlayer"), RequestStatus.PENDING,
+        RequestView request = new RequestView(requestId, PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         FakeTelegramTransport transport = new FakeTelegramTransport();
         transport.nextMessageId = "42";
@@ -37,7 +37,7 @@ class TelegramApprovalInterfaceTest {
 
     @Test
     void publishFailsWhenTransportNull() {
-        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of(UUID.randomUUID(), "TestPlayer"), RequestStatus.PENDING,
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         ModConfig.Telegram config = new ModConfig.Telegram(true, "token", "chat1", List.of());
         TelegramApprovalInterface telegram = new TelegramApprovalInterface(config, null);

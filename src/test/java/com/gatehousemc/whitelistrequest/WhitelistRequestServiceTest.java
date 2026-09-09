@@ -47,8 +47,8 @@ class WhitelistRequestServiceTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity first = PlayerIdentity.of(UUID.randomUUID(), "Alice");
-            PlayerIdentity variant = PlayerIdentity.of(UUID.randomUUID(), "ALICE");
+            PlayerIdentity first = PlayerIdentity.of("Alice");
+            PlayerIdentity variant = PlayerIdentity.of("ALICE");
 
             assertEquals(AttemptState.CREATED, service.recordAttempt(first).state());
             assertEquals(AttemptState.PENDING, service.recordAttempt(variant).state());
@@ -65,7 +65,7 @@ class WhitelistRequestServiceTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "BlockedPlayer");
+            PlayerIdentity identity = PlayerIdentity.of("BlockedPlayer");
             service.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("blockedplayer").orElseThrow().id();
             DecisionService decisions = new DecisionService(repository, new NoopWhitelist(), () -> NOW, service.cache());

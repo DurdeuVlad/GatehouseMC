@@ -26,7 +26,7 @@ class WhitelistRequestCoreTest {
 
     @Test
     void normalizesWithoutChangingApprovalTarget() {
-        PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Alice");
+        PlayerIdentity identity = PlayerIdentity.of("Alice");
         assertEquals("alice", identity.normalizedUsername());
         assertEquals("Alice", identity.exactUsername());
     }
@@ -36,8 +36,8 @@ class WhitelistRequestCoreTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity first = PlayerIdentity.of(UUID.randomUUID(), "Alice");
-            PlayerIdentity caseVariant = PlayerIdentity.of(UUID.randomUUID(), "ALICE");
+            PlayerIdentity first = PlayerIdentity.of("Alice");
+            PlayerIdentity caseVariant = PlayerIdentity.of("ALICE");
 
             AttemptOutcome created = service.recordAttempt(first);
             AttemptOutcome repeated = service.recordAttempt(caseVariant);
@@ -58,7 +58,7 @@ class WhitelistRequestCoreTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Bob");
+            PlayerIdentity identity = PlayerIdentity.of("Bob");
             service.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("bob").orElseThrow().id();
             DecisionService decisions = new DecisionService(repository, new FakeWhitelist(), clock, service.cache());
@@ -83,7 +83,7 @@ class WhitelistRequestCoreTest {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "Carol");
+            PlayerIdentity identity = PlayerIdentity.of("Carol");
             service.recordAttempt(identity);
             UUID requestId = repository.findActiveByName("carol").orElseThrow().id();
             CompletableFuture<Void> whitelistResult = new CompletableFuture<>();

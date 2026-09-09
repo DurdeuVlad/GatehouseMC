@@ -51,7 +51,7 @@ class SqliteWorkflowRepositoryTest {
         try (SqliteDatabase database = new SqliteDatabase(path, 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            service.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "Alice"));
+            service.recordAttempt(PlayerIdentity.of("Alice"));
             requestId = repository.findActiveByName("alice").orElseThrow().id();
             assertEquals(1, scalarLong(database.connection(), "SELECT COUNT(*) FROM audit_log"));
         }
@@ -82,7 +82,7 @@ class SqliteWorkflowRepositoryTest {
              SqliteWorkflowRepository first = new SqliteWorkflowRepository(firstDatabase);
              SqliteDatabase secondDatabase = new SqliteDatabase(path, 5000);
              SqliteWorkflowRepository second = new SqliteWorkflowRepository(secondDatabase)) {
-            PlayerIdentity identity = PlayerIdentity.of(UUID.randomUUID(), "ConcurrentPlayer");
+            PlayerIdentity identity = PlayerIdentity.of("ConcurrentPlayer");
             CountDownLatch ready = new CountDownLatch(2);
             CountDownLatch start = new CountDownLatch(1);
             CompletableFuture<?> firstAttempt = CompletableFuture.runAsync(() -> recordAfterStart(first, identity, ready, start));
@@ -102,7 +102,7 @@ class SqliteWorkflowRepositoryTest {
         try (SqliteDatabase database = new SqliteDatabase(path, 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
             WhitelistRequestService service = service(repository);
-            service.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "AuditPlayer"));
+            service.recordAttempt(PlayerIdentity.of("AuditPlayer"));
             UUID requestId = repository.findActiveByName("auditplayer").orElseThrow().id();
             var claim = repository.claimApproval(requestId, AdminPrincipal.console(), "", NOW, UUID.randomUUID());
 

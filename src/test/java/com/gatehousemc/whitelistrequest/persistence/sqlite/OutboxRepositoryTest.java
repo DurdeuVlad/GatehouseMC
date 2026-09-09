@@ -26,7 +26,7 @@ class OutboxRepositoryTest {
              SqliteWorkflowRepository first = new SqliteWorkflowRepository(firstDatabase);
              SqliteDatabase secondDatabase = new SqliteDatabase(path, 5000);
              SqliteWorkflowRepository second = new SqliteWorkflowRepository(secondDatabase)) {
-            first.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "OutboxPlayer"), NOW, Duration.ofDays(1));
+            first.recordAttempt(PlayerIdentity.of("OutboxPlayer"), NOW, Duration.ofDays(1));
             CountDownLatch ready = new CountDownLatch(2);
             CountDownLatch start = new CountDownLatch(1);
             CompletableFuture<List<OutboxEvent>> firstClaim = CompletableFuture.supplyAsync(() -> claim(first, ready, start));
@@ -48,7 +48,7 @@ class OutboxRepositoryTest {
         UUID outboxId;
         try (SqliteDatabase database = new SqliteDatabase(path, 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
-            repository.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "RestartPlayer"), NOW, Duration.ofDays(1));
+            repository.recordAttempt(PlayerIdentity.of("RestartPlayer"), NOW, Duration.ofDays(1));
             outboxId = repository.readyOutbox(NOW, 10).get(0).id();
         }
         try (SqliteDatabase database = new SqliteDatabase(path, 5000);
@@ -62,7 +62,7 @@ class OutboxRepositoryTest {
         Path path = temp.resolve("retry.sqlite");
         try (SqliteDatabase database = new SqliteDatabase(path, 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
-            repository.recordAttempt(PlayerIdentity.of(UUID.randomUUID(), "RetryPlayer"), NOW, Duration.ofDays(1));
+            repository.recordAttempt(PlayerIdentity.of("RetryPlayer"), NOW, Duration.ofDays(1));
             OutboxEvent event = repository.readyOutbox(NOW, 10).get(0);
             Instant nextAttempt = NOW.plusSeconds(60);
             repository.retryOutbox(event.id(), nextAttempt, "provider unavailable", NOW);
