@@ -601,8 +601,9 @@ The interface must not expose JDA/Telegram types.
 
 ## Multi-version Minecraft support
 
-The mod currently targets Minecraft 1.21.1 exclusively. This section documents
-how to add support for a new Minecraft version without forking the project.
+The main working tree targets Minecraft 1.21.1. Compatibility branches publish
+the same workflow for Minecraft 1.14.4 through 1.21.4. This section documents
+how to add or maintain a Minecraft version without forking the project.
 
 ### Version-coupled components
 
@@ -644,8 +645,10 @@ src/1.21.1/java/        — 1.21.1-specific Mixin and platform adapter
 src/1.21.4/java/        — 1.21.4-specific Mixin and platform adapter
 ```
 
-Configure `build.gradle` with a source set per version and a multi-jar build.
-This is not needed for a single-version target.
+Configure `build.gradle` with a source set per version and a multi-jar build
+when a target needs version-specific source. The current release uses
+version-specific branches for historical targets rather than pretending the
+1.21.1 working tree compiles unchanged everywhere.
 
 ### Router
 

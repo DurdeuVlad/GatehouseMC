@@ -6,15 +6,18 @@ testing strategy, OSS policy, and issue-style task backlog. Those documents are
 requirements/context; they are not a replacement for the user's request or for
 the acceptance evidence below.
 
-Private GitHub repository: [DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC)
+Public GitHub repository: [DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC)
 
-The tracker contains 31 imported implementation, compatibility, and release issues covering
-M0 through M7. Dependabot is enabled for the Gradle wrapper and the Node E2E
-client.
+The tracker contains the imported implementation, compatibility, and release
+backlog covering M0 through M7. Use the live GitHub tracker for the current
+open/closed issue count. Dependabot is enabled for the Gradle wrapper and the
+Node E2E client.
 
 ## Current baseline
 
-- Minecraft 1.21.1, Fabric, Java 21.
+- Primary implementation baseline: Minecraft 1.21.1, Fabric, Java 21.
+- Published compatibility artifacts: Minecraft 1.14.4 through 1.21.4; Java
+  8/16/17/21 as documented in [`docs/OSS.md`](OSS.md).
 - Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
@@ -22,6 +25,17 @@ client.
 - `/gatehouse` (with `/gh` and `/wlreq` aliases) command interface.
 - Discord JDA and Telegram Bot API adapters behind one core decision service.
 - No IP persistence and no claim that offline usernames are authenticated.
+
+## Publication status
+
+- GitHub is public and contains the source repository.
+- Modrinth has all 12 version files and the corrected project copy; the project
+  is submitted and **Under review**.
+- CurseForge has all 12 version files, the corrected project copy, source link,
+  and media; the project and files are **Under Review** pending moderator
+  approval.
+- GitHub Release `v1.0.0` is published with all 12 compatibility JARs and a
+  checksum file. Treat it as the current public release archive.
 
 ## Verification already executed
 
@@ -40,7 +54,7 @@ running server. `E2E_Bob` was independently rejected and persisted as pending.
 
 ## What Devin should do next
 
-The local issue backlog and the private GitHub issue tracker are the source of
+The local issue backlog and the public GitHub issue tracker are the source of
 execution order. Start with the open P0 issues, not with broad refactoring.
 
 The remaining production gates are:

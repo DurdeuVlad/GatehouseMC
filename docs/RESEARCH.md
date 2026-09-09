@@ -453,10 +453,10 @@ The following matrix documents the verified version pins, toolchain requirements
 | **1.19.4** | `1.19.4+build.2` | `0.87.2+1.19.4` | Java 17 | `sendFeedback(Text, boolean)` raw Text parameter |
 | **1.19.2** | `1.19.2+build.28` | `0.77.0+1.19.2` | Java 17 | Primary 1.19 modpack LTS |
 | **1.18.2** | `1.18.2+build.4` | `0.77.0+1.18.2` | Java 17 | `LiteralText`, `TranslatableText`, `v1.CommandRegistrationCallback` |
-| **1.17.1** | `1.17.1+build.65` | `0.46.1+1.17` | Java 17 | `new JsonParser().parse()` for Gson 2.8 compatibility |
-| **1.16.5** | `1.16.5+build.10` | `0.42.0+1.16` | Java 17 | `runtime.server().execute(...)` for thread dispatch |
-| **1.15.2** | `1.15.2+build.17` | `0.28.5+1.15` | Java 17 | Pure Brigadier `SuggestionsBuilder` matching |
-| **1.14.4** | `1.14.4+build.18` | `0.28.5+1.14` | Java 17 | Initial official Fabric release |
+| **1.17.1** | `1.17.1+build.65` | `0.46.1+1.17` | Java 16 | `new JsonParser().parse()` for Gson 2.8 compatibility |
+| **1.16.5** | `1.16.5+build.10` | `0.42.0+1.16` | Java 8 | `runtime.server().execute(...)` for thread dispatch |
+| **1.15.2** | `1.15.2+build.17` | `0.28.5+1.15` | Java 8 | Pure Brigadier `SuggestionsBuilder` matching |
+| **1.14.4** | `1.14.4+build.18` | `0.28.5+1.14` | Java 8 | Initial official Fabric release |
 
 ### 10.2 Architectural Evolution Across Minecraft Eras
 
