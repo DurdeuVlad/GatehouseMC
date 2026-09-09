@@ -169,7 +169,7 @@ public final class FabricRuntime implements AutoCloseable {
     public WorkflowRepository repository() { return repository; }
     public ModConfig config() { return config; }
     public ExecutorService commandExecutor() { return commandExecutor; }
-    MinecraftServer server() { return server; }
+    public MinecraftServer server() { return server; }
     public int queueSize() { return worker == null ? 0 : worker.size(); }
     public boolean degraded() { return degraded || cache.isDegraded(); }
 

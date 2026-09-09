@@ -72,7 +72,7 @@ public final class GatehouseCommands {
         ServerCommandSource source = context.getSource();
         runtime.commandExecutor().execute(() -> {
             var requests = runtime.repository().findByStatus(status, 50);
-            source.getServer().execute(() -> {
+            runtime.server().execute(() -> {
                 if (requests.isEmpty()) {
                     source.sendFeedback(new LiteralText(Messages.get("command.no_requests")), false);
                 } else {
@@ -92,7 +92,7 @@ public final class GatehouseCommands {
         String key = context.getArgument("request", String.class);
         runtime.commandExecutor().execute(() -> {
             Optional<WhitelistRequest> request = resolve(runtime, key);
-            source.getServer().execute(() -> {
+            runtime.server().execute(() -> {
                 if (request.isEmpty()) {
                     source.sendError(new LiteralText(Messages.get("command.request_not_found")));
                 } else {
@@ -112,15 +112,15 @@ public final class GatehouseCommands {
         runtime.commandExecutor().execute(() -> {
             Optional<WhitelistRequest> request = resolve(runtime, key);
             if (request.isEmpty()) {
-                source.getServer().execute(() -> source.sendError(new LiteralText(Messages.get("command.request_not_found"))));
+                runtime.server().execute(() -> source.sendError(new LiteralText(Messages.get("command.request_not_found"))));
                 return;
             }
             runtime.decisions().decide(request.get().id(), action, principalOf(source), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
-                    .thenAcceptAsync(result -> source.sendFeedback(new LiteralText(result.message()), false), source.getServer()::execute)
+                    .thenAcceptAsync(result -> source.sendFeedback(new LiteralText(result.message()), false), runtime.server()::execute)
                     .exceptionallyAsync(error -> {
-                        source.getServer().execute(() -> source.sendError(new LiteralText(Messages.get("command.decision_failed", safeMessage(error)))));
+                        runtime.server().execute(() -> source.sendError(new LiteralText(Messages.get("command.decision_failed", safeMessage(error)))));
                         return null;
-                    }, source.getServer()::execute);
+                    }, runtime.server()::execute);
         });
         return 1;
     }
@@ -132,7 +132,7 @@ public final class GatehouseCommands {
         String username = context.getArgument("username", String.class).toLowerCase(Locale.ROOT);
         runtime.commandExecutor().execute(() -> {
             boolean removed = runtime.decisions().unblock(username, principalOf(source), "");
-            source.getServer().execute(() ->
+            runtime.server().execute(() ->
                     source.sendFeedback(new LiteralText(removed ? Messages.get("command.unblocked", username, source.getName()) : Messages.get("command.no_block", username)), false));
         });
         return 1;
@@ -145,10 +145,10 @@ public final class GatehouseCommands {
         runtime.commandExecutor().execute(() -> {
             try {
                 long pending = runtime.repository().pendingOutboxCount();
-                source.getServer().execute(() ->
+                runtime.server().execute(() ->
                         source.sendFeedback(new LiteralText(Messages.get("command.health_healthy", runtime.queueSize(), pending)), false));
             } catch (RuntimeException error) {
-                source.getServer().execute(() ->
+                runtime.server().execute(() ->
                         source.sendFeedback(new LiteralText(Messages.get("command.health_degraded", runtime.queueSize(), safeMessage(error))), false));
             }
         });
