@@ -74,11 +74,21 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 ### 5.1 Long-lived branches
 
-| Branch   | Minecraft | Status              | Notes |
-|----------|-----------|---------------------|-------|
-| `main`   | 1.21.1    | Active trunk        | Fast-forward mirror of `1.21.1`; all feature work merges here first |
-| `1.21.1` | 1.21.1    | LTS / maintenance   | Created from `main` at v1.0.0. Bug-fixes and security patches only. Merge-down from `main` cherry-picked by maintainer. |
-| `1.21.4` | 1.21.4    | Active development  | Created from `1.21.1` at v1.0.0. Receives same feature/fix PRs after acceptance on `main`/`1.21.1`. |
+| Branch   | Minecraft | Java Target | Loader | Status | Notes |
+|----------|-----------|-------------|--------|--------|-------|
+| `main`   | 1.21.1    | Java 21     | Fabric | Active trunk | Fast-forward mirror of `1.21.1`; all feature work merges here first |
+| `1.21.4` | 1.21.4    | Java 21     | Fabric | Active support | Separate binary build (`1.21.4+build.8`, API `0.119.4+1.21.4`) |
+| `1.21.1` | 1.21.1    | Java 21     | Fabric | LTS / primary | Baseline release target (`1.21.1+build.3`, API `0.116.17+1.21.1`) |
+| `1.20.6` | 1.20.6    | Java 21     | Fabric | Active support | Short-lived Java 21 release (`1.20.6+build.3`, API `0.100.8+1.20.6`) |
+| `1.20.4` | 1.20.4    | Java 17     | Fabric | Active support | Java 17 toolchain (`1.20.4+build.3`, API `0.97.3+1.20.4`) |
+| `1.20.1` | 1.20.1    | Java 17     | Fabric | LTS / popular | Legacy gold standard for 1.20 modpacks (`1.20.1+build.10`, API `0.92.12+1.20.1`) |
+| `1.19.4` | 1.19.4    | Java 17     | Fabric | Active support | Raw `Text` sendFeedback (`1.19.4+build.2`, API `0.87.2+1.19.4`) |
+| `1.19.2` | 1.19.2    | Java 17     | Fabric | LTS / popular | Primary 1.19 modpack LTS (`1.19.2+build.28`, API `0.77.0+1.19.2`) |
+| `1.18.2` | 1.18.2    | Java 17     | Fabric | LTS / popular | `LiteralText`, `TranslatableText`, v1 CommandRegistration (`1.18.2+build.4`, API `0.77.0+1.18.2`) |
+| `1.17.1` | 1.17.1    | Java 17     | Fabric | Active support | Gson 2.8 compatible parsing (`1.17.1+build.65`, API `0.46.1+1.17`) |
+| `1.16.5` | 1.16.5    | Java 17     | Fabric | LTS / popular | Runtime server thread dispatch (`1.16.5+build.10`, API `0.42.0+1.16`) |
+| `1.15.2` | 1.15.2    | Java 17     | Fabric | Maintenance | Pure Brigadier suggestions (`1.15.2+build.17`, API `0.28.5+1.15`) |
+| `1.14.4` | 1.14.4    | Java 17     | Fabric | Maintenance | Initial official Fabric release (`1.14.4+build.18`, API `0.28.5+1.14`) |
 
 Short-lived branches follow this naming convention:
 
@@ -92,15 +102,23 @@ chore/*     build, tooling, dependency bumps
 ### 5.2 Merge direction
 
 ```
-feat/* ──► main ──► 1.21.1 ──cherry-pick──► 1.21.4
+feat/* ──► main ──► 1.21.1 ──cherry-pick──► 1.21.4, 1.20.x, 1.19.x, 1.18.x, 1.17.x, 1.16.x, 1.15.x, 1.14.x
                                 fix/*  ─────────────►
 ```
 
 - Features land on `main` first.
-- Bug-fixes that apply to all versions are cherry-picked to `1.21.1` and `1.21.4` individually.
-- Never merge `1.21.4` back into `main` or `1.21.1`.
+- Bug-fixes that apply to all versions are cherry-picked across individual version branches.
+- Never merge older version branches back into `main` or newer versions.
 
-### 5.3 Adding future Minecraft versions
+### 5.3 Minecraft 1.12.2 Roadmap & Support Boundary
+
+Official Fabric **does not support versions earlier than 1.14**. 
+Supporting Minecraft 1.12.2 requires either:
+1. **Minecraft Forge (Recommended for 1.12.2)**: 99% of 1.12.2 servers run Forge. Requires a dedicated Forge platform adapter (`@Mod`, Forge events, `CommandBase` replacing Brigadier, `ITextComponent` replacing `Text`).
+2. **Legacy Fabric**: An unofficial community backport using `legacy-looming` and `net.legacyfabric.legacy-fabric-api`.
+3. **Runtime Environment**: 1.12.2 runs strictly on Java 8, requiring either running under modern Java launchers (such as CleanroomMC) or backporting core domain records and `java.net.http.HttpClient` to Java 8 class standards.
+
+### 5.4 Adding future Minecraft versions
 
 When a new Minecraft version becomes a target:
 
@@ -111,11 +129,11 @@ When a new Minecraft version becomes a target:
 5. Record verified version pins in `docs/RESEARCH.md`.
 6. Update this table.
 
-### 5.4 Branch deprecation
+### 5.5 Branch deprecation
 
 A version branch is deprecated when the corresponding Minecraft release is no longer widely used in active servers. Deprecated branches receive no further commits; they are archived (not deleted) on GitHub.
 
-### 5.5 Release branches
+### 5.6 Release branches
 
 Releases are tagged directly on the relevant version branch (e.g. `git tag v1.0.0` on `1.21.1`). No separate `release/*` staging branches are needed unless the release workflow requires pre-release review.
 

@@ -434,3 +434,50 @@ Before coding the critical hook, verify locally:
 - [ ] Discord role authorization works without enabling unnecessary privileged intents.
 
 Record discoveries that materially differ from this research in `.scratch/MIXIN_INVESTIGATION.md`, then update permanent docs/ADR if the accepted design must change.
+
+---
+
+## 10. Multi-version Fabric & Historical Minecraft Research Matrix
+
+### 10.1 Verified Version Matrix
+
+The following matrix documents the verified version pins, toolchain requirements, and passing build status for all historical Minecraft branches:
+
+| Minecraft | Yarn Mapping | Fabric API | Java Target | Key API Adaptations |
+|---|---|---|---|---|
+| **1.21.4** | `1.21.4+build.8` | `0.119.4+1.21.4` | Java 21 | Modern Fabric baseline |
+| **1.21.1** | `1.21.1+build.3` | `0.116.17+1.21.1` | Java 21 | Mod primary target (`main`) |
+| **1.20.6** | `1.20.6+build.3` | `0.100.8+1.20.6` | Java 21 | Short-lived Java 21 release |
+| **1.20.4** | `1.20.4+build.3` | `0.97.3+1.20.4` | Java 17 | `ExecutorService` try-finally compatibility in tests |
+| **1.20.1** | `1.20.1+build.10` | `0.92.12+1.20.1` | Java 17 | "Legacy gold standard" for 1.20 modpacks |
+| **1.19.4** | `1.19.4+build.2` | `0.87.2+1.19.4` | Java 17 | `sendFeedback(Text, boolean)` raw Text parameter |
+| **1.19.2** | `1.19.2+build.28` | `0.77.0+1.19.2` | Java 17 | Primary 1.19 modpack LTS |
+| **1.18.2** | `1.18.2+build.4` | `0.77.0+1.18.2` | Java 17 | `LiteralText`, `TranslatableText`, `v1.CommandRegistrationCallback` |
+| **1.17.1** | `1.17.1+build.65` | `0.46.1+1.17` | Java 17 | `new JsonParser().parse()` for Gson 2.8 compatibility |
+| **1.16.5** | `1.16.5+build.10` | `0.42.0+1.16` | Java 17 | `runtime.server().execute(...)` for thread dispatch |
+| **1.15.2** | `1.15.2+build.17` | `0.28.5+1.15` | Java 17 | Pure Brigadier `SuggestionsBuilder` matching |
+| **1.14.4** | `1.14.4+build.18` | `0.28.5+1.14` | Java 17 | Initial official Fabric release |
+
+### 10.2 Architectural Evolution Across Minecraft Eras
+
+1. **The Whitelist Hook Stability**:
+   `PlayerManager#checkCanJoin(SocketAddress, GameProfile)` (intermediary `method_14586`) exists with an identical signature across all official Fabric versions from **1.14.4 through 1.21.4**. The denial key `multiplayer.disconnect.not_whitelisted` is also invariant across this entire range.
+2. **Text Representation**:
+   - 1.14.4 – 1.18.2: Text components are instantiated directly (`new LiteralText("...")`, `new TranslatableText("...")`).
+   - 1.19.2 – 1.21.4: Text components use factory methods (`Text.literal("...")`, `Text.translatable("...")`).
+3. **Command Registration**:
+   - 1.14.4 – 1.18.2: `net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback` provides `(dispatcher, dedicated)`.
+   - 1.19.2 – 1.21.4: `net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback` provides `(dispatcher, registryAccess, environment)`.
+4. **Command Feedback**:
+   - 1.14.4 – 1.19.4: `source.sendFeedback(Text, boolean)`.
+   - 1.20.1 – 1.21.4: `source.sendFeedback(Supplier<Text>, boolean)`.
+5. **Gson Compatibility**:
+   - Minecraft 1.17.1 and earlier bundle older Gson versions where `JsonParser.parseString(String)` does not exist. Using `new JsonParser().parse(String)` provides universal cross-version support.
+
+### 10.3 The Minecraft 1.12.2 Boundary
+
+- **No Official Fabric**: The Fabric Loader project began during Minecraft 1.14. Official Fabric does not support 1.12.2.
+- **Mod Loader Choice**: Over 99% of 1.12.2 servers operate on **Minecraft Forge**. Community "Legacy Fabric" is an alternative for niche setups.
+- **Brigadier Absence**: Minecraft 1.12.2 predates Brigadier (introduced in 1.13). Commands must extend `net.minecraft.command.CommandBase`.
+- **Join Hook**: In 1.12.2, access control is handled by `net.minecraft.server.management.PlayerList#allowUserToLogin(SocketAddress, GameProfile)`.
+- **Java 8 Runtime**: 1.12.2 strictly targets Java 8 bytecode. Running on Java 8 requires either converting all 16 `record` types to standard classes and replacing `java.net.http.HttpClient`, or requiring players/servers to use modern Java 17+ launchers (e.g., CleanroomMC).
