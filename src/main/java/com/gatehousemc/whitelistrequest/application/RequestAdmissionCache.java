@@ -37,6 +37,10 @@ public final class RequestAdmissionCache {
         states.put(normalizedUsername, state);
     }
 
+    public void invalidate(String normalizedUsername) {
+        states.remove(normalizedUsername);
+    }
+
     public void markDegraded(boolean value) {
         degraded = value;
     }

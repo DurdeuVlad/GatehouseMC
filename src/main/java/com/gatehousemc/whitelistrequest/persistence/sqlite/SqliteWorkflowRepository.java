@@ -345,6 +345,22 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
     }
 
     @Override
+    public synchronized boolean isBlocked(String normalizedUsername) {
+        try {
+            return isBlockedInternal(normalizedUsername);
+        } catch (SQLException exception) {
+            return false;
+        }
+    }
+
+    private boolean isBlockedInternal(String normalizedUsername) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM identity_blocks WHERE normalized_name=?")) {
+            statement.setString(1, normalizedUsername);
+            try (ResultSet result = statement.executeQuery()) { return result.next(); }
+        }
+    }
+
+    @Override
     public synchronized List<OutboxEvent> readyOutbox(Instant now, int limit) {
         return readyOutbox(now, limit, 3);
     }
@@ -429,13 +445,6 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             LOGGER.warn("storage.persistence.failed operation=update_outbox outboxId={} errorType={}",
                     id, sqlError.getClass().getSimpleName());
             // Outbox failures are surfaced by the next status check and retry loop.
-        }
-    }
-
-    private boolean isBlocked(String normalizedUsername) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM identity_blocks WHERE normalized_name=?")) {
-            statement.setString(1, normalizedUsername);
-            try (ResultSet result = statement.executeQuery()) { return result.next(); }
         }
     }
 

@@ -34,6 +34,8 @@ public interface WorkflowRepository extends AutoCloseable {
 
     boolean unblock(String normalizedUsername, AdminPrincipal actor, String reason, Instant now);
 
+    boolean isBlocked(String normalizedUsername);
+
     List<OutboxEvent> readyOutbox(Instant now, int limit);
 
     void completeOutbox(UUID outboxId, Instant now);

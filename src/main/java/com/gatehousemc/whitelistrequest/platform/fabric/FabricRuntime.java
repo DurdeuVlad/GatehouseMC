@@ -108,8 +108,12 @@ public final class FabricRuntime implements AutoCloseable {
                 denialCooldown, decisionExecutor);
         repository.findByStatus(Optional.of(RequestStatus.PENDING), 500)
                 .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending()));
-        repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500)
-                .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.blocked()));
+        List<WhitelistRequest> blockedRequests = repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500);
+        for (WhitelistRequest request : blockedRequests) {
+            if (repository.isBlocked(request.identity().normalizedUsername())) {
+                cache.put(request.identity().normalizedUsername(), AdmissionState.blocked());
+            }
+        }
         repository.findByStatus(Optional.of(RequestStatus.DENIED), 500)
                 .forEach(request -> {
                     Instant deniedUntil = request.resolvedAt().plus(denialCooldown);
@@ -171,6 +175,7 @@ public final class FabricRuntime implements AutoCloseable {
     public WorkflowRepository repository() { return repository; }
     public ModConfig config() { return config; }
     public ExecutorService commandExecutor() { return commandExecutor; }
+    public void invalidateCache(String normalizedUsername) { cache.invalidate(normalizedUsername); }
     MinecraftServer server() { return server; }
     public int queueSize() { return worker == null ? 0 : worker.size(); }
     public boolean degraded() { return degraded || cache.isDegraded(); }
