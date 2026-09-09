@@ -119,7 +119,17 @@ public final class DecisionService {
         WorkflowRepository.DecisionResultSnapshot result = repository.resolveTerminal(
                 requestId, action, actor, reason, clock.now());
         result.request().ifPresent(this::refreshCache);
-        return new DecisionResult(result.outcome(), result.request(), result.message());
+        String message = switch (result.outcome()) {
+            case DENIED -> Messages.get("decision.denied", actor.displayName());
+            case BLOCKED -> Messages.get("decision.blocked", actor.displayName());
+            case NOT_FOUND -> Messages.get("decision.not_found");
+            case RESOLVING -> Messages.get("decision.already_resolving");
+            case ALREADY_RESOLVED -> Messages.get("decision.already_resolved");
+            case ALREADY_PENDING -> Messages.get("decision.already_pending");
+            case FAILED -> Messages.get("decision.failed");
+            default -> result.message();
+        };
+        return new DecisionResult(result.outcome(), result.request(), message);
     }
 
     /**
@@ -186,7 +196,7 @@ public final class DecisionService {
         if (result.outcome() != DecisionOutcome.UNDONE) {
             return new DecisionResult(result.outcome(), Optional.of(current), result.message());
         }
-        return DecisionResult.of(DecisionOutcome.UNDONE, current, Messages.get("decision.undone"));
+        return DecisionResult.of(DecisionOutcome.UNDONE, current, Messages.get("decision.undone", actor.displayName()));
     }
 
     private DecisionResult completeApproval(WhitelistRequest request, AdminPrincipal actor, String reason,
@@ -207,7 +217,7 @@ public final class DecisionService {
                     Messages.get("decision.approval_state_error"));
         }
         refreshCache(current);
-        return DecisionResult.of(DecisionOutcome.APPROVED, current, Messages.get("decision.approved"));
+        return DecisionResult.of(DecisionOutcome.APPROVED, current, Messages.get("decision.approved", actor.displayName()));
     }
 
     private Void recover(WhitelistRequest request, Boolean allowed, Throwable error) {

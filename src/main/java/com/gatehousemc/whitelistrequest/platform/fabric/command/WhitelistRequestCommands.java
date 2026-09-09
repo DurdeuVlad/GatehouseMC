@@ -107,7 +107,7 @@ public final class WhitelistRequestCommands {
                 source.getServer().execute(() -> source.sendError(Text.literal(Messages.get("command.request_not_found"))));
                 return;
             }
-            runtime.decisions().decide(request.get().id(), action, AdminPrincipal.console(), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
+            runtime.decisions().decide(request.get().id(), action, principalOf(source), Optional.ofNullable(reason).filter(value -> !value.isBlank()))
                     .thenAcceptAsync(result -> source.sendFeedback(() -> Text.literal(result.message()), false), source.getServer()::execute)
                     .exceptionallyAsync(error -> {
                         source.getServer().execute(() -> source.sendError(Text.literal(Messages.get("command.decision_failed", safeMessage(error)))));
@@ -123,9 +123,9 @@ public final class WhitelistRequestCommands {
         ServerCommandSource source = context.getSource();
         String username = context.getArgument("username", String.class).toLowerCase(Locale.ROOT);
         runtime.commandExecutor().execute(() -> {
-            boolean removed = runtime.decisions().unblock(username, AdminPrincipal.console(), "");
+            boolean removed = runtime.decisions().unblock(username, principalOf(source), "");
             source.getServer().execute(() ->
-                    source.sendFeedback(() -> Text.literal(removed ? Messages.get("command.unblocked", username) : Messages.get("command.no_block", username)), false));
+                    source.sendFeedback(() -> Text.literal(removed ? Messages.get("command.unblocked", username, source.getName()) : Messages.get("command.no_block", username)), false));
         });
         return 1;
     }
@@ -145,6 +145,13 @@ public final class WhitelistRequestCommands {
             }
         });
         return 1;
+    }
+
+    private static AdminPrincipal principalOf(ServerCommandSource source) {
+        if (source.getEntity() != null) {
+            return new AdminPrincipal("minecraft", source.getName(), source.getName());
+        }
+        return AdminPrincipal.console();
     }
 
     private static Optional<WhitelistRequest> resolve(FabricRuntime runtime, String value) {

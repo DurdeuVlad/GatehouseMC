@@ -6,6 +6,8 @@ import com.gatehousemc.whitelistrequest.domain.*;
 import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.integration.common.ApprovalMessageRenderer;
 import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser.ParsedCallback;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser.CallbackKind;
 import com.gatehousemc.whitelistrequest.port.ApprovalInterface;
 import com.gatehousemc.whitelistrequest.port.ProviderHealth;
 import com.google.gson.JsonArray;
@@ -118,14 +120,43 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         JsonObject message = callback.getAsJsonObject("message");
         String chatId = message.getAsJsonObject("chat").get("id").getAsString();
         String userId = from.get("id").getAsString();
-        CallbackActionParser.ParsedAction action = CallbackActionParser.parse(callback.get("data").getAsString());
-        if (action == null || !config.chatId().equals(chatId) || !config.allowedUserIds().contains(userId)) {
+        ParsedCallback parsed = CallbackActionParser.parse(callback.get("data").getAsString());
+        if (parsed == null || !config.chatId().equals(chatId) || !config.allowedUserIds().contains(userId)) {
             api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\",\"text\":\"" + json(Messages.get("provider.not_authorized_telegram")) + "\",\"show_alert\":true}");
             return;
         }
-        api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
-        decisions.decide(action.requestId(), action.action(), new AdminPrincipal("telegram", userId,
-                        from.has("username") ? from.get("username").getAsString() : userId), Optional.empty());
+        AdminPrincipal principal = new AdminPrincipal("telegram", userId,
+                from.has("username") ? from.get("username").getAsString() : userId);
+        switch (parsed.kind()) {
+            case PRIMARY -> {
+                String confirmText = confirmMessage(parsed.action());
+                String keyboard = confirmKeyboard(parsed.action(), parsed.requestId());
+                api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
+                api.post("sendMessage", "{\"chat_id\":\"" + json(chatId) + "\",\"text\":\"" + json(confirmText) + "\",\"reply_markup\":" + keyboard + "}");
+            }
+            case CONFIRM -> {
+                api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
+                decisions.decide(parsed.requestId(), parsed.action(), principal, Optional.empty());
+            }
+            case CANCEL -> {
+                api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\",\"text\":\"" + json(Messages.get("confirm.cancelled")) + "\",\"show_alert\":true}");
+            }
+        }
+    }
+
+    private static String confirmMessage(DecisionAction action) {
+        return switch (action) {
+            case APPROVE -> Messages.get("confirm.approve");
+            case DENY -> Messages.get("confirm.deny");
+            case BLOCK -> Messages.get("confirm.block");
+            case UNDO -> Messages.get("confirm.undo");
+        };
+    }
+
+    private static String confirmKeyboard(DecisionAction action, UUID requestId) {
+        return "{\"inline_keyboard\":[[" +
+                "{\"text\":\"✅ " + json(Messages.get("button.confirm")) + "\",\"callback_data\":\"" + json(CallbackActionParser.formatConfirm(action, requestId)) + "\"}," +
+                "{\"text\":\"❌ " + json(Messages.get("button.cancel")) + "\",\"callback_data\":\"" + json(CallbackActionParser.formatCancel(requestId)) + "\"}]]}";
     }
 
     private static String render(RequestView request) {

@@ -2,6 +2,7 @@ package com.gatehousemc.whitelistrequest.integration.discord;
 
 import com.gatehousemc.whitelistrequest.domain.*;
 import com.gatehousemc.whitelistrequest.config.ModConfig;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
 import com.gatehousemc.whitelistrequest.port.ProviderHealth;
 import org.junit.jupiter.api.Test;
 
@@ -70,6 +71,39 @@ class DiscordApprovalInterfaceTest {
         assertNull(DiscordApprovalInterface.parseAction("wr:x:" + UUID.randomUUID()));
         assertNull(DiscordApprovalInterface.parseAction("wr:a:not-a-uuid"));
         assertNull(DiscordApprovalInterface.parseAction("invalid"));
+    }
+
+    @Test
+    void parseCallbackHandlesConfirmAndCancelFormats() {
+        UUID id = UUID.randomUUID();
+        CallbackActionParser.ParsedCallback primary = CallbackActionParser.parse("wr:a:" + id);
+        assertEquals(CallbackActionParser.CallbackKind.PRIMARY, primary.kind());
+        assertEquals(DecisionAction.APPROVE, primary.action());
+        assertEquals(id, primary.requestId());
+
+        CallbackActionParser.ParsedCallback confirm = CallbackActionParser.parse("wr:c:d:" + id);
+        assertEquals(CallbackActionParser.CallbackKind.CONFIRM, confirm.kind());
+        assertEquals(DecisionAction.DENY, confirm.action());
+        assertEquals(id, confirm.requestId());
+
+        CallbackActionParser.ParsedCallback cancel = CallbackActionParser.parse("wr:x:" + id);
+        assertEquals(CallbackActionParser.CallbackKind.CANCEL, cancel.kind());
+        assertEquals(id, cancel.requestId());
+    }
+
+    @Test
+    void formatCallbacksProduceCorrectStrings() {
+        UUID id = UUID.randomUUID();
+        assertEquals("wr:a:" + id, CallbackActionParser.formatPrimary(DecisionAction.APPROVE, id));
+        assertEquals("wr:c:a:" + id, CallbackActionParser.formatConfirm(DecisionAction.APPROVE, id));
+        assertEquals("wr:x:" + id, CallbackActionParser.formatCancel(id));
+    }
+
+    @Test
+    void legacyParseActionIgnoresConfirmAndCancel() {
+        UUID id = UUID.randomUUID();
+        assertNull(CallbackActionParser.parseAction("wr:c:a:" + id));
+        assertNull(CallbackActionParser.parseAction("wr:x:" + id));
     }
 
     @Test

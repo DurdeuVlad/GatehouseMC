@@ -45,4 +45,29 @@ class MessagesTest {
         assertTrue(result.contains("Charlie"));
         assertFalse(result.contains("{0}"));
     }
+
+    @Test
+    void decisionMessagesIncludeActorName() {
+        Messages.load("en_us");
+        assertTrue(Messages.get("decision.approved", "Console").contains("Console"));
+        assertTrue(Messages.get("decision.denied", "Admin").contains("Admin"));
+        assertTrue(Messages.get("decision.blocked", "Moderator").contains("Moderator"));
+        assertTrue(Messages.get("decision.undone", "Operator").contains("Operator"));
+    }
+
+    @Test
+    void confirmationMessagesExistInBothLanguages() {
+        Messages.load("en_us");
+        assertNotNull(Messages.get("confirm.approve"));
+        assertNotNull(Messages.get("confirm.deny"));
+        assertNotNull(Messages.get("confirm.block"));
+        assertNotNull(Messages.get("confirm.undo"));
+        assertEquals("Confirm", Messages.get("button.confirm"));
+        assertEquals("Cancel", Messages.get("button.cancel"));
+
+        Messages.load("ro_ro");
+        assertNotNull(Messages.get("confirm.approve"));
+        assertEquals("Confirma", Messages.get("button.confirm"));
+        assertEquals("Anuleaza", Messages.get("button.cancel"));
+    }
 }

@@ -6,6 +6,8 @@ import com.gatehousemc.whitelistrequest.domain.*;
 import com.gatehousemc.whitelistrequest.i18n.Messages;
 import com.gatehousemc.whitelistrequest.integration.common.ApprovalMessageRenderer;
 import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser.ParsedCallback;
+import com.gatehousemc.whitelistrequest.integration.common.CallbackActionParser.CallbackKind;
 import com.gatehousemc.whitelistrequest.port.ApprovalInterface;
 import com.gatehousemc.whitelistrequest.port.ProviderHealth;
 import net.dv8tion.jda.api.JDA;
@@ -14,6 +16,8 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
 
 import java.util.UUID;
 import java.util.Optional;
@@ -93,8 +97,8 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String customId = event.getComponentId();
-        CallbackActionParser.ParsedAction action = CallbackActionParser.parse(customId);
-        if (action == null) {
+        ParsedCallback callback = CallbackActionParser.parse(customId);
+        if (callback == null) {
             event.reply(Messages.get("provider.invalid_action")).setEphemeral(true).queue();
             return;
         }
@@ -102,11 +106,33 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
             event.reply(Messages.get("provider.not_authorized")).setEphemeral(true).queue();
             return;
         }
-        event.deferReply(true).queue();
-        decisions.decide(action.requestId(), action.action(),
-                        new AdminPrincipal("discord", event.getUser().getId(), event.getUser().getEffectiveName()), Optional.empty())
-                .thenAccept(result -> event.getHook().sendMessage(result.message()).setEphemeral(true).queue())
-                .exceptionally(error -> { event.getHook().sendMessage(Messages.get("provider.decision_failed")).setEphemeral(true).queue(); return null; });
+        AdminPrincipal principal = new AdminPrincipal("discord", event.getUser().getId(), event.getUser().getEffectiveName());
+        switch (callback.kind()) {
+            case PRIMARY -> {
+                String confirmMsg = confirmMessage(callback.action());
+                Button confirmBtn = Button.danger(CallbackActionParser.formatConfirm(callback.action(), callback.requestId()), Messages.get("button.confirm"));
+                Button cancelBtn = Button.secondary(CallbackActionParser.formatCancel(callback.requestId()), Messages.get("button.cancel"));
+                event.reply(confirmMsg).addComponents(ActionRow.of(confirmBtn, cancelBtn)).setEphemeral(true).queue();
+            }
+            case CONFIRM -> {
+                event.deferReply(true).queue();
+                decisions.decide(callback.requestId(), callback.action(), principal, Optional.empty())
+                        .thenAccept(result -> event.getHook().sendMessage(result.message()).setEphemeral(true).queue())
+                        .exceptionally(error -> { event.getHook().sendMessage(Messages.get("provider.decision_failed")).setEphemeral(true).queue(); return null; });
+            }
+            case CANCEL -> {
+                event.reply(Messages.get("confirm.cancelled")).setEphemeral(true).queue();
+            }
+        }
+    }
+
+    private static String confirmMessage(DecisionAction action) {
+        return switch (action) {
+            case APPROVE -> Messages.get("confirm.approve");
+            case DENY -> Messages.get("confirm.deny");
+            case BLOCK -> Messages.get("confirm.block");
+            case UNDO -> Messages.get("confirm.undo");
+        };
     }
 
     private boolean authorized(ButtonInteractionEvent event) {
@@ -122,7 +148,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     }
 
     static ParsedAction parseAction(String value) {
-        CallbackActionParser.ParsedAction parsed = CallbackActionParser.parse(value);
+        CallbackActionParser.ParsedAction parsed = CallbackActionParser.parseAction(value);
         return parsed == null ? null : new ParsedAction(parsed.action(), parsed.requestId());
     }
 
