@@ -597,6 +597,56 @@ public interface ApprovalInterface {
 
 The interface must not expose JDA/Telegram types.
 
+---
+
+## Multi-version Minecraft support
+
+The mod currently targets Minecraft 1.21.1 exclusively. This section documents
+how to add support for a new Minecraft version without forking the project.
+
+### Version-coupled components
+
+All Minecraft-specific code is confined to `platform/fabric/`:
+
+| Component | Coupling point |
+|-----------|---------------|
+| `PlayerManagerMixin` | Injects `PlayerManager.checkCanJoin`, inspects `TranslatableTextContent.getKey()` for `"multiplayer.disconnect.not_whitelisted"` |
+| `WhitelistRequestMod` | `Text.literal(...)`, `MinecraftServer`, `GameProfile` |
+| `FabricRuntime` | `MinecraftServer`, `Text` |
+| `FabricVanillaWhitelistAdapter` | `WhitelistEntry`, `GameProfile` |
+| `WhitelistRequestCommands` | Brigadier, `ServerCommandSource`, `Text.literal(...)` |
+
+The core domain (`domain/`, `application/`, `port/`) has zero Minecraft imports,
+verified by `ArchitectureTest`.
+
+### Adding a new Minecraft version
+
+1. **Update `gradle.properties`**: change `minecraft_version`, `yarn_mappings`,
+   and `fabric_version` to the target version's values.
+2. **Verify the Mixin target**: inspect the new Yarn mappings for
+   `PlayerManager.checkCanJoin(SocketAddress, GameProfile)`. If the method
+   signature or name has changed, create a version-specific Mixin.
+3. **Verify the translatable key**: check that
+   `multiplayer.disconnect.not_whitelisted` still exists in the new version's
+   language files. If it has changed, update `PlayerManagerMixin`.
+4. **Verify `Text.literal`**: this API is stable across modern Minecraft
+   versions but should be checked if targeting a major version jump.
+5. **Run the full test suite and E2E acceptance matrix** on the new version.
+
+### Per-version source directories (when needed)
+
+If a Mixin or adapter must differ between versions, create per-version source
+directories:
+
+```text
+src/main/java/          — common code (domain, application, ports, non-MC adapters)
+src/1.21.1/java/        — 1.21.1-specific Mixin and platform adapter
+src/1.21.4/java/        — 1.21.4-specific Mixin and platform adapter
+```
+
+Configure `build.gradle` with a source set per version and a multi-jar build.
+This is not needed for a single-version target.
+
 ### Router
 
 ```java
