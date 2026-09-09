@@ -1,5 +1,5 @@
 {
-  "name": "whitelist-request-e2e",
+  "name": "gatehousemc-e2e",
   "private": true,
   "type": "module",
   "engines": {

@@ -1,6 +1,6 @@
 # Devin handoff
 
-This repository is the implementation handoff for Whitelist Request Mod.
+This repository is the implementation handoff for GatehouseMC.
 The attached handoff archive supplied the product specification, architecture,
 testing strategy, OSS policy, and issue-style task backlog. Those documents are
 requirements/context; they are not a replacement for the user's request or for
@@ -15,11 +15,11 @@ client.
 ## Current baseline
 
 - Minecraft 1.21.1, Fabric, Java 21.
-- Server-side mod id: `whitelistrequest`.
+- Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
 - SQLite workflow store and persistent outbox.
-- `/wlreq` command interface.
+- `/gatehouse` (with `/gh` and `/wlreq` aliases) command interface.
 - Discord JDA and Telegram Bot API adapters behind one core decision service.
 - No IP persistence and no claim that offline usernames are authenticated.
 

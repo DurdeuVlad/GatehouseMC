@@ -1,6 +1,6 @@
-# Contributing to Whitelist Request Mod
+# Contributing to GatehouseMC
 
-Whitelist Request Mod is a server-side access-request workflow for modded Minecraft. Because it touches the login path, persistent state, and privileged admin actions, contributions are held to a high proof standard.
+GatehouseMC is a server-side access-request workflow for modded Minecraft. Because it touches the login path, persistent state, and privileged admin actions, contributions are held to a high proof standard.
 
 This project intentionally follows the collaboration discipline that worked well for [HeapHammer](https://github.com/DurdeuVlad/heaphammer): narrow architecture boundaries, test-first behavior changes, real-server verification, clear issues, and transparent AI-assisted development.
 

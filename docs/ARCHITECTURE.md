@@ -1,4 +1,4 @@
-# Architecture — Whitelist Request Mod
+# Architecture — GatehouseMC
 
 This document defines the implementation blueprint for the Minecraft 1.21.1 Fabric release. Product semantics live in `../WHITELIST_REQUEST_SPEC.md`; accepted rationale lives in `DECISION.md`.
 
@@ -39,7 +39,7 @@ Dependency direction always points inward.
 A single Gradle module is acceptable for v1 if package boundaries are strict. Do not create a multi-module build solely for aesthetics.
 
 ```text
-src/main/java/<base>/whitelistrequest/
+src/main/java/com/gatehousemc/
 ├── domain/
 │   ├── WhitelistRequest.java
 │   ├── RequestStatus.java
@@ -74,10 +74,10 @@ src/main/java/<base>/whitelistrequest/
 │   └── MigrationRunner.java
 │
 ├── platform/fabric/
-│   ├── WhitelistRequestMod.java
+│   ├── GatehouseMod.java
 │   ├── FabricVanillaWhitelistAdapter.java
 │   ├── FabricServerScheduler.java
-│   ├── command/WhitelistRequestCommands.java
+│   ├── command/GatehouseCommands.java
 │   └── mixin/PlayerManagerMixin.java
 │
 ├── integration/discord/
@@ -611,10 +611,10 @@ All Minecraft-specific code is confined to `platform/fabric/`:
 | Component | Coupling point |
 |-----------|---------------|
 | `PlayerManagerMixin` | Injects `PlayerManager.checkCanJoin`, inspects `TranslatableTextContent.getKey()` for `"multiplayer.disconnect.not_whitelisted"` |
-| `WhitelistRequestMod` | `Text.literal(...)`, `MinecraftServer`, `GameProfile` |
+| `GatehouseMod` | `Text.literal(...)`, `MinecraftServer`, `GameProfile` |
 | `FabricRuntime` | `MinecraftServer`, `Text` |
 | `FabricVanillaWhitelistAdapter` | `WhitelistEntry`, `GameProfile` |
-| `WhitelistRequestCommands` | Brigadier, `ServerCommandSource`, `Text.literal(...)` |
+| `GatehouseCommands` | Brigadier, `ServerCommandSource`, `Text.literal(...)` |
 
 The core domain (`domain/`, `application/`, `port/`) has zero Minecraft imports,
 verified by `ArchitectureTest`.
@@ -741,7 +741,7 @@ Telegram callback data has a small size limit; the action + canonical request UU
 
 `ConfigLoader`:
 
-1. read JSON from `config/whitelistrequest/config.json`;
+1. read JSON from `config/gatehousemc/config.json` (or migrated from `config/whitelistrequest/config.json`);
 2. expand `${ENV_VAR}` placeholders in memory;
 3. validate all fields;
 4. produce immutable `ModConfig`;
@@ -749,7 +749,7 @@ Telegram callback data has a small size limit; the action + canonical request UU
 
 Provider config validation errors disable that provider and surface status, rather than crashing Minecraft unless a core-required config (e.g. database path) is unusable.
 
-`/wlreq reload` should restart affected providers safely. Do not change database path on live reload.
+`/gatehouse reload` (or `/wlreq reload`) should restart affected providers safely. Do not change database path on live reload.
 
 ---
 

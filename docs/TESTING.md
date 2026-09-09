@@ -145,7 +145,7 @@ Provision:
 3. the **built production mod jar** from `build/libs`;
 4. `eula=true` (test harness must document that enabling it accepts Mojang's EULA for the test environment);
 5. generated `server.properties`;
-6. test `config/whitelistrequest/config.json`;
+6. test `config/gatehousemc/config.json`;
 7. empty whitelist/database unless scenario requires fixture state.
 
 Do not run the E2E against the developer's personal Minecraft server directory.

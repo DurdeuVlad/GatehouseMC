@@ -1,8 +1,8 @@
-# Whitelist Request Mod — Product & Business Specification
+# GatehouseMC — Product & Business Specification
 
-> **Status:** Implementation handoff specification  
-> **Working name:** Whitelist Request Mod  
-> **Working mod id:** `whitelistrequest`  
+> **Status:** Active product specification  
+> **Official name:** GatehouseMC (formerly Whitelist Request Mod)  
+> **Canonical mod id:** `gatehousemc`  
 > **Initial platform:** Minecraft 1.21.1, Fabric, Java 21  
 > **Primary deployment:** `online-mode=false`, `white-list=true`  
 > **Quality benchmark:** HeapHammer-level engineering discipline, not HeapHammer functionality.

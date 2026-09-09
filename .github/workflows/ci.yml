@@ -25,8 +25,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: whitelist-request-jar
-          path: build/libs/whitelist-request-*.jar
+          name: gatehousemc-jar
+          path: build/libs/gatehousemc-*.jar
           if-no-files-found: error
 
   e2e-smoke:

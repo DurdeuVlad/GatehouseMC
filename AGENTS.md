@@ -1,7 +1,7 @@
-# Whitelist Request Mod — Agent Constitution
+# GatehouseMC — Agent Constitution
 
-> Working project name: **Whitelist Request Mod**  
-> Working mod id: `whitelistrequest`  
+> Official project name: **GatehouseMC**  
+> Canonical mod id: `gatehousemc`  
 > Quality benchmark: [HeapHammer](https://github.com/DurdeuVlad/heaphammer)  
 > Product behavior is defined by [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md).
 

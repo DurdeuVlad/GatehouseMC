@@ -1,12 +1,12 @@
 # Open Source Software (OSS) Guide & Governance
 
-This document defines the intended open-source operating model for Whitelist Request Mod. It is modeled on the successful governance style of HeapHammer but adapted to this project's security/privacy surface.
+This document defines the open-source operating model for GatehouseMC. It is modeled on the successful governance style of HeapHammer but adapted to this project's security/privacy surface.
 
 ---
 
 ## 1. Mission and values
 
-Whitelist Request Mod exists to make private/modded Minecraft whitelist administration simple, durable, and extensible while preserving vanilla behavior.
+GatehouseMC exists to make private/modded Minecraft whitelist administration simple, durable, and extensible while preserving vanilla behavior.
 
 Values:
 
@@ -20,19 +20,15 @@ Values:
 
 ---
 
-## 2. Recommended license
+## 2. Project license
 
-Recommended project license: **GNU Lesser General Public License v3.0 (LGPL-3.0)**, matching the broad interoperability goals and the licensing model used by HeapHammer.
+The canonical project license is the **MIT License** (see [`LICENSE`](../LICENSE)).
 
 Rationale:
 
-- keeps the mod itself free/open;
-- allows inclusion in public/private modpacks and servers;
-- does not require unrelated mods or server configuration to adopt the same license merely because they run alongside it.
-
-Before public release, add a canonical `LICENSE` file and make repository/package metadata agree with it.
-
-This document is project policy guidance, not legal advice.
+- simple, permissive, and universally recognized in the Minecraft modding and open-source ecosystems;
+- allows frictionless inclusion in modpacks, public servers, and private server networks;
+- matches `fabric.mod.json` and artifact publishing policies for Modrinth and CurseForge.
 
 ---
 

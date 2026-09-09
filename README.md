@@ -1,8 +1,22 @@
-# Whitelist Request Mod
+<p align="center">
+  <img src="assets/gatehousemc_banner.png" alt="GatehouseMC Banner" width="100%">
+</p>
 
-Server-side Fabric mod for Minecraft 1.21.1. When vanilla rejects an offline-mode player because they are not whitelisted, the mod records one durable request and exposes it through `/wlreq`, Discord, and Telegram adapters.
+# GatehouseMC
 
-This is a workflow layer around Minecraft's native whitelist. It does not authenticate players, replace `whitelist.json`, retain IP addresses, or require a client mod.
+<p align="center">
+  <a href="https://github.com/DurdeuVlad/GatehouseMC/releases"><img src="https://img.shields.io/github/v/release/DurdeuVlad/GatehouseMC?color=brightgreen&label=Release" alt="GitHub Release"></a>
+  <a href="https://modrinth.com/mod/gatehousemc"><img src="https://img.shields.io/badge/Modrinth-Available-00AF5C?logo=modrinth&logoColor=white" alt="Modrinth"></a>
+  <a href="https://www.curseforge.com/minecraft/mc-mods/gatehousemc"><img src="https://img.shields.io/badge/CurseForge-Available-F16436?logo=curseforge&logoColor=white" alt="CurseForge"></a>
+  <img src="https://img.shields.io/badge/Minecraft-1.21.1-brightgreen.svg" alt="Minecraft 1.21.1">
+  <img src="https://img.shields.io/badge/Loader-Fabric-blue.svg" alt="Fabric">
+  <img src="https://img.shields.io/badge/Side-Server--Only-orange.svg" alt="Server-Side Only">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
+</p>
+
+Server-side Fabric mod for Minecraft 1.21.1. When vanilla rejects an offline-mode player because they are not whitelisted, GatehouseMC records one durable request and exposes approve/deny/block/undo actions through `/gatehouse` (aliases `/gh`, `/wlreq`), Discord, and Telegram adapters.
+
+GatehouseMC is an operational workflow layer around Minecraft's native whitelist. It does not authenticate players, replace `whitelist.json`, retain IP addresses, or require a client mod.
 
 ## Requirements
 
@@ -10,6 +24,13 @@ This is a workflow layer around Minecraft's native whitelist. It does not authen
 - Fabric Loader 0.19.5 and a compatible Fabric API
 - Java 21
 - `online-mode=false` and `white-list=true` for the supported offline-mode workflow
+
+## Downloads & Distribution
+
+- **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(see [Modrinth Description](docs/publishing/MODRINTH.md))*
+- **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(see [CurseForge Description](docs/publishing/CURSEFORGE.md))*
+- **GitHub Releases:** [github.com/DurdeuVlad/GatehouseMC/releases](https://github.com/DurdeuVlad/GatehouseMC/releases)
+- **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)
 
 ## Build
 
@@ -23,7 +44,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The production artifact is written to `build/libs/`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server.
+The production artifact is written to `build/libs/gatehousemc-1.0.0.jar`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
 
 ## Real-server smoke test
 
@@ -44,24 +65,31 @@ clean standalone server and restart/outage scenarios, is documented in
 
 ## Install and configure
 
-Put the production jar in the server's `mods/` directory and start the server once. The mod creates:
+Put `gatehousemc-1.0.0.jar` in the server's `mods/` directory and start the server once. GatehouseMC creates:
 
 ```text
-config/whitelistrequest/config.json
-config/whitelistrequest/requests.sqlite
+config/gatehousemc/config.json
+config/gatehousemc/requests.sqlite
 ```
+
+> [!NOTE]
+> Existing deployments using legacy `config/whitelistrequest/` are automatically migrated on startup to `config/gatehousemc/`.
 
 Minecraft commands are always available after the server starts:
 
 ```text
-/wlreq list [pending|approved|denied|blocked]
-/wlreq show <request-id|username>
-/wlreq approve <request-id|username> [reason...]
-/wlreq deny <request-id|username> [reason...]
-/wlreq block <request-id|username> [reason...]
-/wlreq unblock <username> [reason...]
-/wlreq status
+/gatehouse list [pending|approved|denied|blocked]
+/gatehouse show <request-id|username>
+/gatehouse approve <request-id|username> [reason...]
+/gatehouse deny <request-id|username> [reason...]
+/gatehouse block <request-id|username> [reason...]
+/gatehouse unblock <username> [reason...]
+/gatehouse undo <request-id|username> [reason...]
+/gatehouse status
+/gatehouse reload
 ```
+
+*(Commands also respond to `/gh` and `/wlreq` aliases).*
 
 Discord and Telegram are disabled by default. Enable them only after setting stable administrator IDs and provider secrets. Secrets can use `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`; expanded values stay in memory and are never written back or included in status output.
 
@@ -73,4 +101,4 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 All unit, component, architecture, router, and fake-transport tests pass. A real Fabric 1.21.1 dedicated server has proven: rejection -> persistence -> approval -> native whitelist mutation -> reconnect -> restart persistence, and distinct player-facing messages for first-request, pending, denied, blocked, and degraded states. The production jar nests SQLite and JDA and runs on a clean server with no additional dependencies.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), and [`docs/OSS.md`](docs/OSS.md) for project policy and handoff status.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.

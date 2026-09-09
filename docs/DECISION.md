@@ -147,3 +147,19 @@ This document records the accepted foundational decisions for Whitelist Request 
 - **Context:** Unit tests cannot prove Mixins, loader packaging, offline login protocol, or vanilla whitelist behavior.
 - **Decision:** The acceptance suite must boot a real Minecraft 1.21.1 Fabric dedicated server and connect an offline-mode protocol client. Build success alone is never release proof.
 - **Consequences:** CI is slower and more operationally involved, but runtime confidence is materially higher.
+
+---
+
+## ADR-016 — Full Project Rebrand to GatehouseMC
+
+- **Status:** Accepted
+- **Context:** The project transitioned from the generic working title `Whitelist Request Mod` (`whitelistrequest`) to the canonical product identity **GatehouseMC** (`gatehousemc`), accompanied by distinct brand assets (gatehouse pixel logo and banner).
+- **Decision:**
+  - Official mod id is `gatehousemc`.
+  - Jar output name is `gatehousemc-<version>.jar`.
+  - Java base package is `com.gatehousemc`.
+  - Primary command is `/gatehouse` with aliases `/gh` and `/wlreq`.
+  - Default config path is `config/gatehousemc/` with transparent automatic migration from legacy `config/whitelistrequest/`.
+  - In-jar assets and translation bundles are housed under `/assets/gatehousemc/`.
+- **Consequences:** Consistent, unified branding across repository, jar metadata, fabric loader, documentation, and operational interfaces while retaining 100% backward compatibility for existing deployments.
+
