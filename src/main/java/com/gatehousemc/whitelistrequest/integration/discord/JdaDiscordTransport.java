@@ -51,11 +51,6 @@ final class JdaDiscordTransport implements DiscordTransport {
     }
 
     private static Button[] actionButtons(UUID requestId, boolean disabled) {
-        return new Button[]{
-                Button.success("wr:a:" + requestId, Messages.get("button.approve")).withDisabled(disabled),
-                Button.danger("wr:d:" + requestId, Messages.get("button.deny")).withDisabled(disabled),
-                Button.secondary("wr:b:" + requestId, Messages.get("button.block")).withDisabled(disabled),
-                Button.secondary("wr:u:" + requestId, Messages.get("button.undo")).withDisabled(disabled)
-        };
+        return DiscordApprovalInterface.actionButtons(requestId, disabled);
     }
 }

@@ -90,6 +90,12 @@ public final class DecisionService {
         return removed;
     }
 
+    /** Returns a snapshot of the current request state for rendering by approval interfaces. */
+    public Optional<RequestView> findRequest(UUID requestId) {
+        Objects.requireNonNull(requestId, "requestId");
+        return repository.findById(requestId).map(RequestView::from);
+    }
+
     public CompletionStage<Void> recoverInterruptedApprovals() {
         List<CompletableFuture<Void>> recoveries = new ArrayList<>();
         for (WhitelistRequest request : repository.findResolvingApprovals()) {

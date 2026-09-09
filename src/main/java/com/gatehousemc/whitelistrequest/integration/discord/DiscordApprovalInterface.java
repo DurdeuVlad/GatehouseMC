@@ -19,8 +19,9 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 
-import java.util.UUID;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -109,29 +110,49 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         AdminPrincipal principal = new AdminPrincipal("discord", event.getUser().getId(), event.getUser().getEffectiveName());
         switch (callback.kind()) {
             case PRIMARY -> {
-                String confirmMsg = confirmMessage(callback.action());
+                Optional<RequestView> request = decisions.findRequest(callback.requestId());
+                String player = request.map(r -> r.identity().exactUsername()).orElse("?");
+                String shortId = shortId(callback.requestId());
+                String confirmMsg = confirmMessage(callback.action(), player, shortId);
                 Button confirmBtn = Button.danger(CallbackActionParser.formatConfirm(callback.action(), callback.requestId()), Messages.get("button.confirm"));
                 Button cancelBtn = Button.secondary(CallbackActionParser.formatCancel(callback.requestId()), Messages.get("button.cancel"));
-                event.reply(confirmMsg).addComponents(ActionRow.of(confirmBtn, cancelBtn)).setEphemeral(true).queue();
+                event.editMessage(confirmMsg).setComponents(ActionRow.of(confirmBtn, cancelBtn)).queue();
             }
             case CONFIRM -> {
-                event.deferReply(true).queue();
+                event.deferEdit().queue();
                 decisions.decide(callback.requestId(), callback.action(), principal, Optional.empty())
                         .thenAccept(result -> event.getHook().sendMessage(result.message()).setEphemeral(true).queue())
                         .exceptionally(error -> { event.getHook().sendMessage(Messages.get("provider.decision_failed")).setEphemeral(true).queue(); return null; });
             }
             case CANCEL -> {
-                event.reply(Messages.get("confirm.cancelled")).setEphemeral(true).queue();
+                Optional<RequestView> request = decisions.findRequest(callback.requestId());
+                if (request.isPresent()) {
+                    String originalText = ApprovalMessageRenderer.render(request.get());
+                    event.editMessage(originalText).setComponents(ActionRow.of(Arrays.asList(actionButtons(callback.requestId(), request.get().status().isTerminal())))).queue();
+                } else {
+                    event.editMessage(Messages.get("confirm.cancelled")).setComponents().queue();
+                }
             }
         }
     }
 
-    private static String confirmMessage(DecisionAction action) {
+    private static String confirmMessage(DecisionAction action, String player, String shortId) {
         return switch (action) {
-            case APPROVE -> Messages.get("confirm.approve");
-            case DENY -> Messages.get("confirm.deny");
-            case BLOCK -> Messages.get("confirm.block");
-            case UNDO -> Messages.get("confirm.undo");
+            case APPROVE -> Messages.get("confirm.approve", player, shortId);
+            case DENY -> Messages.get("confirm.deny", player, shortId);
+            case BLOCK -> Messages.get("confirm.block", player, shortId);
+            case UNDO -> Messages.get("confirm.undo", player, shortId);
+        };
+    }
+
+    private static String shortId(UUID id) { return id.toString().substring(0, 8); }
+
+    static Button[] actionButtons(UUID requestId, boolean disabled) {
+        return new Button[]{
+                Button.success(CallbackActionParser.formatPrimary(DecisionAction.APPROVE, requestId), Messages.get("button.approve")).withDisabled(disabled),
+                Button.danger(CallbackActionParser.formatPrimary(DecisionAction.DENY, requestId), Messages.get("button.deny")).withDisabled(disabled),
+                Button.secondary(CallbackActionParser.formatPrimary(DecisionAction.BLOCK, requestId), Messages.get("button.block")).withDisabled(disabled),
+                Button.secondary(CallbackActionParser.formatPrimary(DecisionAction.UNDO, requestId), Messages.get("button.undo")).withDisabled(disabled)
         };
     }
 
