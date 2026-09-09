@@ -62,24 +62,29 @@ public final class OutboxWorker implements AutoCloseable {
             repository.completeOutbox(event.id(), clock.now());
             return;
         }
-        if (event.eventType().equals("REQUEST_CREATED")) {
-            List<com.gatehousemc.whitelistrequest.domain.PublicationRef> existing = repository.publications(request.id());
-            router.publish(RequestView.from(request), existing).whenComplete((publications, error) -> {
-                Throwable failure = error;
-                try {
-                    saveSuccessfulPublications(request.id(), publications, error);
-                } catch (RuntimeException storageError) {
-                    failure = storageError;
-                }
-                finish(event, failure);
-            });
-            return;
-        } else if (event.eventType().equals("REQUEST_RESOLVED") || event.eventType().equals("REQUEST_UPDATED")) {
-            router.updateAll(repository.publications(request.id()), RequestView.from(request)).whenComplete((ignored, error) -> finish(event, error));
-            return;
-        } else {
-            repository.completeOutbox(event.id(), clock.now());
+        switch (event.eventType()) {
+            case "REQUEST_CREATED" -> processCreated(event, request);
+            case "REQUEST_RESOLVED", "REQUEST_UPDATED" -> processUpdate(event, request);
+            default -> repository.completeOutbox(event.id(), clock.now());
         }
+    }
+
+    private void processCreated(OutboxEvent event, WhitelistRequest request) {
+        List<com.gatehousemc.whitelistrequest.domain.PublicationRef> existing = repository.publications(request.id());
+        router.publish(RequestView.from(request), existing).whenComplete((publications, error) -> {
+            Throwable failure = error;
+            try {
+                saveSuccessfulPublications(request.id(), publications, error);
+            } catch (RuntimeException storageError) {
+                failure = storageError;
+            }
+            finish(event, failure);
+        });
+    }
+
+    private void processUpdate(OutboxEvent event, WhitelistRequest request) {
+        router.updateAll(repository.publications(request.id()), RequestView.from(request))
+                .whenComplete((ignored, error) -> finish(event, error));
     }
 
     private void saveSuccessfulPublications(UUID requestId, List<com.gatehousemc.whitelistrequest.domain.PublicationRef> publications, Throwable error) {

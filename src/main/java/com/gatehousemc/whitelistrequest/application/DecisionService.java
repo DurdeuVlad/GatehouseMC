@@ -55,23 +55,27 @@ public final class DecisionService {
         if (action != DecisionAction.APPROVE) {
             return CompletableFuture.supplyAsync(() -> decideTerminal(requestId, action, actor, cleanReason), decisionExecutor);
         }
+        return claimAndApprove(requestId, actor, cleanReason);
+    }
 
+    private CompletionStage<DecisionResult> claimAndApprove(UUID requestId, AdminPrincipal actor, String reason) {
         return CompletableFuture.supplyAsync(() -> repository.claimApproval(
-                        requestId, actor, cleanReason, clock.now(), UUID.randomUUID()), decisionExecutor)
-                .thenCompose(claim -> {
-                                if (claim.outcome() != DecisionClaim.ClaimOutcome.CLAIMED) {
-                        return CompletableFuture.completedFuture(claimResult(claim));
-                    }
-                    WhitelistRequest request = claim.request().orElseThrow();
-                    try {
-                        return vanillaWhitelist.addExactProfile(request.identity())
-                                .handleAsync((ignored, error) -> completeApproval(request, actor, cleanReason, claim.token(), error),
-                                        decisionExecutor);
-                    } catch (Throwable error) {
-                        return CompletableFuture.completedFuture(
-                                completeApproval(request, actor, cleanReason, claim.token(), error));
-                    }
-                });
+                        requestId, actor, reason, clock.now(), UUID.randomUUID()), decisionExecutor)
+                .thenCompose(claim -> claim.outcome() == DecisionClaim.ClaimOutcome.CLAIMED
+                        ? completeApprovalAsync(claim, actor, reason)
+                        : CompletableFuture.completedFuture(claimResult(claim)));
+    }
+
+    private CompletionStage<DecisionResult> completeApprovalAsync(DecisionClaim claim, AdminPrincipal actor, String reason) {
+        WhitelistRequest request = claim.request().orElseThrow();
+        try {
+            return vanillaWhitelist.addExactProfile(request.identity())
+                    .handleAsync((ignored, error) -> completeApproval(request, actor, reason, claim.token(), error),
+                            decisionExecutor);
+        } catch (Throwable error) {
+            return CompletableFuture.completedFuture(
+                    completeApproval(request, actor, reason, claim.token(), error));
+        }
     }
 
     public boolean unblock(String normalizedUsername, AdminPrincipal actor, String reason) {

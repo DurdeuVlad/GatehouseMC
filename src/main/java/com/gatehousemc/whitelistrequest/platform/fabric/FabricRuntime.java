@@ -87,53 +87,59 @@ public final class FabricRuntime implements AutoCloseable {
         List<ApprovalInterface> providers = new ArrayList<>();
         OutboxWorker outbox = null;
         try {
-        database = new SqliteDatabase(config.database().path(), config.database().busyTimeoutMs());
-        repository = new SqliteWorkflowRepository(database);
-        ClockPort clock = Instant::now;
-        RequestAdmissionCache cache = new RequestAdmissionCache(clock);
-        Duration denialCooldown = Duration.ofMinutes(config.requests().denialCooldownMinutes());
-        WhitelistRequestService requests = new WhitelistRequestService(repository, clock, denialCooldown, cache);
-        worker = new AdmissionWorker(config.requests().queueCapacity(), requests);
-        decisionExecutor = Executors.newSingleThreadExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "whitelistrequest-decisions");
-            thread.setDaemon(true);
-            return thread;
-        });
-        commandExecutor = Executors.newSingleThreadExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "whitelistrequest-commands");
-            thread.setDaemon(true);
-            return thread;
-        });
-        DecisionService decisions = new DecisionService(repository, new FabricVanillaWhitelistAdapter(server), clock, cache,
-                denialCooldown, decisionExecutor);
-        requests.hydrateCache();
-        decisions.recoverInterruptedApprovals().toCompletableFuture().join();
+            database = new SqliteDatabase(config.database().path(), config.database().busyTimeoutMs());
+            repository = new SqliteWorkflowRepository(database);
+            ClockPort clock = Instant::now;
+            RequestAdmissionCache cache = new RequestAdmissionCache(clock);
+            Duration denialCooldown = Duration.ofMinutes(config.requests().denialCooldownMinutes());
+            WhitelistRequestService requests = new WhitelistRequestService(repository, clock, denialCooldown, cache);
+            worker = new AdmissionWorker(config.requests().queueCapacity(), requests);
+            decisionExecutor = newDaemonExecutor("whitelistrequest-decisions");
+            commandExecutor = newDaemonExecutor("whitelistrequest-commands");
+            DecisionService decisions = new DecisionService(repository, new FabricVanillaWhitelistAdapter(server), clock, cache,
+                    denialCooldown, decisionExecutor);
+            requests.hydrateCache();
+            decisions.recoverInterruptedApprovals().toCompletableFuture().join();
+            createProviders(config, decisions, providers);
+            ApprovalInterfaceRouter router = new ApprovalInterfaceRouter(providers, config.routing().mode());
+            outbox = new OutboxWorker(repository, router, clock);
+            providers.forEach(ApprovalInterface::start);
+            worker.start();
+            outbox.start();
+            return new FabricRuntime(server, config, cache, repository, requests, decisions, worker, decisionExecutor, commandExecutor, providers, outbox);
+        } catch (IOException | SQLException | RuntimeException error) {
+            cleanup(outbox, providers, worker, decisionExecutor, commandExecutor, repository, database, error);
+            throw error;
+        }
+    }
+
+    private static void createProviders(ModConfig config, DecisionService decisions, List<ApprovalInterface> providers) {
         for (String provider : config.routing().providers()) {
             if (provider.equalsIgnoreCase("discord")) providers.add(new DiscordApprovalInterface(config.discord(), decisions));
             if (provider.equalsIgnoreCase("telegram")) providers.add(new TelegramApprovalInterface(config.telegram(), decisions));
         }
-        ApprovalInterfaceRouter router = new ApprovalInterfaceRouter(providers, config.routing().mode());
-        outbox = new OutboxWorker(repository, router, clock);
-        providers.forEach(ApprovalInterface::start);
-        worker.start();
-        outbox.start();
-        return new FabricRuntime(server, config, cache, repository, requests, decisions, worker, decisionExecutor, commandExecutor, providers, outbox);
-        } catch (IOException | SQLException | RuntimeException error) {
-            if (outbox != null) outbox.close();
-            providers.forEach(ApprovalInterface::stop);
-            if (worker != null) worker.close();
-            if (decisionExecutor != null) {
-                decisionExecutor.shutdownNow();
-            }
-            if (commandExecutor != null) {
-                commandExecutor.shutdownNow();
-            }
-            if (repository != null) {
-                try { repository.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
-            } else if (database != null) {
-                try { database.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
-            }
-            throw error;
+    }
+
+    private static ExecutorService newDaemonExecutor(String name) {
+        return Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, name);
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    private static void cleanup(OutboxWorker outbox, List<ApprovalInterface> providers, AdmissionWorker worker,
+                                ExecutorService decisionExecutor, ExecutorService commandExecutor,
+                                WorkflowRepository repository, SqliteDatabase database, Throwable error) {
+        if (outbox != null) outbox.close();
+        providers.forEach(ApprovalInterface::stop);
+        if (worker != null) worker.close();
+        if (decisionExecutor != null) decisionExecutor.shutdownNow();
+        if (commandExecutor != null) commandExecutor.shutdownNow();
+        if (repository != null) {
+            try { repository.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
+        } else if (database != null) {
+            try { database.close(); } catch (Exception closeError) { error.addSuppressed(closeError); }
         }
     }
 
