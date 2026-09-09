@@ -121,8 +121,7 @@ public final class WhitelistRequestCommands {
         ServerCommandSource source = context.getSource();
         String username = context.getArgument("username", String.class).toLowerCase(Locale.ROOT);
         runtime.commandExecutor().execute(() -> {
-            boolean removed = runtime.repository().unblock(username, AdminPrincipal.console(), "", java.time.Instant.now());
-            if (removed) runtime.invalidateCache(username);
+            boolean removed = runtime.decisions().unblock(username, AdminPrincipal.console(), "");
             source.getServer().execute(() ->
                     source.sendFeedback(() -> Text.literal(removed ? "Unblocked " + username : "No block exists for " + username), false));
         });

@@ -74,6 +74,14 @@ public final class DecisionService {
                 });
     }
 
+    public boolean unblock(String normalizedUsername, AdminPrincipal actor, String reason) {
+        Objects.requireNonNull(normalizedUsername, "normalizedUsername");
+        Objects.requireNonNull(actor, "actor");
+        boolean removed = repository.unblock(normalizedUsername, actor, reason, clock.now());
+        if (removed) cache.invalidate(normalizedUsername);
+        return removed;
+    }
+
     public CompletionStage<Void> recoverInterruptedApprovals() {
         List<CompletableFuture<Void>> recoveries = new ArrayList<>();
         for (WhitelistRequest request : repository.findResolvingApprovals()) {

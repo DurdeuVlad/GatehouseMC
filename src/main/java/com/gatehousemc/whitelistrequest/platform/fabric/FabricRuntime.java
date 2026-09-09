@@ -106,25 +106,7 @@ public final class FabricRuntime implements AutoCloseable {
         });
         DecisionService decisions = new DecisionService(repository, new FabricVanillaWhitelistAdapter(server), clock, cache,
                 denialCooldown, decisionExecutor);
-        repository.findByStatus(Optional.of(RequestStatus.PENDING), 500)
-                .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending()));
-        List<WhitelistRequest> blockedRequests = repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500);
-        for (WhitelistRequest request : blockedRequests) {
-            try {
-                if (repository.isBlocked(request.identity().normalizedUsername())) {
-                    cache.put(request.identity().normalizedUsername(), AdmissionState.blocked());
-                }
-            } catch (RuntimeException error) {
-                WhitelistRequestMod.LOGGER.warn("Failed to check block status for {} during cache hydration", request.identity().normalizedUsername(), error);
-            }
-        }
-        repository.findByStatus(Optional.of(RequestStatus.DENIED), 500)
-                .forEach(request -> {
-                    Instant deniedUntil = request.resolvedAt().plus(denialCooldown);
-                    if (deniedUntil.isAfter(clock.now())) {
-                        cache.put(request.identity().normalizedUsername(), AdmissionState.deniedUntil(deniedUntil));
-                    }
-                });
+        requests.hydrateCache();
         decisions.recoverInterruptedApprovals().toCompletableFuture().join();
         for (String provider : config.routing().providers()) {
             if (provider.equalsIgnoreCase("discord")) providers.add(new DiscordApprovalInterface(config.discord(), decisions));
@@ -179,7 +161,6 @@ public final class FabricRuntime implements AutoCloseable {
     public WorkflowRepository repository() { return repository; }
     public ModConfig config() { return config; }
     public ExecutorService commandExecutor() { return commandExecutor; }
-    public void invalidateCache(String normalizedUsername) { cache.invalidate(normalizedUsername); }
     MinecraftServer server() { return server; }
     public int queueSize() { return worker == null ? 0 : worker.size(); }
     public boolean degraded() { return degraded || cache.isDegraded(); }
