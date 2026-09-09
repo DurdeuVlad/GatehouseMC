@@ -10,3 +10,4 @@ logs/
 *.sqlite-wal
 node_modules/
 tools/e2e/.env
+.e2e/
