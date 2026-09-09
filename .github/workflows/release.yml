@@ -9,26 +9,97 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  JAVA_DISTRIBUTION: temurin
+  JAVA_VERSION: '21'
+
 jobs:
-  release:
+  verify:
+    name: Release verification (quality gate)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle (cache keyed by immutable project files only)
+        uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build, unit/component tests, and package
+        run: ./gradlew clean test build --stacktrace
+
+      - name: Record unit test evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-unit-test-reports-${{ github.run_id }}
+          path: build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Install E2E dependencies
+        run: npm ci
+        working-directory: tools/e2e
+
+      - name: Run dedicated-server E2E on the release artifact (E2E-01)
+        run: npm run e2e
+        working-directory: tools/e2e
+        env:
+          MC_EXPECTED_STATUS: rejected
+          E2E_SERVER_PORT: '25599'
+
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-e2e-evidence-${{ github.run_id }}
+          path: build/e2e/artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Compute SHA-256 checksums
+        run: |
+          cd build/libs
+          sha256sum gatehousemc-*.jar > checksums.txt
+          cat checksums.txt
+
+      - name: Upload staged release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-staging-${{ github.run_id }}
+          path: |
+            build/libs/gatehousemc-*.jar
+            build/libs/checksums.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - name: Download staged release artifacts
+        uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+          name: release-staging-${{ github.run_id }}
+          path: release-assets
 
       - name: Extract version info
         id: version
@@ -40,15 +111,6 @@ jobs:
           echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT
           echo "mc_version=${MC_VER}" >> $GITHUB_OUTPUT
 
-      - name: Build and test mod
-        run: ./gradlew clean test build --stacktrace
-
-      - name: Compute SHA-256 Checksums
-        run: |
-          cd build/libs
-          sha256sum gatehousemc-*.jar > checksums.txt
-          cat checksums.txt
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -56,8 +118,8 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
           files: |
-            build/libs/gatehousemc-*.jar
-            build/libs/checksums.txt
+            release-assets/gatehousemc-*.jar
+            release-assets/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -69,7 +131,7 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: build/libs/gatehousemc-*.jar
+          files: release-assets/gatehousemc-*.jar
           name: GatehouseMC ${{ steps.version.outputs.clean_version }} (${{ steps.version.outputs.mc_version }})
           version: ${{ steps.version.outputs.clean_version }}
           version-type: release
