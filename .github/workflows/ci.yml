@@ -58,8 +58,10 @@ jobs:
           set -euo pipefail
           mkdir -p .e2e-server/mods
           curl --fail --silent --show-error --location \
-            "https://meta.fabricmc.net/v2/versions/loader/1.21.1/0.19.5/1.1.2/server/jar" \
-            --output .e2e-server/fabric-server-launch.jar
+            "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.2/fabric-installer-1.1.2.jar" \
+            --output .e2e-server/fabric-installer.jar
+          java -jar .e2e-server/fabric-installer.jar server \
+            -dir .e2e-server -mcversion 1.21.1 -loader 0.19.5 -downloadMinecraft
           curl --fail --silent --show-error --location \
             "https://maven.fabricmc.net/net/fabricmc/fabric-api/0.116.17+1.21.1/fabric-api-0.116.17+1.21.1.jar" \
             --output .e2e-server/mods/fabric-api.jar
