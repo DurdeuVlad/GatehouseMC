@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without the leading v (for example 1.1.0)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -32,13 +37,50 @@ jobs:
 
       - name: Extract version info
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          TAG_NAME="${{ github.ref_name }}"
-          CLEAN_VER="${TAG_NAME#v}"
+          MOD_VER=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_VERSION" ]; then
+              CLEAN_VER="$INPUT_VERSION"
+            else
+              CLEAN_VER=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+            fi
+            TAG_NAME="v${CLEAN_VER}"
+          else
+            TAG_NAME="$REF_NAME"
+            CLEAN_VER="${TAG_NAME#v}"
+          fi
           MC_VER=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          case "$MC_VER" in
+            1.21.1|1.21.4) ;;
+            *)
+              echo "Release publishing is guarded to the Java 21 targets 1.21.1 and 1.21.4; $MC_VER remains blocked by compatibility issues #50/#51." >&2
+              exit 1
+              ;;
+          esac
+          if ! printf '%s' "$CLEAN_VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "Invalid release version: $CLEAN_VER" >&2
+            exit 1
+          fi
+          if [ "$CLEAN_VER" != "$MOD_VER" ]; then
+            echo "Release version $CLEAN_VER does not match mod_version $MOD_VER" >&2
+            exit 1
+          fi
           echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT
           echo "mc_version=${MC_VER}" >> $GITHUB_OUTPUT
+
+      - name: Validate publishing secrets
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          test -n "$MODRINTH_TOKEN" || { echo 'Missing MODRINTH_TOKEN repository secret.' >&2; exit 1; }
+          test -n "$CURSEFORGE_TOKEN" || { echo 'Missing CURSEFORGE_TOKEN repository secret.' >&2; exit 1; }
 
       - name: Build and test mod
         run: ./gradlew clean test build --stacktrace
@@ -46,7 +88,7 @@ jobs:
       - name: Compute SHA-256 Checksums
         run: |
           cd build/libs
-          sha256sum gatehousemc-*.jar > checksums.txt
+          sha256sum "gatehousemc-${{ steps.version.outputs.clean_version }}.jar" > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
@@ -56,25 +98,29 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
           files: |
-            build/libs/gatehousemc-*.jar
+            build/libs/gatehousemc-${{ steps.version.outputs.clean_version }}.jar
             build/libs/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to Modrinth and CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
-        continue-on-error: true
         with:
-          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+          modrinth-id: gatehousemc
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: build/libs/gatehousemc-*.jar
+          files: build/libs/gatehousemc-${{ steps.version.outputs.clean_version }}.jar
           name: GatehouseMC ${{ steps.version.outputs.clean_version }} (${{ steps.version.outputs.mc_version }})
-          version: ${{ steps.version.outputs.clean_version }}
+          version: ${{ steps.version.outputs.clean_version }}+${{ steps.version.outputs.mc_version }}
           version-type: release
           changelog-file: CHANGELOG.md
           loaders: fabric
+          environment: dedicated-server
           game-versions: ${{ steps.version.outputs.mc_version }}
+          java: 21
           dependencies: |
             fabric-api(required)
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000

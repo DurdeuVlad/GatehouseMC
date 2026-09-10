@@ -80,18 +80,23 @@ than misrepresenting the project metadata.
 
 ## Automation secrets
 
-For the release workflow, configure these repository Actions secrets only when
-the corresponding publishing automation is enabled:
+The release workflow reads project identifiers from `fabric.mod.json`. Configure
+these repository Actions secrets before using a release tag or the manual
+release dispatch:
 
 | Secret | Purpose |
 |---|---|
 | `MODRINTH_TOKEN` | Modrinth API token with version-creation permission |
-| `MODRINTH_PROJECT_ID` | Modrinth project ID or slug |
 | `CURSEFORGE_TOKEN` | CurseForge API token |
-| `CURSEFORGE_PROJECT_ID` | CurseForge numeric project ID |
 
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
 expanded secret values to disk.
+
+The workflow fails closed if either publishing token is missing or if the tag
+does not match `mod_version`. It publishes only the primary mod JAR for the
+checked-out target branch; the Gradle sources JAR is not sent to either
+storefront. Historical Minecraft targets remain separate branches and must not
+be advertised as release-ready until issues #50 and #51 are resolved.
 
 ## Manual release commands
 

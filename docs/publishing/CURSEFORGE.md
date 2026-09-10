@@ -7,7 +7,9 @@ approval.
 
 ## Media and settings
 
-- Project name: GatehouseMC.
+- Project name: Gatehouse. CurseForge rejects project names containing `mc`,
+  while the product and mod remain branded **GatehouseMC** in the description,
+  files, source repository, and slug (`gatehousemc`).
 - Class/category: Mods → Server Utility.
 - License: MIT.
 - Source code: GitHub — <https://github.com/DurdeuVlad/GatehouseMC>.
