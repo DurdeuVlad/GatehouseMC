@@ -74,10 +74,11 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 ### 5.1 Long-lived branches and artifact targets
 
-The repository tracks a version branch for each published target, with `main`
-and `1.21.1` as the primary implementation baseline. The matrix below is the
-published artifact and branch map. Retained maintenance branches are not a
-promise of equal future feature support.
+The repository tracks a version branch for each target, with `main` and
+`1.21.1` as the primary implementation baseline. The matrix below is the target
+branch map, not a release approval list. Retained maintenance branches are not
+a promise of equal future feature support; only versions with clean-server
+evidence may be published.
 
 | Target   | Minecraft | Java Runtime | Loader | Status | Notes |
 |----------|-----------|--------------|--------|--------|-------|

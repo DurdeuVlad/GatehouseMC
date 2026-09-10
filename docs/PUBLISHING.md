@@ -1,16 +1,18 @@
 # Publishing Guide — GatehouseMC
 
 This guide describes the repeatable release process for GatehouseMC across
-GitHub Releases, Modrinth, and CurseForge. The first multi-version release is
-already published on GitHub as `v1.0.0`; the storefront submissions are waiting
-for moderation.
+GitHub Releases, Modrinth, and CurseForge. The existing `v1.0.0` archive is
+under a compatibility hold; it must not be treated as a production-ready
+multi-version release.
 
 ## Current publication state
 
 - GitHub repository: public — <https://github.com/DurdeuVlad/GatehouseMC>
-- GitHub Release: `v1.0.0`, with 12 version-labelled JARs and `checksums.txt`
-- Modrinth: 12 versions uploaded, project submitted for review
-- CurseForge: 12 files uploaded, project submitted for review
+- GitHub Release: `v1.0.0` exists with 12 labelled JARs, but the non-1.21.1
+  assets contain 1.21.1 internal Minecraft metadata and are not valid for their
+  labels.
+- Modrinth and CurseForge: existing submissions are not release-ready and must
+  not be advertised until corrected artefacts are uploaded.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
@@ -95,9 +97,11 @@ release dispatch:
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
 expanded secret values to disk.
 
-The workflow fails closed if either publishing token is missing or if the tag
-does not match `mod_version`. It publishes only the primary mod JAR for the
-checked-out target branch; the Gradle sources JAR is not sent to either
+The workflow fails closed if either publishing token is missing, if the tag does
+not use `v<version>-mc<minecraft-version>`, if the tag target does not match
+`gradle.properties`, or if the JAR's internal `fabric.mod.json` metadata does
+not match the release target. It publishes only the primary labelled mod JAR
+for the checked-out target branch; the Gradle sources JAR is not sent to either
 storefront. Historical Minecraft targets remain separate branches and must not
 be advertised as release-ready until issues #50 and #51 are resolved.
 
@@ -113,8 +117,8 @@ though the already-created release remains available.
 git switch main
 git pull --ff-only
 .\gradlew.ps1 clean test build
-git tag v<version>
-git push origin v<version>
+git tag v<version>-mc<minecraft-version>
+git push origin v<version>-mc<minecraft-version>
 ```
 
 The release workflow must be inspected before tagging to confirm that it builds

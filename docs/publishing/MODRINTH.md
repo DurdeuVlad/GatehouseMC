@@ -69,7 +69,7 @@ Players do **not** need a client-side mod, Discord account, or external registra
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-Published builds currently cover Minecraft **1.14.4 through 1.21.4**. Choose the exact matching version entry; Java and loader requirements vary by Minecraft version.
+Verified release builds currently cover Minecraft **1.19.2, 1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4**. Legacy targets 1.14.4–1.18.2 remain held pending compatibility fixes; do not advertise them as available.
 
 ## 🔒 Offline-Mode Notice
 

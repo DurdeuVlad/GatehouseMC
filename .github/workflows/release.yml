@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-mc*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version without the leading v (for example 1.1.0)'
+        description: 'Release version without the leading v (for example 1.1.0); the Minecraft target comes from the checked-out branch'
         required: false
         type: string
 
@@ -53,12 +53,19 @@ jobs:
             else
               CLEAN_VER=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
             fi
-            TAG_NAME="v${CLEAN_VER}"
+            MC_VER=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+            TAG_NAME="v${CLEAN_VER}-mc${MC_VER}"
           else
             TAG_NAME="$REF_NAME"
-            CLEAN_VER="${TAG_NAME#v}"
+            if [[ "$TAG_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?)-mc([0-9]+\.[0-9]+(\.[0-9]+)?)$ ]]; then
+              CLEAN_VER="${BASH_REMATCH[1]}"
+              TAG_MC_VER="${BASH_REMATCH[3]}"
+            else
+              echo "Release tags must use v<version>-mc<minecraft-version> (for example v1.1.0-mc1.21.1)." >&2
+              exit 1
+            fi
           fi
-          MC_VER=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          MC_VER=${MC_VER:-$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')}
           case "$MC_VER" in
             1.21.1|1.21.4) ;;
             *)
@@ -66,6 +73,10 @@ jobs:
               exit 1
               ;;
           esac
+          if [ -n "${TAG_MC_VER:-}" ] && [ "$TAG_MC_VER" != "$MC_VER" ]; then
+            echo "Tag Minecraft target $TAG_MC_VER does not match gradle.properties minecraft_version $MC_VER" >&2
+            exit 1
+          fi
           if ! printf '%s' "$CLEAN_VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
             echo "Invalid release version: $CLEAN_VER" >&2
             exit 1
@@ -89,10 +100,25 @@ jobs:
       - name: Build and test mod
         run: bash ./gradlew clean test build --stacktrace
 
+      - name: Validate artifact identity
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.clean_version }}
+          MINECRAFT_VERSION: ${{ steps.version.outputs.mc_version }}
+        run: |
+          set -euo pipefail
+          source_jar="build/libs/gatehousemc-${RELEASE_VERSION}.jar"
+          test -f "$source_jar" || { echo "Missing build artifact: $source_jar" >&2; exit 1; }
+          metadata=$(unzip -p "$source_jar" fabric.mod.json)
+          test "$(jq -r '.id' <<<"$metadata")" = "gatehousemc" || { echo 'Artifact mod id is not gatehousemc.' >&2; exit 1; }
+          test "$(jq -r '.version' <<<"$metadata")" = "$RELEASE_VERSION" || { echo 'Artifact mod version does not match the release version.' >&2; exit 1; }
+          test "$(jq -r '.depends.minecraft' <<<"$metadata")" = "$MINECRAFT_VERSION" || { echo 'Artifact Minecraft metadata does not match the release target.' >&2; exit 1; }
+          labeled_jar="build/libs/gatehousemc-${MINECRAFT_VERSION}-${RELEASE_VERSION}.jar"
+          cp "$source_jar" "$labeled_jar"
+
       - name: Compute SHA-256 Checksums
         run: |
           cd build/libs
-          sha256sum "gatehousemc-${{ steps.version.outputs.clean_version }}.jar" > checksums.txt
+          sha256sum "gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar" > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
@@ -102,7 +128,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
           files: |
-            build/libs/gatehousemc-${{ steps.version.outputs.clean_version }}.jar
+            build/libs/gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar
             build/libs/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,7 +140,7 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: build/libs/gatehousemc-${{ steps.version.outputs.clean_version }}.jar
+          files: build/libs/gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar
           name: GatehouseMC ${{ steps.version.outputs.clean_version }} (${{ steps.version.outputs.mc_version }})
           version: ${{ steps.version.outputs.clean_version }}+${{ steps.version.outputs.mc_version }}
           version-type: release

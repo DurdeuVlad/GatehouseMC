@@ -16,8 +16,9 @@ Node E2E client.
 ## Current baseline
 
 - Primary implementation baseline: Minecraft 1.21.1, Fabric, Java 21.
-- Published compatibility artifacts: Minecraft 1.14.4 through 1.21.4; Java
-  8/16/17/21 as documented in [`docs/OSS.md`](OSS.md).
+- Target branches exist for Minecraft 1.14.4 through 1.21.4, but only
+  1.19.2, 1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4 currently pass
+  clean standalone server boot. Legacy targets remain blocked by #50/#51.
 - Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
@@ -29,13 +30,10 @@ Node E2E client.
 ## Publication status
 
 - GitHub is public and contains the source repository.
-- Modrinth has all 12 version files and the corrected project copy; the project
-  is submitted and **Under review**.
-- CurseForge has all 12 version files, the corrected project copy, source link,
-  and media; the project and files are **Under Review** pending moderator
-  approval.
-- GitHub Release `v1.0.0` is published with all 12 compatibility JARs and a
-  checksum file. Treat it as the current public release archive.
+- Modrinth and CurseForge submissions contain the earlier multi-version files,
+  but must remain on hold until corrected artefacts are uploaded.
+- GitHub Release `v1.0.0` is published but not production-ready: its labelled
+  assets all declare Minecraft 1.21.1 internally.
 
 ## Verification already executed
 
@@ -47,10 +45,11 @@ tools/e2e: npm run smoke                        PASS (unwhitelisted rejection)
 tools/e2e: MC_EXPECTED_STATUS=joined npm run smoke PASS (approved reconnect)
 ```
 
-A real Fabric 1.21.1 dedicated server booted successfully with the Mixin
-applied. `E2E_Alice` was rejected, persisted as `PENDING`, approved through the
-server command, added to vanilla `whitelist.json`, and reconnected to the
-running server. `E2E_Bob` was independently rejected and persisted as pending.
+A real clean Fabric dedicated server booted with rebuilt artefacts for 1.19.2,
+1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4, with GatehouseMC startup
+logged. The exact v1.0.0 1.21.1 asset also booted; the exact v1.0.0 1.21.4
+asset was rejected because its internal metadata says 1.21.1. Full request
+workflow E2E remains a separate release gate.
 
 ## What Devin should do next
 

@@ -1,7 +1,7 @@
 # GatehouseMC — CurseForge publication copy
 
 This is the current audience-facing copy for the GatehouseMC CurseForge
-project. The project and its 12 files are submitted and **Under Review**;
+project. The project and its existing files are submitted and **Under Review**;
 CurseForge will not expose the project or synchronize its files until moderator
 approval.
 
@@ -14,8 +14,9 @@ approval.
 - License: MIT.
 - Source code: GitHub — <https://github.com/DurdeuVlad/GatehouseMC>.
 - Comments: enabled; issue tracking remains the public GitHub issue tracker.
-- Files: all 12 release JARs are tagged Fabric and Server with their exact
-  Minecraft versions, and are configured to publish after approval.
+- Files: only artefacts whose internal metadata matches their Minecraft label
+  may be published. The existing v1.0.0 multi-version submission is on hold
+  because its non-1.21.1 labelled files contain 1.21.1 metadata.
 - Media: the project has a neutral multi-version banner. Keep the square
   project logo available as the canonical icon.
 
@@ -56,7 +57,7 @@ INSTALLATION
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram integrations. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-Published builds currently cover Minecraft **1.14.4 through 1.21.4**. Choose the exact matching file; Java and loader requirements vary by Minecraft version.
+Verified release builds currently cover Minecraft **1.19.2, 1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4**. Legacy targets 1.14.4–1.18.2 remain held pending compatibility fixes.
 
 OFFLINE-MODE NOTICE
 
