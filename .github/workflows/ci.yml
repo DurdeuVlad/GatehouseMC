@@ -76,8 +76,10 @@ jobs:
           enforce-secure-profile=false
           server-port=25565
           EOF
-          java -jar .e2e-server/fabric-server-launch.jar nogui > .e2e-server/server.log 2>&1 &
+          pushd .e2e-server
+          java -jar fabric-server-launch.jar nogui > server.log 2>&1 &
           server_pid=$!
+          popd
           for attempt in $(seq 1 90); do
             if grep -q 'Done (' .e2e-server/server.log; then
               break
