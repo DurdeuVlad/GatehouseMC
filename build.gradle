@@ -34,6 +34,8 @@ dependencies {
 
     implementation "net.dv8tion:JDA:${jda_version}"
     include "net.dv8tion:JDA:${jda_version}"
+    implementation "org.slf4j:slf4j-api:${slf4j_version}"
+    include "org.slf4j:slf4j-api:${slf4j_version}"
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation "org.junit.jupiter:junit-jupiter"
