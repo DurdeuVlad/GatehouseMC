@@ -8,7 +8,7 @@
   <a href="https://github.com/DurdeuVlad/GatehouseMC/releases/latest"><img src="https://img.shields.io/github/v/release/DurdeuVlad/GatehouseMC?color=brightgreen&label=Release" alt="Latest GitHub release"></a>
   <a href="https://modrinth.com/mod/gatehousemc"><img src="https://img.shields.io/badge/Modrinth-Submitted%20for%20review-F5A623?logo=modrinth&logoColor=white" alt="Modrinth submitted for review"></a>
   <a href="https://www.curseforge.com/minecraft/mc-mods/gatehousemc"><img src="https://img.shields.io/badge/CurseForge-Pending%20review-F5A623?logo=curseforge&logoColor=white" alt="CurseForge pending review"></a>
-  <img src="https://img.shields.io/badge/Minecraft-1.19.2--1.21.4-brightgreen.svg" alt="Verified Minecraft 1.19.2 through 1.21.4">
+  <img src="https://img.shields.io/badge/Minecraft-1.14.4--1.21.4-brightgreen.svg" alt="Verified Minecraft 1.14.4 through 1.21.4">
   <img src="https://img.shields.io/badge/Loader-Fabric-blue.svg" alt="Fabric">
   <img src="https://img.shields.io/badge/Side-Server--Only-orange.svg" alt="Server-Side Only">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
@@ -20,11 +20,10 @@ GatehouseMC is an operational workflow layer around Minecraft's native whitelist
 
 ## Requirements
 
-- Verified release targets: Minecraft Java Edition 1.19.2, 1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4
-- Legacy targets 1.14.4–1.18.2 are held pending compatibility fixes in [#50](https://github.com/DurdeuVlad/GatehouseMC/issues/50) and [#51](https://github.com/DurdeuVlad/GatehouseMC/issues/51)
+- Verified release targets: Minecraft Java Edition 1.14.4 through 1.21.4
 - Fabric Loader and Fabric API for that same Minecraft version
 - Java matching the selected Minecraft version:
-  - 1.19.2, 1.19.4, 1.20.1, 1.20.4 — Java 17
+  - 1.14.4, 1.15.2, 1.16.5, 1.17.1, 1.18.2, 1.19.2, 1.19.4, 1.20.1, 1.20.4 — Java 17
   - 1.20.6, 1.21.1, 1.21.4 — Java 21
 - `online-mode=false` and `white-list=true` for the supported offline-mode workflow
 
@@ -32,7 +31,7 @@ GatehouseMC is an operational workflow layer around Minecraft's native whitelist
 
 - **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(submitted; pending moderation)*
 - **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(submitted; pending moderation)*
-- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(v1.0.0 is under a compatibility hold)*
+- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(v1.0.1 compatibility rebuild)*
 - **Source and issues:** [github.com/DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC) · [issue tracker](https://github.com/DurdeuVlad/GatehouseMC/issues)
 - **Publishing copy:** [Modrinth](docs/publishing/MODRINTH.md) · [CurseForge](docs/publishing/CURSEFORGE.md)
 - **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)
@@ -49,7 +48,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The primary 1.21.1 artifact is written to `build/libs/gatehousemc-1.0.0.jar`. A release artifact is publishable only when its internal `fabric.mod.json` Minecraft dependency matches its label; the release workflow enforces this. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
+The primary 1.21.1 artifact is written to `build/libs/gatehousemc-1.0.1.jar`. A release artifact is publishable only when its internal `fabric.mod.json` Minecraft dependency matches its label; the release workflow enforces this. The build nests SQLite, JDA, and the SLF4J API required by older servers.
 
 ## Real-server smoke test
 
@@ -104,6 +103,6 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-Unit, component, architecture, router, and fake-transport tests pass. Clean standalone servers booted with rebuilt artifacts for 1.19.2, 1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4. The 1.14.4–1.18.2 targets currently fail startup compatibility checks, and the existing v1.0.0 labelled assets contain mismatched internal Minecraft metadata; no new storefront publication is authorized until these gates are fixed.
+Unit, component, architecture, router, and fake-transport tests pass. Clean standalone servers booted with rebuilt `1.0.1` artifacts for every target from 1.14.4 through 1.21.4. Release publishing validates the internal metadata, Java bytecode, and target-specific tag before upload.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.

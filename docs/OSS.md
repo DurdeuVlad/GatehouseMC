@@ -76,9 +76,9 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 The repository tracks a version branch for each target, with `main` and
 `1.21.1` as the primary implementation baseline. The matrix below is the target
-branch map, not a release approval list. Retained maintenance branches are not
-a promise of equal future feature support; only versions with clean-server
-evidence may be published.
+branch and release map. Retained maintenance branches are not a promise of
+equal future feature support; every `1.0.1` target listed here has clean-server
+evidence.
 
 | Target   | Minecraft | Java Runtime | Loader | Status | Notes |
 |----------|-----------|--------------|--------|--------|-------|

@@ -441,10 +441,8 @@ Record discoveries that materially differ from this research in `.scratch/MIXIN_
 
 ### 10.1 Target Version Matrix (Not Release Approval)
 
-This is the researched target/branch matrix, not proof that every published
-artefact works. The latest clean-server validation passes for 1.19.2 through
-1.21.4 as listed in `docs/PUBLISHING.md`; 1.14.4–1.18.2 remain blocked by
-startup compatibility issues #50 and #51.
+This is the researched target/branch matrix. The `1.0.1` clean-server
+validation passes for every listed target from 1.14.4 through 1.21.4.
 
 The following matrix documents the verified version pins, toolchain requirements, and passing build status for all historical Minecraft branches:
 

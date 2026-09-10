@@ -1,18 +1,16 @@
 # Publishing Guide — GatehouseMC
 
 This guide describes the repeatable release process for GatehouseMC across
-GitHub Releases, Modrinth, and CurseForge. The existing `v1.0.0` archive is
-under a compatibility hold; it must not be treated as a production-ready
-multi-version release.
+GitHub Releases, Modrinth, and CurseForge. The `1.0.1` release is the first
+rebuild that has passed the complete clean-server compatibility matrix.
 
 ## Current publication state
 
 - GitHub repository: public — <https://github.com/DurdeuVlad/GatehouseMC>
-- GitHub Release: `v1.0.0` exists with 12 labelled JARs, but the non-1.21.1
-  assets contain 1.21.1 internal Minecraft metadata and are not valid for their
-  labels.
-- Modrinth and CurseForge: existing submissions are not release-ready and must
-  not be advertised until corrected artefacts are uploaded.
+- GitHub Release: `v1.0.0` remains archived with invalid legacy labels. Do not
+  use it for installation.
+- Modrinth and CurseForge: publish the corrected `1.0.1` files only after the
+  release workflow completes successfully.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
@@ -102,8 +100,8 @@ not use `v<version>-mc<minecraft-version>`, if the tag target does not match
 `gradle.properties`, or if the JAR's internal `fabric.mod.json` metadata does
 not match the release target. It publishes only the primary labelled mod JAR
 for the checked-out target branch; the Gradle sources JAR is not sent to either
-storefront. Historical Minecraft targets remain separate branches and must not
-be advertised as release-ready until issues #50 and #51 are resolved.
+storefront. All twelve target branches are now eligible for publication because
+issues #50 and #51 have executable fixes and clean-server evidence.
 
 Every successful release writes an announcement to the GitHub Actions summary
 and GitHub Release. Discord and Telegram announcements are sent when their

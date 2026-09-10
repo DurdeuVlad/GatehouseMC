@@ -67,9 +67,10 @@ jobs:
           fi
           MC_VER=${MC_VER:-$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')}
           case "$MC_VER" in
-            1.21.1|1.21.4) ;;
+            1.14.4|1.15.2|1.16.5|1.17.1|1.18.2|1.19.2|1.19.4|1.20.1|1.20.4) JAVA_RUNTIME=17 ;;
+            1.20.6|1.21.1|1.21.4) JAVA_RUNTIME=21 ;;
             *)
-              echo "Release publishing is guarded to the Java 21 targets 1.21.1 and 1.21.4; $MC_VER remains blocked by compatibility issues #50/#51." >&2
+              echo "Unsupported Minecraft release target: $MC_VER" >&2
               exit 1
               ;;
           esac
@@ -88,6 +89,7 @@ jobs:
           echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT
           echo "mc_version=${MC_VER}" >> $GITHUB_OUTPUT
+          echo "java_runtime=${JAVA_RUNTIME}" >> $GITHUB_OUTPUT
 
       - name: Validate publishing secrets
         env:
@@ -148,7 +150,7 @@ jobs:
           loaders: fabric
           environment: dedicated-server
           game-versions: ${{ steps.version.outputs.mc_version }}
-          java: 21
+          java: ${{ steps.version.outputs.java_runtime }}
           dependencies: |
             fabric-api(required)
           fail-mode: fail

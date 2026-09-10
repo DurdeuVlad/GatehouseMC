@@ -16,9 +16,8 @@ Node E2E client.
 ## Current baseline
 
 - Primary implementation baseline: Minecraft 1.21.1, Fabric, Java 21.
-- Target branches exist for Minecraft 1.14.4 through 1.21.4, but only
-  1.19.2, 1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4 currently pass
-  clean standalone server boot. Legacy targets remain blocked by #50/#51.
+- Target branches exist for Minecraft 1.14.4 through 1.21.4 and all twelve
+  now pass clean standalone server boot with the `1.0.1` rebuild.
 - Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
@@ -30,10 +29,10 @@ Node E2E client.
 ## Publication status
 
 - GitHub is public and contains the source repository.
-- Modrinth and CurseForge submissions contain the earlier multi-version files,
-  but must remain on hold until corrected artefacts are uploaded.
-- GitHub Release `v1.0.0` is published but not production-ready: its labelled
-  assets all declare Minecraft 1.21.1 internally.
+- Modrinth and CurseForge submissions contain the earlier files and must be
+  replaced with the corrected `1.0.1` artefacts.
+- GitHub Release `v1.0.0` is retained for history but is not production-ready;
+  its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 
 ## Verification already executed
 
@@ -45,11 +44,10 @@ tools/e2e: npm run smoke                        PASS (unwhitelisted rejection)
 tools/e2e: MC_EXPECTED_STATUS=joined npm run smoke PASS (approved reconnect)
 ```
 
-A real clean Fabric dedicated server booted with rebuilt artefacts for 1.19.2,
-1.19.4, 1.20.1, 1.20.4, 1.20.6, 1.21.1, and 1.21.4, with GatehouseMC startup
-logged. The exact v1.0.0 1.21.1 asset also booted; the exact v1.0.0 1.21.4
-asset was rejected because its internal metadata says 1.21.1. Full request
-workflow E2E remains a separate release gate.
+A real clean Fabric dedicated server booted with rebuilt `1.0.1` artefacts for
+every target from 1.14.4 through 1.21.4, with GatehouseMC startup logged. The
+exact v1.0.0 1.21.4 asset was rejected because its internal metadata says
+1.21.1. Full request workflow E2E remains a separate release gate.
 
 ## What Devin should do next
 
