@@ -88,6 +88,9 @@ release dispatch:
 |---|---|
 | `MODRINTH_TOKEN` | Modrinth API token with version-creation permission |
 | `CURSEFORGE_TOKEN` | CurseForge API token |
+| `DISCORD_RELEASE_WEBHOOK_URL` | Optional Discord webhook for release announcements |
+| `TELEGRAM_RELEASE_BOT_TOKEN` | Optional Telegram bot token for release announcements |
+| `TELEGRAM_RELEASE_CHAT_ID` | Optional Telegram chat/channel ID paired with the release bot token |
 
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
 expanded secret values to disk.
@@ -97,6 +100,12 @@ does not match `mod_version`. It publishes only the primary mod JAR for the
 checked-out target branch; the Gradle sources JAR is not sent to either
 storefront. Historical Minecraft targets remain separate branches and must not
 be advertised as release-ready until issues #50 and #51 are resolved.
+
+Every successful release writes an announcement to the GitHub Actions summary
+and GitHub Release. Discord and Telegram announcements are sent when their
+optional repository secrets are configured. A configured notification channel
+is treated as a real check: delivery failures are visible in Actions even
+though the already-created release remains available.
 
 ## Manual release commands
 

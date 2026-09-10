@@ -17,6 +17,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      clean_version: ${{ steps.version.outputs.clean_version }}
+      mc_version: ${{ steps.version.outputs.mc_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -124,3 +128,86 @@ jobs:
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
+
+  announce:
+    name: Announce release
+    needs: release
+    if: needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.release.outputs.clean_version }}
+      MINECRAFT_VERSION: ${{ needs.release.outputs.mc_version }}
+      RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag }}
+      MODRINTH_URL: https://modrinth.com/mod/gatehousemc
+      CURSEFORGE_URL: https://www.curseforge.com/minecraft/mc-mods/gatehousemc
+      DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+      TELEGRAM_RELEASE_BOT_TOKEN: ${{ secrets.TELEGRAM_RELEASE_BOT_TOKEN }}
+      TELEGRAM_RELEASE_CHAT_ID: ${{ secrets.TELEGRAM_RELEASE_CHAT_ID }}
+    steps:
+      - name: Write release announcement summary
+        run: |
+          {
+            echo "## GatehouseMC ${RELEASE_VERSION} released"
+            echo
+            echo "Minecraft ${MINECRAFT_VERSION}"
+            echo
+            echo "- GitHub: ${RELEASE_URL}"
+            echo "- Modrinth: ${MODRINTH_URL}"
+            echo "- CurseForge: ${CURSEFORGE_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Announce to Discord webhook
+        if: env.DISCORD_RELEASE_WEBHOOK_URL != ''
+        run: |
+          python - <<'PY' > "$RUNNER_TEMP/discord-release.json"
+          import json
+          import os
+
+          version = os.environ["RELEASE_VERSION"]
+          minecraft = os.environ["MINECRAFT_VERSION"]
+          release_url = os.environ["RELEASE_URL"]
+          modrinth_url = os.environ["MODRINTH_URL"]
+          curseforge_url = os.environ["CURSEFORGE_URL"]
+          message = (
+              f"🎉 GatehouseMC {version} is released for Minecraft {minecraft}!\n"
+              f"GitHub: {release_url}\n"
+              f"Modrinth: {modrinth_url}\n"
+              f"CurseForge: {curseforge_url}"
+          )
+          print(json.dumps({"content": message}))
+          PY
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/discord-release.json" \
+            "$DISCORD_RELEASE_WEBHOOK_URL"
+
+      - name: Announce to Telegram
+        if: env.TELEGRAM_RELEASE_BOT_TOKEN != '' || env.TELEGRAM_RELEASE_CHAT_ID != ''
+        run: |
+          test -n "$TELEGRAM_RELEASE_BOT_TOKEN" || { echo 'TELEGRAM_RELEASE_BOT_TOKEN is missing.' >&2; exit 1; }
+          test -n "$TELEGRAM_RELEASE_CHAT_ID" || { echo 'TELEGRAM_RELEASE_CHAT_ID is missing.' >&2; exit 1; }
+          python - <<'PY' > "$RUNNER_TEMP/telegram-release.json"
+          import json
+          import os
+
+          version = os.environ["RELEASE_VERSION"]
+          minecraft = os.environ["MINECRAFT_VERSION"]
+          message = (
+              f"🎉 GatehouseMC {version} is released for Minecraft {minecraft}!\n"
+              f"GitHub: {os.environ['RELEASE_URL']}\n"
+              f"Modrinth: {os.environ['MODRINTH_URL']}\n"
+              f"CurseForge: {os.environ['CURSEFORGE_URL']}"
+          )
+          print(json.dumps({
+              "chat_id": os.environ["TELEGRAM_RELEASE_CHAT_ID"],
+              "text": message,
+              "disable_web_page_preview": True,
+          }))
+          PY
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/telegram-release.json" \
+            "https://api.telegram.org/bot${TELEGRAM_RELEASE_BOT_TOKEN}/sendMessage"
