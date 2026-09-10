@@ -83,7 +83,7 @@ jobs:
           test -n "$CURSEFORGE_TOKEN" || { echo 'Missing CURSEFORGE_TOKEN repository secret.' >&2; exit 1; }
 
       - name: Build and test mod
-        run: ./gradlew clean test build --stacktrace
+        run: bash ./gradlew clean test build --stacktrace
 
       - name: Compute SHA-256 Checksums
         run: |
