@@ -6,7 +6,9 @@
   "description": "Server-side whitelist gatehouse for offline-mode Minecraft servers.",
   "authors": ["GatehouseMC contributors"],
   "contact": {
-    "issues": "https://github.com/GatehouseMC/GatehouseMC/issues"
+    "homepage": "https://github.com/DurdeuVlad/GatehouseMC",
+    "sources": "https://github.com/DurdeuVlad/GatehouseMC",
+    "issues": "https://github.com/DurdeuVlad/GatehouseMC/issues"
   },
   "license": "MIT",
   "icon": "assets/gatehousemc/icon.png",
