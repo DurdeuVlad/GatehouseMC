@@ -62,9 +62,10 @@ jobs:
             --output .e2e-server/fabric-installer.jar
           java -jar .e2e-server/fabric-installer.jar server \
             -dir .e2e-server -mcversion 1.21.1 -loader 0.19.5 -downloadMinecraft
-          curl --fail --silent --show-error --location \
-            "https://maven.fabricmc.net/net/fabricmc/fabric-api/0.116.17%2B1.21.1/fabric-api-0.116.17%2B1.21.1.jar" \
-            --output .e2e-server/mods/fabric-api.jar
+          fabric_api_jar=$(find "$HOME/.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api/fabric-api/0.116.17+1.21.1" \
+            -type f -name 'fabric-api-*.jar' ! -name '*-sources.jar' | head -n 1)
+          test -n "$fabric_api_jar"
+          cp "$fabric_api_jar" .e2e-server/mods/fabric-api.jar
           cp build/libs/gatehousemc-1.0.1.jar .e2e-server/mods/
           printf 'eula=true\n' > .e2e-server/eula.txt
           cat > .e2e-server/server.properties <<'EOF'
