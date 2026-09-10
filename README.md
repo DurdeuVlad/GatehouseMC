@@ -1,35 +1,39 @@
 <p align="center">
-  <img src="assets/gatehousemc_banner.png" alt="GatehouseMC Banner" width="100%">
+  <img src="assets/gatehousemc_logo.png" alt="GatehouseMC logo" width="240">
 </p>
 
 # GatehouseMC
 
 <p align="center">
-  <a href="https://github.com/DurdeuVlad/GatehouseMC/releases"><img src="https://img.shields.io/github/v/release/DurdeuVlad/GatehouseMC?color=brightgreen&label=Release" alt="GitHub Release"></a>
-  <a href="https://modrinth.com/mod/gatehousemc"><img src="https://img.shields.io/badge/Modrinth-Available-00AF5C?logo=modrinth&logoColor=white" alt="Modrinth"></a>
-  <a href="https://www.curseforge.com/minecraft/mc-mods/gatehousemc"><img src="https://img.shields.io/badge/CurseForge-Available-F16436?logo=curseforge&logoColor=white" alt="CurseForge"></a>
-  <img src="https://img.shields.io/badge/Minecraft-1.21.1-brightgreen.svg" alt="Minecraft 1.21.1">
+  <a href="https://github.com/DurdeuVlad/GatehouseMC/releases/latest"><img src="https://img.shields.io/github/v/release/DurdeuVlad/GatehouseMC?color=brightgreen&label=Release" alt="Latest GitHub release"></a>
+  <a href="https://modrinth.com/mod/gatehousemc"><img src="https://img.shields.io/badge/Modrinth-Submitted%20for%20review-F5A623?logo=modrinth&logoColor=white" alt="Modrinth submitted for review"></a>
+  <a href="https://www.curseforge.com/minecraft/mc-mods/gatehousemc"><img src="https://img.shields.io/badge/CurseForge-Pending%20review-F5A623?logo=curseforge&logoColor=white" alt="CurseForge pending review"></a>
+  <img src="https://img.shields.io/badge/Minecraft-1.14.4--1.21.4-brightgreen.svg" alt="Verified Minecraft 1.14.4 through 1.21.4">
   <img src="https://img.shields.io/badge/Loader-Fabric-blue.svg" alt="Fabric">
   <img src="https://img.shields.io/badge/Side-Server--Only-orange.svg" alt="Server-Side Only">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
 </p>
 
-Server-side Fabric mod for Minecraft 1.21.1. When vanilla rejects an offline-mode player because they are not whitelisted, GatehouseMC records one durable request and exposes approve/deny/block/undo actions through `/gatehouse` (aliases `/gh`, `/wlreq`), Discord, and Telegram adapters.
+Server-side Fabric whitelist approvals for private offline-mode Minecraft servers. When vanilla rejects an unwhitelisted player, GatehouseMC records one durable request and lets staff approve, deny, block, or undo it in-game or through optional Discord and Telegram adapters.
 
 GatehouseMC is an operational workflow layer around Minecraft's native whitelist. It does not authenticate players, replace `whitelist.json`, retain IP addresses, or require a client mod.
 
 ## Requirements
 
-- Minecraft Java Edition 1.21.1
-- Fabric Loader 0.19.5 and a compatible Fabric API
-- Java 21
+- Verified release targets: Minecraft Java Edition 1.14.4 through 1.21.4
+- Fabric Loader and Fabric API for that same Minecraft version
+- Java matching the selected Minecraft version:
+  - 1.14.4, 1.15.2, 1.16.5, 1.17.1, 1.18.2, 1.19.2, 1.19.4, 1.20.1, 1.20.4 — Java 17
+  - 1.20.6, 1.21.1, 1.21.4 — Java 21
 - `online-mode=false` and `white-list=true` for the supported offline-mode workflow
 
 ## Downloads & Distribution
 
-- **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(see [Modrinth Description](docs/publishing/MODRINTH.md))*
-- **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(see [CurseForge Description](docs/publishing/CURSEFORGE.md))*
-- **GitHub Releases:** [github.com/DurdeuVlad/GatehouseMC/releases](https://github.com/DurdeuVlad/GatehouseMC/releases)
+- **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(submitted; pending moderation)*
+- **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(submitted; pending moderation)*
+- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(v1.0.1 compatibility rebuild)*
+- **Source and issues:** [github.com/DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC) · [issue tracker](https://github.com/DurdeuVlad/GatehouseMC/issues)
+- **Publishing copy:** [Modrinth](docs/publishing/MODRINTH.md) · [CurseForge](docs/publishing/CURSEFORGE.md)
 - **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)
 
 ## Build
@@ -44,7 +48,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The production artifact is written to `build/libs/gatehousemc-1.0.0.jar`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
+The primary 1.21.1 artifact is written to `build/libs/gatehousemc-1.0.1.jar`. A release artifact is publishable only when its internal `fabric.mod.json` Minecraft dependency matches its label; the release workflow enforces this. The build nests SQLite, JDA, and the SLF4J API required by older servers.
 
 ## Real-server smoke test
 
@@ -65,7 +69,7 @@ clean standalone server and restart/outage scenarios, is documented in
 
 ## Install and configure
 
-Put `gatehousemc-1.0.0.jar` in the server's `mods/` directory and start the server once. GatehouseMC creates:
+Put the file matching your Minecraft version in the server's `mods/` directory and start the server once. GatehouseMC creates:
 
 ```text
 config/gatehousemc/config.json
@@ -99,6 +103,6 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-All unit, component, architecture, router, and fake-transport tests pass. A real Fabric 1.21.1 dedicated server has proven: rejection -> persistence -> approval -> native whitelist mutation -> reconnect -> restart persistence, and distinct player-facing messages for first-request, pending, denied, blocked, and degraded states. The production jar nests SQLite and JDA and runs on a clean server with no additional dependencies.
+Unit, component, architecture, router, and fake-transport tests pass. Clean standalone servers booted with rebuilt `1.0.1` artifacts for every target from 1.14.4 through 1.21.4. Release publishing validates the internal metadata, Java bytecode, and target-specific tag before upload.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.

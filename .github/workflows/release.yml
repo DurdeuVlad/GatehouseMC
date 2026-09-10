@@ -3,8 +3,13 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-mc*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without the leading v (for example 1.1.0); the Minecraft target comes from the checked-out branch'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +17,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      clean_version: ${{ steps.version.outputs.clean_version }}
+      mc_version: ${{ steps.version.outputs.mc_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -32,21 +41,86 @@ jobs:
 
       - name: Extract version info
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          TAG_NAME="${{ github.ref_name }}"
-          CLEAN_VER="${TAG_NAME#v}"
-          MC_VER=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          MOD_VER=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_VERSION" ]; then
+              CLEAN_VER="$INPUT_VERSION"
+            else
+              CLEAN_VER=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+            fi
+            MC_VER=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+            TAG_NAME="v${CLEAN_VER}-mc${MC_VER}"
+          else
+            TAG_NAME="$REF_NAME"
+            if [[ "$TAG_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?)-mc([0-9]+\.[0-9]+(\.[0-9]+)?)$ ]]; then
+              CLEAN_VER="${BASH_REMATCH[1]}"
+              TAG_MC_VER="${BASH_REMATCH[3]}"
+            else
+              echo "Release tags must use v<version>-mc<minecraft-version> (for example v1.1.0-mc1.21.1)." >&2
+              exit 1
+            fi
+          fi
+          MC_VER=${MC_VER:-$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')}
+          case "$MC_VER" in
+            1.14.4|1.15.2|1.16.5|1.17.1|1.18.2|1.19.2|1.19.4|1.20.1|1.20.4) JAVA_RUNTIME=17 ;;
+            1.20.6|1.21.1|1.21.4) JAVA_RUNTIME=21 ;;
+            *)
+              echo "Unsupported Minecraft release target: $MC_VER" >&2
+              exit 1
+              ;;
+          esac
+          if [ -n "${TAG_MC_VER:-}" ] && [ "$TAG_MC_VER" != "$MC_VER" ]; then
+            echo "Tag Minecraft target $TAG_MC_VER does not match gradle.properties minecraft_version $MC_VER" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$CLEAN_VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "Invalid release version: $CLEAN_VER" >&2
+            exit 1
+          fi
+          if [ "$CLEAN_VER" != "$MOD_VER" ]; then
+            echo "Release version $CLEAN_VER does not match mod_version $MOD_VER" >&2
+            exit 1
+          fi
           echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT
           echo "mc_version=${MC_VER}" >> $GITHUB_OUTPUT
+          echo "java_runtime=${JAVA_RUNTIME}" >> $GITHUB_OUTPUT
+
+      - name: Validate publishing secrets
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          test -n "$MODRINTH_TOKEN" || { echo 'Missing MODRINTH_TOKEN repository secret.' >&2; exit 1; }
+          test -n "$CURSEFORGE_TOKEN" || { echo 'Missing CURSEFORGE_TOKEN repository secret.' >&2; exit 1; }
 
       - name: Build and test mod
-        run: ./gradlew clean test build --stacktrace
+        run: bash ./gradlew clean test build --stacktrace
+
+      - name: Validate artifact identity
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.clean_version }}
+          MINECRAFT_VERSION: ${{ steps.version.outputs.mc_version }}
+        run: |
+          set -euo pipefail
+          source_jar="build/libs/gatehousemc-${RELEASE_VERSION}.jar"
+          test -f "$source_jar" || { echo "Missing build artifact: $source_jar" >&2; exit 1; }
+          metadata=$(unzip -p "$source_jar" fabric.mod.json)
+          test "$(jq -r '.id' <<<"$metadata")" = "gatehousemc" || { echo 'Artifact mod id is not gatehousemc.' >&2; exit 1; }
+          test "$(jq -r '.version' <<<"$metadata")" = "$RELEASE_VERSION" || { echo 'Artifact mod version does not match the release version.' >&2; exit 1; }
+          test "$(jq -r '.depends.minecraft' <<<"$metadata")" = "$MINECRAFT_VERSION" || { echo 'Artifact Minecraft metadata does not match the release target.' >&2; exit 1; }
+          labeled_jar="build/libs/gatehousemc-${MINECRAFT_VERSION}-${RELEASE_VERSION}.jar"
+          cp "$source_jar" "$labeled_jar"
 
       - name: Compute SHA-256 Checksums
         run: |
           cd build/libs
-          sha256sum gatehousemc-*.jar > checksums.txt
+          sha256sum "gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar" > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
@@ -56,25 +130,112 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
           files: |
-            build/libs/gatehousemc-*.jar
+            build/libs/gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar
             build/libs/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to Modrinth and CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
-        continue-on-error: true
         with:
-          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+          modrinth-id: gatehousemc
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: build/libs/gatehousemc-*.jar
+          files: build/libs/gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar
           name: GatehouseMC ${{ steps.version.outputs.clean_version }} (${{ steps.version.outputs.mc_version }})
-          version: ${{ steps.version.outputs.clean_version }}
+          version: ${{ steps.version.outputs.clean_version }}+${{ steps.version.outputs.mc_version }}
           version-type: release
           changelog-file: CHANGELOG.md
           loaders: fabric
+          environment: dedicated-server
           game-versions: ${{ steps.version.outputs.mc_version }}
+          java: ${{ steps.version.outputs.java_runtime }}
           dependencies: |
             fabric-api(required)
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000
+
+  announce:
+    name: Announce release
+    needs: release
+    if: needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.release.outputs.clean_version }}
+      MINECRAFT_VERSION: ${{ needs.release.outputs.mc_version }}
+      RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag }}
+      MODRINTH_URL: https://modrinth.com/mod/gatehousemc
+      CURSEFORGE_URL: https://www.curseforge.com/minecraft/mc-mods/gatehousemc
+      DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+      TELEGRAM_RELEASE_BOT_TOKEN: ${{ secrets.TELEGRAM_RELEASE_BOT_TOKEN }}
+      TELEGRAM_RELEASE_CHAT_ID: ${{ secrets.TELEGRAM_RELEASE_CHAT_ID }}
+    steps:
+      - name: Write release announcement summary
+        run: |
+          {
+            echo "## GatehouseMC ${RELEASE_VERSION} released"
+            echo
+            echo "Minecraft ${MINECRAFT_VERSION}"
+            echo
+            echo "- GitHub: ${RELEASE_URL}"
+            echo "- Modrinth: ${MODRINTH_URL}"
+            echo "- CurseForge: ${CURSEFORGE_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Announce to Discord webhook
+        if: env.DISCORD_RELEASE_WEBHOOK_URL != ''
+        run: |
+          python - <<'PY' > "$RUNNER_TEMP/discord-release.json"
+          import json
+          import os
+
+          version = os.environ["RELEASE_VERSION"]
+          minecraft = os.environ["MINECRAFT_VERSION"]
+          release_url = os.environ["RELEASE_URL"]
+          modrinth_url = os.environ["MODRINTH_URL"]
+          curseforge_url = os.environ["CURSEFORGE_URL"]
+          message = (
+              f"🎉 GatehouseMC {version} is released for Minecraft {minecraft}!\n"
+              f"GitHub: {release_url}\n"
+              f"Modrinth: {modrinth_url}\n"
+              f"CurseForge: {curseforge_url}"
+          )
+          print(json.dumps({"content": message}))
+          PY
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/discord-release.json" \
+            "$DISCORD_RELEASE_WEBHOOK_URL"
+
+      - name: Announce to Telegram
+        if: env.TELEGRAM_RELEASE_BOT_TOKEN != '' || env.TELEGRAM_RELEASE_CHAT_ID != ''
+        run: |
+          test -n "$TELEGRAM_RELEASE_BOT_TOKEN" || { echo 'TELEGRAM_RELEASE_BOT_TOKEN is missing.' >&2; exit 1; }
+          test -n "$TELEGRAM_RELEASE_CHAT_ID" || { echo 'TELEGRAM_RELEASE_CHAT_ID is missing.' >&2; exit 1; }
+          python - <<'PY' > "$RUNNER_TEMP/telegram-release.json"
+          import json
+          import os
+
+          version = os.environ["RELEASE_VERSION"]
+          minecraft = os.environ["MINECRAFT_VERSION"]
+          message = (
+              f"🎉 GatehouseMC {version} is released for Minecraft {minecraft}!\n"
+              f"GitHub: {os.environ['RELEASE_URL']}\n"
+              f"Modrinth: {os.environ['MODRINTH_URL']}\n"
+              f"CurseForge: {os.environ['CURSEFORGE_URL']}"
+          )
+          print(json.dumps({
+              "chat_id": os.environ["TELEGRAM_RELEASE_CHAT_ID"],
+              "text": message,
+              "disable_web_page_preview": True,
+          }))
+          PY
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/telegram-release.json" \
+            "https://api.telegram.org/bot${TELEGRAM_RELEASE_BOT_TOKEN}/sendMessage"

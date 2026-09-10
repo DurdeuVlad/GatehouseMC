@@ -6,15 +6,18 @@ testing strategy, OSS policy, and issue-style task backlog. Those documents are
 requirements/context; they are not a replacement for the user's request or for
 the acceptance evidence below.
 
-Private GitHub repository: [DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC)
+Public GitHub repository: [DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC)
 
-The tracker contains 31 imported implementation, compatibility, and release issues covering
-M0 through M7. Dependabot is enabled for the Gradle wrapper and the Node E2E
-client.
+The tracker contains the imported implementation, compatibility, and release
+backlog covering M0 through M7. Use the live GitHub tracker for the current
+open/closed issue count. Dependabot is enabled for the Gradle wrapper and the
+Node E2E client.
 
 ## Current baseline
 
-- Minecraft 1.21.1, Fabric, Java 21.
+- Primary implementation baseline: Minecraft 1.21.1, Fabric, Java 21.
+- Target branches exist for Minecraft 1.14.4 through 1.21.4 and all twelve
+  now pass clean standalone server boot with the `1.0.1` rebuild.
 - Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
@@ -22,6 +25,14 @@ client.
 - `/gatehouse` (with `/gh` and `/wlreq` aliases) command interface.
 - Discord JDA and Telegram Bot API adapters behind one core decision service.
 - No IP persistence and no claim that offline usernames are authenticated.
+
+## Publication status
+
+- GitHub is public and contains the source repository.
+- Modrinth and CurseForge submissions contain the earlier files and must be
+  replaced with the corrected `1.0.1` artefacts.
+- GitHub Release `v1.0.0` is retained for history but is not production-ready;
+  its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 
 ## Verification already executed
 
@@ -33,14 +44,14 @@ tools/e2e: npm run smoke                        PASS (unwhitelisted rejection)
 tools/e2e: MC_EXPECTED_STATUS=joined npm run smoke PASS (approved reconnect)
 ```
 
-A real Fabric 1.21.1 dedicated server booted successfully with the Mixin
-applied. `E2E_Alice` was rejected, persisted as `PENDING`, approved through the
-server command, added to vanilla `whitelist.json`, and reconnected to the
-running server. `E2E_Bob` was independently rejected and persisted as pending.
+A real clean Fabric dedicated server booted with rebuilt `1.0.1` artefacts for
+every target from 1.14.4 through 1.21.4, with GatehouseMC startup logged. The
+exact v1.0.0 1.21.4 asset was rejected because its internal metadata says
+1.21.1. Full request workflow E2E remains a separate release gate.
 
 ## What Devin should do next
 
-The local issue backlog and the private GitHub issue tracker are the source of
+The local issue backlog and the public GitHub issue tracker are the source of
 execution order. Start with the open P0 issues, not with broad refactoring.
 
 The remaining production gates are:

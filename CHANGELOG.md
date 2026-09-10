@@ -2,6 +2,15 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.0.1 — Compatibility and release integrity
+
+- Fixed legacy Fabric startup by bundling the SLF4J API required by older
+  servers and aligned all artifact metadata with the actual Java bytecode.
+- Verified clean standalone Fabric server boot for every supported target from
+  Minecraft 1.14.4 through 1.21.4.
+- Release publishing now uses target-specific tags and validates the internal
+  `fabric.mod.json` Minecraft and Java metadata before uploading.
+
 ## 1.0.0 — Initial Release
 
 ### GatehouseMC Brand & Identity

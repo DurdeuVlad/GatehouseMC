@@ -72,10 +72,16 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 ## 5. Branch/release policy
 
-### 5.1 Long-lived branches
+### 5.1 Long-lived branches and artifact targets
 
-| Branch   | Minecraft | Java Target | Loader | Status | Notes |
-|----------|-----------|-------------|--------|--------|-------|
+The repository tracks a version branch for each target, with `main` and
+`1.21.1` as the primary implementation baseline. The matrix below is the target
+branch and release map. Retained maintenance branches are not a promise of
+equal future feature support; every `1.0.1` target listed here has clean-server
+evidence.
+
+| Target   | Minecraft | Java Runtime | Loader | Status | Notes |
+|----------|-----------|--------------|--------|--------|-------|
 | `main`   | 1.21.1    | Java 21     | Fabric | Active trunk | Fast-forward mirror of `1.21.1`; all feature work merges here first |
 | `1.21.4` | 1.21.4    | Java 21     | Fabric | Active support | Separate binary build (`1.21.4+build.8`, API `0.119.4+1.21.4`) |
 | `1.21.1` | 1.21.1    | Java 21     | Fabric | LTS / primary | Baseline release target (`1.21.1+build.3`, API `0.116.17+1.21.1`) |
@@ -85,10 +91,10 @@ The mod's distributed jar contains project code and allowed dependencies only.
 | `1.19.4` | 1.19.4    | Java 17     | Fabric | Active support | Raw `Text` sendFeedback (`1.19.4+build.2`, API `0.87.2+1.19.4`) |
 | `1.19.2` | 1.19.2    | Java 17     | Fabric | LTS / popular | Primary 1.19 modpack LTS (`1.19.2+build.28`, API `0.77.0+1.19.2`) |
 | `1.18.2` | 1.18.2    | Java 17     | Fabric | LTS / popular | `LiteralText`, `TranslatableText`, v1 CommandRegistration (`1.18.2+build.4`, API `0.77.0+1.18.2`) |
-| `1.17.1` | 1.17.1    | Java 17     | Fabric | Active support | Gson 2.8 compatible parsing (`1.17.1+build.65`, API `0.46.1+1.17`) |
-| `1.16.5` | 1.16.5    | Java 17     | Fabric | LTS / popular | Runtime server thread dispatch (`1.16.5+build.10`, API `0.42.0+1.16`) |
-| `1.15.2` | 1.15.2    | Java 17     | Fabric | Maintenance | Pure Brigadier suggestions (`1.15.2+build.17`, API `0.28.5+1.15`) |
-| `1.14.4` | 1.14.4    | Java 17     | Fabric | Maintenance | Initial official Fabric release (`1.14.4+build.18`, API `0.28.5+1.14`) |
+| `1.17.1` | 1.17.1    | Java 16     | Fabric | Active support | Gson 2.8 compatible parsing (`1.17.1+build.65`, API `0.46.1+1.17`) |
+| `1.16.5` | 1.16.5    | Java 8      | Fabric | LTS / popular | Runtime server thread dispatch (`1.16.5+build.10`, API `0.42.0+1.16`) |
+| `1.15.2` | 1.15.2    | Java 8      | Fabric | Maintenance | Pure Brigadier suggestions (`1.15.2+build.17`, API `0.28.5+1.15`) |
+| `1.14.4` | 1.14.4    | Java 8      | Fabric | Maintenance | Initial official Fabric release (`1.14.4+build.18`, API `0.28.5+1.14`) |
 
 Short-lived branches follow this naming convention:
 
@@ -102,8 +108,9 @@ chore/*     build, tooling, dependency bumps
 ### 5.2 Merge direction
 
 ```
-feat/* ──► main ──► 1.21.1 ──cherry-pick──► 1.21.4, 1.20.x, 1.19.x, 1.18.x, 1.17.x, 1.16.x, 1.15.x, 1.14.x
-                                fix/*  ─────────────►
+feat/* ──► main ──► 1.21.1
+                         └─► version branches only when a target is actively maintained
+fix/*  ────────────────► applicable maintained targets
 ```
 
 - Features land on `main` first.
@@ -164,9 +171,10 @@ Every release should record:
 
 Expected public distribution:
 
-- GitHub Releases — authoritative source/tag/checksum;
-- Modrinth — mod distribution;
-- CurseForge — optional/expected secondary distribution.
+- GitHub repository — public source and issue tracker; GitHub Releases is the
+  authoritative tagged source/checksum channel. `v1.0.0` is published.
+- Modrinth — submitted mod distribution; currently pending moderation.
+- CurseForge — submitted secondary distribution; currently pending moderation.
 
 Do not publish automatically on every commit. Release only after the documented verification gates pass.
 

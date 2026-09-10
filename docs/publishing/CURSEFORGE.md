@@ -1,81 +1,72 @@
-# GatehouseMC — CurseForge Project Description
+# GatehouseMC — CurseForge publication copy
 
-```markdown
-<p align="center">
-  <img src="https://raw.githubusercontent.com/DurdeuVlad/GatehouseMC/feat/undo-and-i18n/assets/gatehousemc_banner.png" alt="GatehouseMC Banner" width="100%">
-</p>
+This is the current audience-facing copy for the GatehouseMC CurseForge
+project. The project and its existing files are submitted and **Under Review**;
+CurseForge will not expose the project or synchronize its files until moderator
+approval.
 
-# GatehouseMC
+## Media and settings
 
-**Server-side Fabric mod for Minecraft 1.21.1.** Automatically captures connection denials on offline-mode servers, generates persistent whitelist requests, and allows administrators to approve or deny requests directly from in-game commands, Discord, and Telegram.
+- Project name: Gatehouse. CurseForge rejects project names containing `mc`,
+  while the product and mod remain branded **GatehouseMC** in the description,
+  files, source repository, and slug (`gatehousemc`).
+- Class/category: Mods → Server Utility.
+- License: MIT.
+- Source code: GitHub — <https://github.com/DurdeuVlad/GatehouseMC>.
+- Comments: enabled; issue tracking remains the public GitHub issue tracker.
+- Files: only `1.0.1` artefacts whose internal metadata matches their Minecraft
+  label may be published. The old v1.0.0 multi-version submission remains on
+  hold because its non-1.21.1 labelled files contain 1.21.1 metadata.
+- Media: the project has a neutral multi-version banner. Keep the square
+  project logo available as the canonical icon.
 
----
+CurseForge's current author UI does not expose a project-level Environment
+field, so the preview may show **Not Set** even though every uploaded file has
+the correct **Server** environment tag. Recheck this after moderation.
 
-### ⚠️ Requirements & Environment
+## Description
 
-- **Server-Side Only:** Players joining your server DO NOT need this mod installed.
-- **Minecraft:** Java Edition 1.21.1
-- **Mod Loader:** Fabric Loader (>= 0.19.5) + Fabric API
-- **Java:** 21+
-- **Server Configuration:** `online-mode=false` and `white-list=true`
+GatehouseMC
 
----
+Run a private Fabric server in offline mode? GatehouseMC turns whitelist requests into a simple approval workflow for your staff.
 
-### 🏰 Why GatehouseMC?
+When an unknown player tries to join:
 
-On private or semi-private offline-mode Minecraft servers, onboarding new players is often tedious:
-- Players must join Discord or a forum and manually ask for whitelist access.
-- Admins must copy-paste usernames into console or edit configuration files.
-- Misspelled usernames cause confusion and failed logins.
+1. GatehouseMC detects the vanilla whitelist rejection.
+2. A durable request is saved automatically.
+3. Staff review it in-game or receive optional Discord and Telegram notifications.
+4. Approval adds the player to Minecraft's native whitelist.
+5. The player reconnects and gets in.
 
-**GatehouseMC eliminates this friction entirely:**
-1. A new player joins the server.
-2. Minecraft's native whitelist blocks them with a helpful custom message: *"You are not whitelisted. A whitelist request has been queued automatically."*
-3. GatehouseMC creates a durable request and immediately sends an alert to your **Discord** and/or **Telegram** staff channel.
-4. An admin clicks **Approve** on their phone or desktop.
-5. GatehouseMC immediately adds the player's offline profile to vanilla `whitelist.json`.
-6. The player reconnects and is playing!
+Players do not need a client-side mod, Discord account, or external registration.
 
----
+FEATURES
 
-### 🚀 Key Features
+- Automatic whitelist request creation
+- Optional Discord and Telegram approval workflows
+- In-game commands: `/gatehouse`, `/gh`, and `/wlreq`
+- Approve, deny, block, unblock, undo, status, and reload actions
+- SQLite persistence and restart/outage recovery
+- Minecraft's native whitelist remains authoritative
+- Server-side only; no client IP addresses stored by default
 
-- **Automatic Request Generation:** Joining the server IS the registration.
-- **Discord Bot Integration:** Embeds with interactive Approve / Deny / Block buttons (powered by JDA).
-- **Telegram Bot Integration:** Interactive messages with inline buttons.
-- **Reversible Decisions:** Full `/gatehouse undo` support to revert mistakes.
-- **Vanilla Whitelist Authority:** Directly mutates vanilla Minecraft whitelist; fully compatible with other server management tools.
-- **Durable SQLite Storage:** Requests and notifications are persisted in SQLite with an atomic transactional outbox.
-- **Spam Control:** Configurable denial cooldowns and permanent username blocks prevent request spam.
-- **Zero Client Dependencies:** Only installed on the dedicated server.
+INSTALLATION
 
----
+1. Download the file matching your Minecraft version and place it in the server's `mods/` directory.
+2. Install Fabric Loader and Fabric API for that same Minecraft version.
+3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
+4. Optionally configure Discord or Telegram integrations. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-### 💻 Commands
+Verified release builds cover Minecraft **1.14.4 through 1.21.4**. Choose the exact `1.0.1` file; Java 17 is required for 1.14.4–1.20.4 and Java 21 for 1.20.6–1.21.4.
 
-All commands can be invoked with `/gatehouse`, `/gh`, or `/wlreq`:
+OFFLINE-MODE NOTICE
 
-- `/gatehouse list [pending|approved|denied|blocked]` — List stored requests
-- `/gatehouse show <request-id|username>` — Show detailed request view
-- `/gatehouse approve <request-id|username> [reason]` — Approve player access
-- `/gatehouse deny <request-id|username> [reason]` — Deny request (starts cooldown)
-- `/gatehouse block <request-id|username> [reason]` — Block username from creating requests
-- `/gatehouse unblock <username> [reason]` — Unblock a previously blocked username
-- `/gatehouse undo <request-id|username> [reason]` — Revert last approval/denial/block
-- `/gatehouse status` — Display queue and database status
-- `/gatehouse reload` — Hot-reload bot configurations
+Raw `online-mode=false` servers do not verify Minecraft identity ownership with Mojang or Microsoft. Approving a username grants access to the offline profile derived from that name; it does not authenticate an account.
 
----
+LINKS
 
-### 📦 Installation
+Source: <https://github.com/DurdeuVlad/GatehouseMC>
 
-1. Drop `gatehousemc-1.0.0.jar` into your server's `mods/` directory.
-2. Start the server once to generate `config/gatehousemc/config.json`.
-3. Optionally configure Discord/Telegram tokens and admin IDs in `config.json`.
+Issue tracker: <https://github.com/DurdeuVlad/GatehouseMC/issues>
 
----
-
-### 📄 License
-
-GatehouseMC is open-source software licensed under the [MIT License](https://opensource.org/licenses/MIT).
-```
+Setup guide: <https://github.com/DurdeuVlad/GatehouseMC/blob/main/README.md>

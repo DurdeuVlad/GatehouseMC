@@ -1,101 +1,124 @@
 # Publishing Guide — GatehouseMC
 
-This guide details the steps required to publish **GatehouseMC** to **Modrinth**, **CurseForge**, and **GitHub Releases**.
+This guide describes the repeatable release process for GatehouseMC across
+GitHub Releases, Modrinth, and CurseForge. The `1.0.1` release is the first
+rebuild that has passed the complete clean-server compatibility matrix.
 
----
+## Current publication state
 
-## 1. Prerequisites & Preparation
+- GitHub repository: public — <https://github.com/DurdeuVlad/GatehouseMC>
+- GitHub Release: `v1.0.0` remains archived with invalid legacy labels. Do not
+  use it for installation.
+- Modrinth and CurseForge: publish the corrected `1.0.1` files only after the
+  release workflow completes successfully.
+- Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
+  and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
-Before publishing the first release, ensure:
+## Assets and listing standards
 
-1. The project builds cleanly and all tests pass:
-   ```powershell
-   .\gradlew.ps1 clean test build
-   ```
-2. The production jar exists at `build/libs/gatehousemc-1.0.0.jar`.
-3. The brand assets are available:
-   - **Logo / Icon:** [`assets/gatehousemc_logo.png`](../assets/gatehousemc_logo.png) (1024×1024)
-   - **Banner:** [`assets/gatehousemc_banner.png`](../assets/gatehousemc_banner.png) (1792×1024)
-   - **In-Jar Icon:** [`src/main/resources/assets/gatehousemc/icon.png`](../src/main/resources/assets/gatehousemc/icon.png) (256×256)
+- Project icon/logo: [`assets/gatehousemc_logo.png`](../assets/gatehousemc_logo.png)
+  (1024×1024).
+- In-jar icon: [`src/main/resources/assets/gatehousemc/icon.png`](../src/main/resources/assets/gatehousemc/icon.png)
+  (256×256).
+- The old `assets/gatehousemc_banner.png` contains 1.21.1-only text and must
+  not be used as the multi-version storefront hero image.
+- Modrinth rejects AI-generated gallery images. Use the accepted square logo
+  or a real, non-AI gameplay/administration screenshot.
+- Every storefront file must carry the exact Minecraft version, Fabric loader,
+  and Server environment metadata.
+- Keep the offline-mode identity warning, GitHub source link, and issue tracker
+  in every public description.
 
----
+## Release prerequisites
 
-## 2. Setting Up the Modrinth Project
+Before publishing a new release:
 
-1. Log in to [Modrinth](https://modrinth.com) and click **Create Project**.
-2. Fill out project details:
-   - **Project Name:** `GatehouseMC`
-   - **Project Slug:** `gatehousemc`
-   - **Summary / Tagline:**
-     > Server-side whitelist gatehouse for offline-mode Minecraft servers. Automatic requests, Discord & Telegram integrations.
-   - **Categories:** *Server Utility*, *Management*
-   - **Environment:**
-     - Client: **Unsupported**
-     - Server: **Required**
-   - **License:** MIT
-   - **Source Repository:** `https://github.com/DurdeuVlad/GatehouseMC`
-   - **Issue Tracker:** `https://github.com/DurdeuVlad/GatehouseMC/issues`
-3. Upload brand assets:
-   - Project Icon: `assets/gatehousemc_logo.png`
-   - Project Gallery / Banner: `assets/gatehousemc_banner.png`
-4. Copy the formatted description from [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md) into the description field.
-5. Once created, note the **Project ID** from the project dashboard URL or settings.
+1. Run `./gradlew clean test build` with the JDK required by the target branch.
+2. Run the applicable real dedicated-server scenarios from
+   [`docs/TESTING.md`](TESTING.md).
+3. Verify the clean standalone artifact and representative mod-stack
+   compatibility when the change affects runtime packaging or Minecraft
+   integration.
+4. Generate SHA-256 checksums for every version-labelled JAR.
+5. Confirm no tokens, credentials, runtime state, or Minecraft server jars are
+   present in the commit or release assets.
+6. Update [`CHANGELOG.md`](../CHANGELOG.md), the compatibility matrix, and the
+   public copy before tagging.
 
----
+Do not call a release production-ready when only the Gradle build or the
+1.21.1 smoke path has been executed. Record skipped gates and their reason.
 
-## 3. Setting Up the CurseForge Project
+## GitHub Release
 
-1. Log in to [CurseForge](https://www.curseforge.com) and navigate to **Dashboard -> Create a Project**.
-2. Select **Minecraft Mods**.
-3. Fill out project details:
-   - **Name:** `GatehouseMC`
-   - **Summary:**
-     > Server-side Fabric whitelist management mod for offline-mode servers with Discord and Telegram bot approvals.
-   - **Primary Category:** *Server Utility*
-   - **Environment:** *Server Only*
-   - **License:** MIT
-4. Upload brand assets:
-   - Avatar / Logo: `assets/gatehousemc_logo.png`
-   - Header / Banner: `assets/gatehousemc_banner.png`
-5. Copy the formatted description from [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md) into the description.
-6. Once submitted and approved by CurseForge moderation, note the numeric **Project ID**.
+Release each maintained Minecraft target from its corresponding version branch
+or use the reviewed multi-version release process. A release must contain:
 
----
+- one JAR per supported Minecraft version;
+- a single checksum file covering every JAR;
+- release notes naming the Minecraft version and Java runtime for each asset;
+- the offline-mode trust warning and any unresolved compatibility limits.
 
-## 4. Configuring GitHub Actions Secrets
+The public release channel is:
 
-To automate publishing on git tag pushes, configure the following secrets in your GitHub repository (**Settings -> Secrets and variables -> Actions**):
+<https://github.com/DurdeuVlad/GatehouseMC/releases>
 
-| Secret Name | Description | Where to Obtain |
-|---|---|---|
-| `MODRINTH_TOKEN` | Modrinth API personal access token with *Create version* permissions | [Modrinth Account Settings -> PAT](https://modrinth.com/settings/pats) |
-| `MODRINTH_PROJECT_ID` | Modrinth Project ID or slug | Modrinth project page settings |
-| `CURSEFORGE_TOKEN` | CurseForge API token | [CurseForge API Tokens](https://authors.curseforge.com/account/api-tokens) |
-| `CURSEFORGE_PROJECT_ID` | CurseForge numeric Project ID | CurseForge project page overview |
+## Modrinth and CurseForge
 
-*(Note: `GITHUB_TOKEN` is automatically provided by GitHub Actions).*
+1. Upload the exact JAR for each Minecraft version.
+2. Set Fabric and Dedicated Server/Server metadata on every file.
+3. Use the audience-first copy in the platform-specific publishing document.
+4. Set the public GitHub repository and issue tracker links.
+5. Confirm the MIT license, server-only environment, categories, icon, media,
+   comments, and applicable content disclosures.
+6. Submit for moderation and do not claim availability until the platform
+   changes the project/files from review to approved/public.
 
----
+CurseForge currently exposes no project-level Environment control in the author
+UI. If its public preview still says `Not Set` after approval, verify that the
+file-level Server tags are present and raise it with CurseForge support rather
+than misrepresenting the project metadata.
 
-## 5. Publishing a Release
+## Automation secrets
 
-With secrets configured, triggering a release is as simple as tagging a commit:
+The release workflow reads project identifiers from `fabric.mod.json`. Configure
+these repository Actions secrets before using a release tag or the manual
+release dispatch:
+
+| Secret | Purpose |
+|---|---|
+| `MODRINTH_TOKEN` | Modrinth API token with version-creation permission |
+| `CURSEFORGE_TOKEN` | CurseForge API token |
+| `DISCORD_RELEASE_WEBHOOK_URL` | Optional Discord webhook for release announcements |
+| `TELEGRAM_RELEASE_BOT_TOKEN` | Optional Telegram bot token for release announcements |
+| `TELEGRAM_RELEASE_CHAT_ID` | Optional Telegram chat/channel ID paired with the release bot token |
+
+`GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
+expanded secret values to disk.
+
+The workflow fails closed if either publishing token is missing, if the tag does
+not use `v<version>-mc<minecraft-version>`, if the tag target does not match
+`gradle.properties`, or if the JAR's internal `fabric.mod.json` metadata does
+not match the release target. It publishes only the primary labelled mod JAR
+for the checked-out target branch; the Gradle sources JAR is not sent to either
+storefront. All twelve target branches are now eligible for publication because
+issues #50 and #51 have executable fixes and clean-server evidence.
+
+Every successful release writes an announcement to the GitHub Actions summary
+and GitHub Release. Discord and Telegram announcements are sent when their
+optional repository secrets are configured. A configured notification channel
+is treated as a real check: delivery failures are visible in Actions even
+though the already-created release remains available.
+
+## Manual release commands
 
 ```powershell
-# 1. Ensure working directory is clean and on the main branch
-git checkout main
-git pull
-
-# 2. Tag the release version
-git tag v1.0.0
-
-# 3. Push the tag to GitHub
-git push origin v1.0.0
+git switch main
+git pull --ff-only
+.\gradlew.ps1 clean test build
+git tag v<version>-mc<minecraft-version>
+git push origin v<version>-mc<minecraft-version>
 ```
 
-### What GitHub Actions will automatically do:
-1. Trigger `.github/workflows/release.yml`.
-2. Build and verify the mod with `./gradlew clean test build`.
-3. Compute SHA-256 checksums for the production jar.
-4. Create a GitHub Release with notes from `CHANGELOG.md` and attach the built jar.
-5. Publish the release to **Modrinth** and **CurseForge** via `Kir-Antipov/mc-publish`.
+The release workflow must be inspected before tagging to confirm that it builds
+the intended target branch and uploads the complete artifact matrix. A tag push
+alone is not proof that every Minecraft version was published.
