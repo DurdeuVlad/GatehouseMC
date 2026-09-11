@@ -60,7 +60,6 @@ jobs:
           INPUT_MINECRAFT: ${{ inputs.minecraft_version }}
         run: |
           set -euo pipefail
-          expected=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '\r')
           if [ "$EVENT_NAME" = "push" ]; then
             tag="$REF_NAME"
             if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?)-(fabric|forge|neoforge)-mc([0-9]+\.[0-9]+(\.[0-9]+)?)$ ]]; then
@@ -79,12 +78,6 @@ jobs:
             tag="v${version}-${loader}-mc${minecraft}"
           fi
 
-          printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'
-          test "$version" = "$expected" || {
-            echo "Release $version does not match mod_version $expected" >&2
-            exit 1
-          }
-
           case "$loader:$minecraft" in
             fabric:1.21.1) branch='support/fabric/1.21.1' ;;
             forge:1.20.1) branch='support/forge/1.20.1' ;;
@@ -96,8 +89,15 @@ jobs:
               ;;
           esac
 
+          git fetch --no-tags origin "refs/heads/$branch:refs/remotes/origin/$branch"
+          expected=$(git show "refs/remotes/origin/$branch:gradle.properties" | grep '^mod_version=' | cut -d= -f2 | tr -d '\r')
+          printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'
+          test "$version" = "$expected" || {
+            echo "Release $version does not match $branch mod_version $expected" >&2
+            exit 1
+          }
+
           if [ "$EVENT_NAME" = "push" ]; then
-            git fetch --no-tags origin "refs/heads/$branch:refs/remotes/origin/$branch"
             tag_commit=$(git rev-parse "refs/tags/$tag^{commit}")
             branch_commit=$(git rev-parse "refs/remotes/origin/$branch^{commit}")
             test "$tag_commit" = "$branch_commit" || {
@@ -234,6 +234,7 @@ jobs:
           TARGET_MINECRAFT: ${{ needs.resolve-release.outputs.minecraft }}
         run: |
           set -euo pipefail
+          test "$(find dist -maxdepth 1 -type f -name '*.jar' | wc -l)" -eq 1
           artifact=$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)
           test -n "$artifact"
           case "$TARGET_LOADER" in
