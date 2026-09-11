@@ -2,6 +2,18 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.1.0 — Multi-loader foundation
+
+- Added a loader-neutral runtime core shared by Fabric, Forge, and NeoForge.
+- Added source-build and clean-server proof targets for Fabric 1.21.1,
+  Forge 1.20.1, and NeoForge 1.21.1 with the required Java runtimes.
+- Added fail-closed artifact metadata/runtime validation and loader-specific
+  Modrinth/CurseForge release staging.
+- Added strict clean-server smoke automation for all three proof targets in CI
+  and tagged releases.
+- Older Fabric downloads remain historical 1.0.1 artifacts until their
+  per-version source builds and live-server gates are restored.
+
 ## 1.0.1 — Compatibility and release integrity
 
 - Fixed legacy Fabric startup by bundling the SLF4J API required by older

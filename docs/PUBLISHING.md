@@ -1,16 +1,20 @@
 # Publishing Guide — GatehouseMC
 
 This guide describes the repeatable release process for GatehouseMC across
-GitHub Releases, Modrinth, and CurseForge. The `1.0.1` release is the first
-rebuild that has passed the complete clean-server compatibility matrix.
+GitHub Releases, Modrinth, and CurseForge. The published `1.0.1` line is the
+historical Fabric compatibility release. The `1.1.x` line adds isolated Forge
+and NeoForge proof targets and is not production-publishable until the matrix
+gates are green.
 
 ## Current publication state
 
 - GitHub repository: public — <https://github.com/DurdeuVlad/GatehouseMC>
 - GitHub Release: `v1.0.0` remains archived with invalid legacy labels. Do not
   use it for installation.
-- Modrinth and CurseForge: publish the corrected `1.0.1` files only after the
-  release workflow completes successfully.
+- Modrinth and CurseForge: the release workflow stages Fabric 1.21.1, Forge
+  1.20.1, and NeoForge 1.21.1 independently; storefront publishing is a manual
+  guarded dispatch until the broader acceptance matrix and repeatable CI server
+  evidence are green for each target.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
@@ -21,11 +25,11 @@ rebuild that has passed the complete clean-server compatibility matrix.
 - In-jar icon: [`src/main/resources/assets/gatehousemc/icon.png`](../src/main/resources/assets/gatehousemc/icon.png)
   (256×256).
 - The old `assets/gatehousemc_banner.png` contains 1.21.1-only text and must
-  not be used as the multi-version storefront hero image.
+  not be used as a multi-version storefront hero image.
 - Modrinth rejects AI-generated gallery images. Use the accepted square logo
   or a real, non-AI gameplay/administration screenshot.
-- Every storefront file must carry the exact Minecraft version, Fabric loader,
-  and Server environment metadata.
+- Every storefront file must carry the exact Minecraft version, its actual
+  loader (Fabric, Forge, or NeoForge), and Server environment metadata.
 - Keep the offline-mode identity warning, GitHub source link, and issue tracker
   in every public description.
 
@@ -33,7 +37,7 @@ rebuild that has passed the complete clean-server compatibility matrix.
 
 Before publishing a new release:
 
-1. Run `./gradlew clean test build` with the JDK required by the target branch.
+1. Run the exact loader build lane from [`.github/support-matrix.yml`](../.github/support-matrix.yml) with its required JDK.
 2. Run the applicable real dedicated-server scenarios from
    [`docs/TESTING.md`](TESTING.md).
 3. Verify the clean standalone artifact and representative mod-stack
@@ -50,8 +54,7 @@ Do not call a release production-ready when only the Gradle build or the
 
 ## GitHub Release
 
-Release each maintained Minecraft target from its corresponding version branch
-or use the reviewed multi-version release process. A release must contain:
+Use the reviewed multi-loader release process. A release must contain:
 
 - one JAR per supported Minecraft version;
 - a single checksum file covering every JAR;
@@ -64,8 +67,8 @@ The public release channel is:
 
 ## Modrinth and CurseForge
 
-1. Upload the exact JAR for each Minecraft version.
-2. Set Fabric and Dedicated Server/Server metadata on every file.
+1. Upload the exact JAR for each verified loader/version row.
+2. Set the actual loader and Dedicated Server/Server metadata on every file.
 3. Use the audience-first copy in the platform-specific publishing document.
 4. Set the public GitHub repository and issue tracker links.
 5. Confirm the MIT license, server-only environment, categories, icon, media,
@@ -80,9 +83,9 @@ than misrepresenting the project metadata.
 
 ## Automation secrets
 
-The release workflow reads project identifiers from `fabric.mod.json`. Configure
-these repository Actions secrets before using a release tag or the manual
-release dispatch:
+The release workflow uses the loader metadata in each staged artifact and the
+fixed project identifiers in the workflow. Configure these repository Actions
+secrets before a guarded publishing dispatch:
 
 | Secret | Purpose |
 |---|---|
@@ -95,13 +98,11 @@ release dispatch:
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
 expanded secret values to disk.
 
-The workflow fails closed if either publishing token is missing, if the tag does
-not use `v<version>-mc<minecraft-version>`, if the tag target does not match
-`gradle.properties`, or if the JAR's internal `fabric.mod.json` metadata does
-not match the release target. It publishes only the primary labelled mod JAR
-for the checked-out target branch; the Gradle sources JAR is not sent to either
-storefront. All twelve target branches are now eligible for publication because
-issues #50 and #51 have executable fixes and clean-server evidence.
+The workflow fails closed if either publishing token is missing, if the release
+version does not match `gradle.properties`, or if any JAR's internal loader
+metadata does not match its target. GitHub Releases are staged from all three
+proof targets. Storefront publication requires an explicit manual dispatch
+with `publish=true`; the Gradle sources JAR is never sent to a storefront.
 
 Every successful release writes an announcement to the GitHub Actions summary
 and GitHub Release. Discord and Telegram announcements are sent when their

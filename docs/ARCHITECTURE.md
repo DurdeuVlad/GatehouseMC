@@ -1,6 +1,8 @@
 # Architecture — GatehouseMC
 
-This document defines the implementation blueprint for the Minecraft 1.21.1 Fabric release. Product semantics live in `../WHITELIST_REQUEST_SPEC.md`; accepted rationale lives in `DECISION.md`.
+This document defines the implementation blueprint for the loader-neutral GatehouseMC runtime and its Fabric, Forge, and NeoForge adapters. Product semantics live in `../WHITELIST_REQUEST_SPEC.md`; accepted rationale lives in `DECISION.md`.
+
+The 1.1.x implementation proof targets are Fabric 1.21.1 (Java 21), Forge 1.20.1 (Java 17), and NeoForge 1.21.1 (Java 21). The exact release state is tracked in [`.github/support-matrix.yml`](../.github/support-matrix.yml); historical 1.0.1 artifacts are not treated as freshly verified 1.1.x builds.
 
 ---
 
@@ -23,14 +25,22 @@ The architecture is hexagonal / ports-and-adapters:
          ┌──────────────────────────────┼──────────────────────────────┐
          │                              │                              │
          ▼                              ▼                              ▼
-┌────────────────┐             ┌─────────────────┐          ┌────────────────────┐
-│ Fabric adapter │             │ SQLite adapter  │          │ Approval interfaces │
-│ login/commands │             │ repo + outbox   │          │ Discord / Telegram │
-│ vanilla list   │             │ audit/migrate   │          │ future adapters     │
-└────────────────┘             └─────────────────┘          └────────────────────┘
+┌──────────────────────────────────┐   ┌─────────────────┐   ┌────────────────────┐
+│ Loader adapters                  │   │ SQLite adapter  │   │ Approval interfaces │
+│ Fabric / Forge / NeoForge        │   │ repo + outbox   │   │ Discord / Telegram  │
+│ login / commands / vanilla list  │   │ audit/migrate   │   │ future adapters     │
+└──────────────────────────────────┘   └─────────────────┘   └────────────────────┘
 ```
 
 Dependency direction always points inward.
+
+## 1.1 Build boundaries
+
+`core/` compiles the loader-neutral application, domain, ports, persistence, and provider adapters from the shared source tree. The root project is the Fabric 1.21.1 distribution. `platform-neoforge/` consumes the core output through NeoForge ModDevGradle. `platform-forge/` consumes the same core through ForgeGradle 6.
+
+The Forge lane is deliberately isolated because ForgeGradle 6 rejects Gradle 9+. Run it with Gradle 8.8 and `-PenableForge`; the normal wrapper must never silently switch lanes. The platform jars embed the core classes and runtime dependencies, so a clean server must not need the Gradle or IDE classpath.
+
+Loader-specific code may import Minecraft/loader APIs. Code compiled into `core/` may not. The artifact validator in `tools/release/validate_artifact.py` rejects cross-loader metadata and missing nested runtime classes before a release can be staged.
 
 ---
 
@@ -601,38 +611,47 @@ The interface must not expose JDA/Telegram types.
 
 ## Multi-version Minecraft support
 
-The main working tree targets Minecraft 1.21.1. Compatibility branches publish
-the same workflow for Minecraft 1.14.4 through 1.21.4. This section documents
-how to add or maintain a Minecraft version without forking the project.
+The current source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge
+1.21.1. Historical Fabric compatibility artifacts from 1.14.4 through 1.21.4
+remain documented in the support matrix, but a row is not a 1.1.x release
+target until its own source build and dedicated-server proof are rerun.
 
 ### Version-coupled components
 
-All Minecraft-specific code is confined to `platform/fabric/`:
+All Minecraft-specific code is confined to loader platform modules:
 
 | Component | Coupling point |
 |-----------|---------------|
-| `PlayerManagerMixin` | Injects `PlayerManager.checkCanJoin`, inspects `TranslatableTextContent.getKey()` for `"multiplayer.disconnect.not_whitelisted"` |
-| `GatehouseMod` | `Text.literal(...)`, `MinecraftServer`, `GameProfile` |
-| `FabricRuntime` | `MinecraftServer`, `Text` |
-| `FabricVanillaWhitelistAdapter` | `WhitelistEntry`, `GameProfile` |
-| `GatehouseCommands` | Brigadier, `ServerCommandSource`, `Text.literal(...)` |
+| `PlayerListMixin` (each platform) | Injects the loader's mapped whitelist denial method and checks `multiplayer.disconnect.not_whitelisted` |
+| `Gatehouse*Mod` | Loader lifecycle/event bus, server lifecycle, and command registration |
+| `*Runtime` | Loader server handle and adapter-to-core bridge |
+| `*VanillaWhitelistAdapter` | Loader-specific whitelist API and server-thread dispatch |
+| `Gatehouse*Commands` | Loader-specific Brigadier source/component types |
 
 The core domain (`domain/`, `application/`, `port/`) has zero Minecraft imports,
 verified by `ArchitectureTest`.
 
 ### Adding a new Minecraft version
 
-1. **Update `gradle.properties`**: change `minecraft_version`, `yarn_mappings`,
-   and `fabric_version` to the target version's values.
-2. **Verify the Mixin target**: inspect the new Yarn mappings for
-   `PlayerManager.checkCanJoin(SocketAddress, GameProfile)`. If the method
-   signature or name has changed, create a version-specific Mixin.
+1. Add a row to `.github/support-matrix.yml` with the loader, Java runtime,
+   build lane, and explicit `build`, `artifact_validation`, and `server_e2e`
+   gates set to false/pending until proven.
+2. **Verify the Mixin target**: inspect that loader's mappings for the actual
+   whitelist denial method. If the method signature or name has changed,
+   create a version-specific Mixin.
 3. **Verify the translatable key**: check that
    `multiplayer.disconnect.not_whitelisted` still exists in the new version's
    language files. If it has changed, update `PlayerManagerMixin`.
-4. **Verify `Text.literal`**: this API is stable across modern Minecraft
-   versions but should be checked if targeting a major version jump.
-5. **Run the full test suite and E2E acceptance matrix** on the new version.
+4. **Verify the component API**: `Text.literal`/`Component.literal` and command
+   source methods must be checked against the target mappings.
+5. **Run the loader build and artifact validator** with the target Java/Gradle
+   lane.
+6. **Run the full test suite and dedicated-server E2E acceptance matrix** on
+   the new loader/version.
+
+Do not mark `publish: true` until all three gates are green. The old
+`Text.literal` check remains relevant only to Fabric; Forge and NeoForge use
+their mapped `Component` APIs.
 
 ### Per-version source directories (when needed)
 
@@ -828,17 +847,19 @@ Never log provider tokens. Avoid logging full callback payloads if they may incl
 
 ## 17. Build/dependency packaging
 
-Initial baseline from HeapHammer's current 1.21.1 trunk:
+Current 1.1.x build lanes:
 
 ```text
 minecraft_version=1.21.1
-java_version=21
+java_version=21 (Fabric/NeoForge); 17 (Forge 1.20.1)
 loader_version=0.19.5
 fabric_api_version=0.116.17+1.21.1
-loom_version=1.17-SNAPSHOT
+loom_version=1.17.20
+neoforge_version=21.1.201
+forge_version=47.4.23
 ```
 
-The **Minecraft target is fixed** for v1. Loader/API/Loom may be updated only if necessary for resolution/security/compatibility, with exact versions pinned and the change recorded in `DECISION.md` or commit notes.
+Each loader/version target is pinned in `gradle.properties` and `.github/support-matrix.yml`. Loader/API/Gradle versions may be updated only if necessary for resolution, security, or compatibility, with exact versions pinned and the change recorded in `DECISION.md`.
 
 Runtime dependencies expected:
 
@@ -858,6 +879,6 @@ Add automated architecture checks if practical (e.g. ArchUnit or package scan) p
 - core packages do not import Minecraft/Fabric/JDA;
 - Discord package does not import `net.minecraft.*`;
 - Telegram package does not import `net.minecraft.*`;
-- only Fabric adapter calls Minecraft whitelist APIs.
+- only the loader-specific whitelist adapters call Minecraft whitelist APIs.
 
 The tests are guardrails, not substitutes for code review/live testing.

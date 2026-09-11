@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.gatehousemc.platform.neoforge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "server": ["PlayerListMixin"],
+  "injectors": {"defaultRequire": 1}
+}

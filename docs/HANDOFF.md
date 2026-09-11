@@ -15,9 +15,10 @@ Node E2E client.
 
 ## Current baseline
 
-- Primary implementation baseline: Minecraft 1.21.1, Fabric, Java 21.
-- Target branches exist for Minecraft 1.14.4 through 1.21.4 and all twelve
-  now pass clean standalone server boot with the `1.0.1` rebuild.
+- Primary 1.1.x source-build targets: Fabric 1.21.1 (Java 21), Forge 1.20.1
+  (Java 17), and NeoForge 1.21.1 (Java 21).
+- Historical Fabric 1.0.1 artifacts exist for Minecraft 1.14.4 through 1.21.4;
+  current rebuild/publish state is authoritative in `.github/support-matrix.yml`.
 - Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
@@ -29,8 +30,9 @@ Node E2E client.
 ## Publication status
 
 - GitHub is public and contains the source repository.
-- Modrinth and CurseForge submissions contain the earlier files and must be
-  replaced with the corrected `1.0.1` artefacts.
+- Modrinth and CurseForge submissions contain the earlier files. The 1.1.x
+  workflow now stages loader-specific files; storefront publication remains a
+  guarded manual dispatch until the broader acceptance matrix is complete.
 - GitHub Release `v1.0.0` is retained for history but is not production-ready;
   its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 
@@ -44,10 +46,10 @@ tools/e2e: npm run smoke                        PASS (unwhitelisted rejection)
 tools/e2e: MC_EXPECTED_STATUS=joined npm run smoke PASS (approved reconnect)
 ```
 
-A real clean Fabric dedicated server booted with rebuilt `1.0.1` artefacts for
-every target from 1.14.4 through 1.21.4, with GatehouseMC startup logged. The
-exact v1.0.0 1.21.4 asset was rejected because its internal metadata says
-1.21.1. Full request workflow E2E remains a separate release gate.
+The current local implementation has passed the Fabric/core test suite,
+reproducibly builds the three 1.1.x proof artifacts, and has local clean-server
+smoke proof on Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Compilation
+alone is not being reported as production proof.
 
 ## What Devin should do next
 
@@ -56,8 +58,9 @@ execution order. Start with the open P0 issues, not with broad refactoring.
 
 The remaining production gates are:
 
-1. Run the full clean-artifact E2E matrix from `docs/TESTING.md`, not only the
-   smoke path.
+1. Run the full clean-artifact E2E matrix from `docs/TESTING.md` for Fabric,
+   Forge, and NeoForge, extending the verified smoke paths with the full
+   workflow scenarios.
 2. Add repeat-attempt, deny, block/unblock, restart persistence, non-whitelist
    rejection, and interrupted-approval scenarios.
 3. Run the packaged artifact against a representative real mod stack; the
@@ -71,9 +74,10 @@ The remaining production gates are:
 
 ## Important known risks
 
-- The current local server proof used Loom's development launch path. The
-  packaged jar contents were inspected, but a clean standalone server process
-  using only the release jar still needs to be made the repeatable CI gate.
+- The new Forge and NeoForge packaged jars have build/metadata validation and
+  local clean standalone server smoke proof. CI now provisions all three proof
+  lanes, but that workflow still needs to run successfully on the hosted
+  repository before it is treated as release evidence.
 - Real Discord and Telegram credentials were not used. Their adapters need
   fake-transport coverage and optional secret-backed smoke tests.
 - The full acceptance matrix is not automated yet.

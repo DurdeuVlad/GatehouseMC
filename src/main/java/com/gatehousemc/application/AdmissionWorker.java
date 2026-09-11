@@ -1,7 +1,5 @@
-package com.gatehousemc.platform.fabric;
+package com.gatehousemc.application;
 
-import com.gatehousemc.application.AdmissionState;
-import com.gatehousemc.application.WhitelistRequestService;
 import com.gatehousemc.domain.PlayerIdentity;
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -9,23 +7,24 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-final class AdmissionWorker implements AutoCloseable {
+/** Loader-neutral admission worker. */
+public final class AdmissionWorker implements AutoCloseable {
     private final ArrayBlockingQueue<PlayerIdentity> queue;
     private final WhitelistRequestService service;
     private final ExecutorService executor;
     private volatile boolean running;
 
-    AdmissionWorker(int capacity, WhitelistRequestService service) {
+    public AdmissionWorker(int capacity, WhitelistRequestService service) {
         this.queue = new ArrayBlockingQueue<>(capacity);
         this.service = service;
         this.executor = Executors.newSingleThreadExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "whitelistrequest-persistence");
+            Thread thread = new Thread(runnable, "gatehousemc-persistence");
             thread.setDaemon(true);
             return thread;
         });
     }
 
-    void start() {
+    public void start() {
         running = true;
         executor.submit(() -> {
             while (running || !queue.isEmpty()) {
@@ -42,20 +41,14 @@ final class AdmissionWorker implements AutoCloseable {
         });
     }
 
-    boolean offer(PlayerIdentity identity) {
+    public boolean offer(PlayerIdentity identity) {
         if (!running || service.cache().isDegraded()) return false;
         boolean accepted = queue.offer(identity);
         if (!accepted) service.cache().put(identity.normalizedUsername(), AdmissionState.degraded());
         return accepted;
     }
 
-    int size() {
-        return queue.size();
-    }
-
-    java.util.concurrent.Executor executor() {
-        return executor;
-    }
+    public int size() { return queue.size(); }
 
     @Override
     public void close() {

@@ -1,0 +1,148 @@
+schema: 1
+project: GatehouseMC
+release_line: 1.1.x
+
+# This file is the release source of truth. A row is not publishable merely
+# because it is listed: publish requires build=true, artifact_validation=true,
+# and server_e2e=true for the exact loader/version pair.
+release_gates:
+  require_clean_server: true
+  require_artifact_validation: true
+  require_server_e2e: true
+
+targets:
+  # These artifacts existed in the 1.0.1 Fabric release. They remain part of
+  # the compatibility inventory, but are not 1.1.x source-build targets until
+  # their old per-version Gradle projects are restored and rerun.
+  - id: fabric-1.14.4
+    loader: fabric
+    minecraft: 1.14.4
+    java: 8
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.15.2
+    loader: fabric
+    minecraft: 1.15.2
+    java: 8
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.16.5
+    loader: fabric
+    minecraft: 1.16.5
+    java: 8
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.17.1
+    loader: fabric
+    minecraft: 1.17.1
+    java: 16
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.18.2
+    loader: fabric
+    minecraft: 1.18.2
+    java: 17
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.19.2
+    loader: fabric
+    minecraft: 1.19.2
+    java: 17
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.19.4
+    loader: fabric
+    minecraft: 1.19.4
+    java: 17
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.20.1
+    loader: fabric
+    minecraft: 1.20.1
+    java: 17
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.20.4
+    loader: fabric
+    minecraft: 1.20.4
+    java: 17
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.20.6
+    loader: fabric
+    minecraft: 1.20.6
+    java: 21
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+  - id: fabric-1.21.1
+    loader: fabric
+    minecraft: 1.21.1
+    java: 21
+    status: verified-local
+    build: true
+    artifact_validation: true
+    server_e2e: true
+    publish: false
+  - id: fabric-1.21.4
+    loader: fabric
+    minecraft: 1.21.4
+    java: 21
+    status: published-v1.0.1
+    build: false
+    artifact_validation: false
+    server_e2e: false
+    publish: false
+
+  # First implementation targets for the new loader-neutral core.
+  - id: forge-1.20.1
+    loader: forge
+    minecraft: 1.20.1
+    java: 17
+    status: verified-local
+    build: true
+    artifact_validation: true
+    server_e2e: true
+    publish: false
+  - id: neoforge-1.21.1
+    loader: neoforge
+    minecraft: 1.21.1
+    java: 21
+    status: verified-local
+    build: true
+    artifact_validation: true
+    server_e2e: true
+    publish: false
+
+planned:
+  forge: [1.16.5, 1.18.2, 1.19.2, 1.19.4, 1.20.4, 1.20.6, 1.21.1]
+  neoforge: [1.20.2, 1.20.3, 1.20.4, 1.20.5, 1.20.6, 1.21.1, 1.21.4]

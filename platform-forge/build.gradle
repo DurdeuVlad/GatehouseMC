@@ -1,0 +1,115 @@
+plugins {
+    id "java"
+    id "maven-publish"
+    id "net.minecraftforge.gradle" version "${forge_gradle_version}"
+    id "org.spongepowered.mixin" version "0.7.38"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+// Forge's Jar-in-Jar loader keeps third-party module descriptors isolated from
+// Minecraft/Forge's module layer. Do not flatten runtime libraries into the mod
+// jar: that causes duplicate module/package providers (notably JNA) on a clean
+// dedicated server.
+jarJar.enable()
+
+base {
+    archivesName = "gatehousemc-forge-mc${forge_mc_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: "official", version: project.forge_mc_version
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file("run")
+            property "mixin.env.remapRefMap", "true"
+            property "mixin.env.refMapRemappingFile", "${projectDir}/build/createSrgToMcp/output.srg"
+            mods {
+                gatehousemc {
+                    source sourceSets.main
+                    source project(":core").sourceSets.main
+                }
+            }
+        }
+        server { taskName "runServer" }
+    }
+}
+
+mixin {
+    add sourceSets.main, "gatehousemc.forge.mixins.refmap.json"
+    config "gatehousemc.forge.mixins.json"
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${forge_mc_version}-${forge_version}"
+    implementation(project(":core")) {
+        exclude group: "com.google.code.gson", module: "gson"
+        exclude group: "org.xerial", module: "sqlite-jdbc"
+        exclude group: "net.dv8tion", module: "JDA"
+        exclude group: "org.slf4j", module: "slf4j-api"
+    }
+    // Keep the shared core and its runtime dependencies on userdev's server
+    // classpath as well as in the distributable jar.
+    runtimeOnly(project(":core")) {
+        exclude group: "com.google.code.gson", module: "gson"
+        exclude group: "org.xerial", module: "sqlite-jdbc"
+        exclude group: "net.dv8tion", module: "JDA"
+        exclude group: "org.slf4j", module: "slf4j-api"
+    }
+    implementation "com.google.code.gson:gson:${gson_version}"
+    implementation "org.xerial:sqlite-jdbc:${sqlite_version}"
+    implementation("net.dv8tion:JDA:${jda_version}") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "com.google.code.gson", module: "gson"
+    }
+    implementation "org.slf4j:slf4j-api:${slf4j_version}"
+    jarJar(group: "org.xerial", name: "sqlite-jdbc", version: "[${sqlite_version},${sqlite_version}.1)") {
+        jarJar.pin(it, sqlite_version)
+    }
+    jarJar(group: "net.dv8tion", name: "JDA", version: "[${jda_version},${jda_version}.1)") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "com.google.code.gson", module: "gson"
+        jarJar.pin(it, jda_version)
+    }
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+}
+
+processResources {
+    inputs.properties(version: project.version, forge_version: project.forge_version,
+            forge_mc_version: project.forge_mc_version,
+            forge_minecraft_version_range: project.forge_minecraft_version_range)
+    filesMatching("META-INF/mods.toml") {
+        expand version: project.version, forge_version: project.forge_version,
+                forge_mc_version: project.forge_mc_version,
+                forge_minecraft_version_range: project.forge_minecraft_version_range
+    }
+}
+
+jar {
+    archiveClassifier = ""
+    from project(":core").sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest.attributes(["MixinConfigs": "gatehousemc.forge.mixins.json"])
+}
+
+tasks.named("jarJar") {
+    archiveClassifier = "all"
+    // ForgeGradle's JarJar task starts from the reobfuscated class jar. Add
+    // platform/core resources explicitly so metadata, translations, and the
+    // project icon survive into the production artifact.
+    from(project(":core").sourceSets.main.output)
+    from(sourceSets.main.resources)
+    from(project(":core").sourceSets.main.resources)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+jar.finalizedBy("reobfJar")
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = "UTF-8"
+}

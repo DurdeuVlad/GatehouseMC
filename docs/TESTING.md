@@ -6,6 +6,33 @@ This project uses the HeapHammer-style rule:
 
 Unit tests are necessary but cannot prove Fabric loader behavior, Mixins, offline-mode protocol login, packaged dependencies, or vanilla whitelist persistence.
 
+The release matrix is maintained in [`.github/support-matrix.yml`](../.github/support-matrix.yml). For 1.1.x the source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. A historical 1.0.1 download is compatibility evidence, not proof that a 1.1.x artifact can be rebuilt.
+
+## 0. Loader build and artifact gates
+
+Run the modern lanes with Java 21 and the repository wrapper:
+
+```bash
+./gradlew clean test build :platform-neoforge:build
+python tools/release/validate_artifact.py \
+  --artifact build/libs/gatehousemc-1.1.0.jar \
+  --loader fabric --minecraft 1.21.1 --version 1.1.0
+python tools/release/validate_artifact.py \
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.0.jar \
+  --loader neoforge --minecraft 1.21.1 --version 1.1.0
+```
+
+Run the Forge lane with Java 17 and Gradle 8.8:
+
+```bash
+gradle -PenableForge :platform-forge:build
+python tools/release/validate_artifact.py \
+  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.0-all.jar \
+  --loader forge --minecraft 1.20.1 --version 1.1.0
+```
+
+The validator checks the exact loader metadata, Minecraft dependency, entrypoint, icon, core classes, and nested SQLite runtime. It is intentionally fail-closed: no loader/version pair is publishable until its build, artifact validation, and clean dedicated-server E2E columns are all green.
+
 ---
 
 ## 1. Verification tiers
@@ -85,7 +112,10 @@ GameTest is **not sufficient** for the pre-join whitelist admission acceptance t
 
 This is the release gate for login/whitelist behavior.
 
-Boot an actual Minecraft **1.21.1 Fabric dedicated server** using the final built mod artifact.
+Boot an actual clean dedicated server using the final built mod artifact. The
+1.1.x proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1; the
+same rejection assertion is run against each loader with its required Java
+runtime.
 
 Required server properties:
 
@@ -102,6 +132,20 @@ Selected reference implementation:
 https://github.com/PrismarineJS/node-minecraft-protocol
 
 It explicitly supports Minecraft 1.21.1 and offline client auth.
+
+The repeatable smoke wrapper provisions the loader, starts the server, waits
+for `Done (...)!`, runs the strict offline-client assertion, and cleans up the
+server process:
+
+```bash
+npm --prefix tools/e2e ci
+bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565 \
+  build/libs/gatehousemc-1.1.0.jar 1.21.1
+bash tools/e2e/run-clean-server-smoke.sh forge .e2e-forge 25566 \
+  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.0-all.jar 1.20.1
+bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-neoforge 25567 \
+  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.0.jar 1.21.1
+```
 
 ---
 
@@ -458,8 +502,8 @@ A high-confidence pipeline should run:
 3. component/SQLite tests
 4. build production jar
 5. optional Fabric GameTests
-6. provision clean Minecraft 1.21.1 Fabric server
-7. run core E2E scenario matrix
+6. provision clean dedicated servers for each source-build loader target
+7. run the core E2E scenario matrix on Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1
 8. archive server logs + E2E report
 9. verify no unexpected ERROR/FATAL patterns
 10. publish checksum/artifact for release staging

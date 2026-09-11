@@ -1,0 +1,109 @@
+plugins {
+    id "java-library"
+    id "maven-publish"
+    id "net.neoforged.moddev" version "${moddev_gradle_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = "gatehousemc-neoforge-mc${neoforge_mc_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neoforge_version
+    runs {
+        server {
+            server()
+            programArgument "--nogui"
+        }
+        configureEach {
+            systemProperty "forge.logging.markers", "REGISTRIES"
+        }
+    }
+    mods {
+        gatehousemc {
+            sourceSet(sourceSets.main)
+            sourceSet(project(":core").sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    implementation(project(":core")) {
+        exclude group: "com.google.code.gson", module: "gson"
+        exclude group: "org.xerial", module: "sqlite-jdbc"
+        exclude group: "net.dv8tion", module: "JDA"
+        exclude group: "org.slf4j", module: "slf4j-api"
+    }
+    // NeoForge's Jar-in-Jar loader keeps third-party libraries isolated from
+    // Minecraft's module layer. Gson and SLF4J are supplied by Minecraft/
+    // NeoForge, so exclude them from JDA instead of shipping duplicate modules.
+    def sqliteDependency = implementation("org.xerial:sqlite-jdbc:${sqlite_version}")
+    implementation("net.dv8tion:JDA:${jda_version}") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "com.google.code.gson", module: "gson"
+    }
+    jarJar(sqliteDependency) {
+        version {
+            strictly "[${sqlite_version},${sqlite_version}.1)"
+            prefer sqlite_version
+        }
+    }
+    // NeoForge Jar-in-Jar selects direct coordinates. Keep JDA's complete
+    // runtime graph explicit so enabling Discord does not depend on a library
+    // being present in a particular server distribution. Gson and SLF4J are
+    // intentionally omitted because Minecraft/NeoForge supplies them.
+    jarJar "net.dv8tion:JDA:${jda_version}"
+    jarJar "net.sf.trove4j:core:3.1.0"
+    jarJar "com.fasterxml.jackson.core:jackson-core:2.22.0"
+    jarJar "com.fasterxml.jackson.core:jackson-databind:2.22.0"
+    jarJar "com.fasterxml.jackson.core:jackson-annotations:2.22"
+    jarJar "com.google.crypto.tink:tink:1.18.0"
+    jarJar "com.google.protobuf:protobuf-java:4.28.2"
+    jarJar "com.neovisionaries:nv-websocket-client:2.14"
+    jarJar "com.squareup.okhttp3:okhttp-jvm:5.4.0"
+    jarJar "org.jetbrains.kotlin:kotlin-stdlib:2.2.21"
+    jarJar "org.jetbrains:annotations:13.0"
+    jarJar "com.squareup.okio:okio:3.17.0"
+    jarJar "com.squareup.okio:okio-jvm:3.17.0"
+    jarJar "club.minnced:opus-java:1.1.1"
+    jarJar "club.minnced:opus-java-api:1.1.1"
+    jarJar "club.minnced:opus-java-natives:1.1.1"
+    // nv-websocket-client already carries the JNA package used by this JDA
+    // graph. Adding the standalone JNA module as well breaks NeoForge's module
+    // layer with a duplicate com.sun.jna.win32 export.
+    jarJar "org.apache.commons:commons-collections4:4.5.0"
+    // NeoForge 1.21.1 is below 1.21.8, so userdev needs these non-Minecraft
+    // libraries on every development run in addition to Jar-in-Jar packaging.
+    additionalRuntimeClasspath "org.xerial:sqlite-jdbc:${sqlite_version}"
+    additionalRuntimeClasspath("net.dv8tion:JDA:${jda_version}") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "com.google.code.gson", module: "gson"
+    }
+}
+
+processResources {
+    inputs.properties(version: project.version, neo_version: project.neoforge_version,
+            minecraft_version: project.neoforge_mc_version,
+            minecraft_version_range: project.neoforge_minecraft_version_range)
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand version: project.version, neo_version: project.neoforge_version,
+                minecraft_version: project.neoforge_mc_version,
+                minecraft_version_range: project.neoforge_minecraft_version_range
+    }
+}
+
+jar {
+    archiveClassifier = ""
+    from project(":core").sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = "UTF-8"
+}

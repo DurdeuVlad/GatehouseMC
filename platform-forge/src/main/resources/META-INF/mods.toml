@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+issueTrackerURL="https://github.com/DurdeuVlad/GatehouseMC/issues"
+showAsResourcePack=false
+clientSideOnly=false
+
+[[mods]]
+modId="gatehousemc"
+version="${version}"
+displayName="GatehouseMC"
+displayURL="https://github.com/DurdeuVlad/GatehouseMC"
+logoFile="assets/gatehousemc/icon.png"
+authors="GatehouseMC contributors"
+description='''Server-side whitelist workflow for offline-mode modded Minecraft servers.'''
+
+[[dependencies.gatehousemc]]
+modId="forge"
+mandatory=true
+versionRange="[${forge_version},)"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.gatehousemc]]
+modId="minecraft"
+mandatory=true
+versionRange="${forge_minecraft_version_range}"
+ordering="NONE"
+side="SERVER"
+
+[[mixins]]
+config="gatehousemc.forge.mixins.json"

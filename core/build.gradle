@@ -1,0 +1,43 @@
+plugins {
+    id "java-library"
+}
+
+group = project.maven_group
+version = project.mod_version
+
+repositories {
+    mavenCentral()
+}
+
+// The source tree is intentionally shared during the migration. Platform code
+// remains in the root Fabric project; this module owns loader-neutral code
+// consumed by Forge and NeoForge.
+sourceSets {
+    main {
+        java {
+            srcDirs = ["../src/main/java"]
+            exclude "com/gatehousemc/platform/**"
+        }
+        resources {
+            srcDirs = ["../src/main/resources"]
+            exclude "fabric.mod.json", "gatehousemc.mixins.json"
+        }
+    }
+}
+
+dependencies {
+    implementation "com.google.code.gson:gson:${gson_version}"
+    implementation "org.slf4j:slf4j-api:${slf4j_version}"
+    implementation "org.xerial:sqlite-jdbc:${sqlite_version}"
+    implementation "net.dv8tion:JDA:${jda_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = "UTF-8"
+}

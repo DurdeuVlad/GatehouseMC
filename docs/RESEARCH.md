@@ -335,7 +335,7 @@ The project explicitly supports:
 - protocol login/disconnect events;
 - automated use against Minecraft server jars.
 
-At research time its release page reports **1.66.2** as the latest release (May 2026). Pin the exact E2E dependency in `tools/e2e/package-lock.json`.
+The E2E harness pins **1.68.0** in `tools/e2e/package-lock.json`; keep this dependency exact and test-only.
 
 API reference:
 
@@ -429,7 +429,7 @@ Before coding the critical hook, verify locally:
 - [ ] banned player path does not pass the whitelist-detection predicate;
 - [ ] `Whitelist.add` persistence behavior in the exact 1.21.1 implementation;
 - [ ] server-thread requirement for whitelist mutation;
-- [ ] final built jar contains/nests JDA + sqlite-jdbc runtime requirements;
+- [ ] each final built jar contains/nests JDA + sqlite-jdbc runtime requirements appropriate to its loader;
 - [ ] Telegram callback-data representation remains inside official size constraints;
 - [ ] Discord role authorization works without enabling unnecessary privileged intents.
 
@@ -441,8 +441,10 @@ Record discoveries that materially differ from this research in `.scratch/MIXIN_
 
 ### 10.1 Target Version Matrix (Not Release Approval)
 
-This is the researched target/branch matrix. The `1.0.1` clean-server
-validation passes for every listed target from 1.14.4 through 1.21.4.
+This is the researched historical target/branch matrix. The `1.0.1` clean-server
+results are historical evidence for the listed Fabric artifacts; they do not
+automatically transfer to the 1.1.x loader-neutral rebuild. Current release
+eligibility is tracked in `.github/support-matrix.yml`.
 
 The following matrix documents the verified version pins, toolchain requirements, and passing build status for all historical Minecraft branches:
 

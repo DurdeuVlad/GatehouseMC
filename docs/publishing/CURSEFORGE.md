@@ -14,9 +14,9 @@ approval.
 - License: MIT.
 - Source code: GitHub — <https://github.com/DurdeuVlad/GatehouseMC>.
 - Comments: enabled; issue tracking remains the public GitHub issue tracker.
-- Files: only `1.0.1` artefacts whose internal metadata matches their Minecraft
-  label may be published. The old v1.0.0 multi-version submission remains on
-  hold because its non-1.21.1 labelled files contain 1.21.1 metadata.
+- Files: only artefacts whose internal loader and Minecraft metadata match
+  their labels may be published. The old v1.0.0 multi-version submission
+  remains on hold because its non-1.21.1 labelled files contain 1.21.1 metadata.
 - Media: the project has a neutral multi-version banner. Keep the square
   project logo available as the canonical icon.
 
@@ -28,7 +28,7 @@ the correct **Server** environment tag. Recheck this after moderation.
 
 GatehouseMC
 
-Run a private Fabric server in offline mode? GatehouseMC turns whitelist requests into a simple approval workflow for your staff.
+Run a private Fabric, Forge, or NeoForge server in offline mode? GatehouseMC turns whitelist requests into a simple approval workflow for your staff.
 
 When an unknown player tries to join:
 
@@ -52,12 +52,12 @@ FEATURES
 
 INSTALLATION
 
-1. Download the file matching your Minecraft version and place it in the server's `mods/` directory.
-2. Install Fabric Loader and Fabric API for that same Minecraft version.
+1. Download the file matching both your Minecraft version and loader, then place it in the server's `mods/` directory.
+2. Install the matching Fabric API, Forge, or NeoForge runtime for that same Minecraft version.
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram integrations. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-Verified release builds cover Minecraft **1.14.4 through 1.21.4**. Choose the exact `1.0.1` file; Java 17 is required for 1.14.4–1.20.4 and Java 21 for 1.20.6–1.21.4.
+The 1.1.x source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Choose only the exact loader/version file marked public in the [support matrix](../../.github/support-matrix.yml).
 
 OFFLINE-MODE NOTICE
 

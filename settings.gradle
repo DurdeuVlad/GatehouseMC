@@ -2,9 +2,23 @@ pluginManagement {
     repositories {
         maven { url = uri("https://libraries.minecraft.net/") }
         maven { url = uri("https://maven.fabricmc.net/") }
+        maven { url = uri("https://maven.minecraftforge.net/") }
+        maven { url = uri("https://maven.neoforged.net/releases/") }
+        maven { url = uri("https://repo.spongepowered.org/repository/maven-public/") }
         mavenCentral()
         gradlePluginPortal()
     }
 }
 
-rootProject.name = "whitelist-request"
+rootProject.name = "gatehousemc"
+
+// ForgeGradle 6 is intentionally isolated behind Gradle 8.8. The root
+// wrapper is Gradle 9.5 for Fabric and modern NeoForge, and ForgeGradle
+// rejects Gradle 9+ during configuration rather than producing a trustworthy
+// build. CI enables this lane explicitly with -PenableForge and configures
+// only the Forge project, avoiding incompatible Loom/NeoForge plugins.
+if (providers.gradleProperty("enableForge").isPresent()) {
+    include("core", "platform-forge")
+} else {
+    include("core", "platform-neoforge")
+}

@@ -9,6 +9,8 @@ logs/
 *.sqlite-shm
 *.sqlite-wal
 node_modules/
+__pycache__/
+*.py[cod]
 tools/e2e/.env
 .e2e/
 .scratch/

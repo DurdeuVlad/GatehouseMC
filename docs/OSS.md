@@ -74,11 +74,11 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 ### 5.1 Long-lived branches and artifact targets
 
-The repository tracks a version branch for each target, with `main` and
-`1.21.1` as the primary implementation baseline. The matrix below is the target
-branch and release map. Retained maintenance branches are not a promise of
-equal future feature support; every `1.0.1` target listed here has clean-server
-evidence.
+The repository tracks the primary implementation baseline on `main`. The full
+loader/version release state is maintained in [`.github/support-matrix.yml`](../.github/support-matrix.yml).
+Retained historical branches and downloads are not a promise of equal future
+feature support; a row becomes a current release target only after its own
+source build, artifact validation, and dedicated-server proof.
 
 | Target   | Minecraft | Java Runtime | Loader | Status | Notes |
 |----------|-----------|--------------|--------|--------|-------|
@@ -95,6 +95,11 @@ evidence.
 | `1.16.5` | 1.16.5    | Java 8      | Fabric | LTS / popular | Runtime server thread dispatch (`1.16.5+build.10`, API `0.42.0+1.16`) |
 | `1.15.2` | 1.15.2    | Java 8      | Fabric | Maintenance | Pure Brigadier suggestions (`1.15.2+build.17`, API `0.28.5+1.15`) |
 | `1.14.4` | 1.14.4    | Java 8      | Fabric | Maintenance | Initial official Fabric release (`1.14.4+build.18`, API `0.28.5+1.14`) |
+
+The 1.1.x source-build proof targets are Fabric 1.21.1 (Java 21), Forge 1.20.1
+(Java 17), and NeoForge 1.21.1 (Java 21). Forge is intentionally built in an
+isolated Gradle 8.8 lane because ForgeGradle 6 rejects Gradle 9+. These new
+targets remain unpublished until their clean dedicated-server gates are green.
 
 Short-lived branches follow this naming convention:
 

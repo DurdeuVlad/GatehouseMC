@@ -28,7 +28,7 @@ truthfully disclosed.
 
 # 🏰 GatehouseMC
 
-Run a private Fabric server in offline mode? **GatehouseMC** turns whitelist requests into a simple approval workflow for your staff.
+Run a private Fabric, Forge, or NeoForge server in offline mode? **GatehouseMC** turns whitelist requests into a simple approval workflow for your staff.
 
 When an unknown player tries to join:
 
@@ -64,12 +64,12 @@ Players do **not** need a client-side mod, Discord account, or external registra
 
 ## ⚙️ Installation
 
-1. Download the file matching your Minecraft version and place it in the server's `mods/` directory.
-2. Install Fabric Loader and Fabric API for that same Minecraft version.
+1. Download the file matching both your Minecraft version and loader, then place it in the server's `mods/` directory.
+2. Install the matching Fabric API, Forge, or NeoForge runtime for that same Minecraft version.
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-Verified release builds cover Minecraft **1.14.4 through 1.21.4**. Use the exact matching `1.0.1` version entry; the legacy Java 17 targets include the bundled SLF4J API fix.
+The 1.1.x source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Use only the exact loader/version entry marked public in the [support matrix](../../.github/support-matrix.yml); build artifacts under review are not production support claims.
 
 ## 🔒 Offline-Mode Notice
 
