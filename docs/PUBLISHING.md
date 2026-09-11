@@ -12,9 +12,10 @@ gates are green.
 - GitHub Release: `v1.0.0` remains archived with invalid legacy labels. Do not
   use it for installation.
 - Modrinth and CurseForge: the release workflow stages Fabric 1.21.1, Forge
-  1.20.1, and NeoForge 1.21.1 independently; storefront publishing is a manual
-  guarded dispatch until the broader acceptance matrix and repeatable CI server
-  evidence are green for each target.
+  1.20.1, and NeoForge 1.21.1 independently. A loader-qualified tag publishes
+  that one verified artifact automatically when both storefront secrets are
+  configured; a guarded manual dispatch remains available for a controlled
+  republish.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
@@ -54,10 +55,11 @@ Do not call a release production-ready when only the Gradle build or the
 
 ## GitHub Release
 
-Use the reviewed multi-loader release process. A release must contain:
+Use the reviewed loader-qualified release process described in
+[`docs/RELEASE_BRANCHING.md`](RELEASE_BRANCHING.md). A release must contain:
 
-- one JAR per supported Minecraft version;
-- a single checksum file covering every JAR;
+- exactly one JAR for the loader/version in the tag;
+- a checksum file covering that JAR;
 - release notes naming the Minecraft version and Java runtime for each asset;
 - the offline-mode trust warning and any unresolved compatibility limits.
 
@@ -85,7 +87,8 @@ than misrepresenting the project metadata.
 
 The release workflow uses the loader metadata in each staged artifact and the
 fixed project identifiers in the workflow. Configure these repository Actions
-secrets before a guarded publishing dispatch:
+secrets before tagging a production release or starting a guarded publishing
+dispatch:
 
 | Secret | Purpose |
 |---|---|
@@ -96,13 +99,16 @@ secrets before a guarded publishing dispatch:
 | `TELEGRAM_RELEASE_CHAT_ID` | Optional Telegram chat/channel ID paired with the release bot token |
 
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
-expanded secret values to disk.
+expanded secret values to disk. With both storefront tokens configured, a
+loader-qualified tag is the CI/CD publish trigger; do not create the tag until
+the target is ready for public publication.
 
 The workflow fails closed if either publishing token is missing, if the release
 version does not match `gradle.properties`, or if any JAR's internal loader
 metadata does not match its target. GitHub Releases are staged from all three
-proof targets. Storefront publication requires an explicit manual dispatch
-with `publish=true`; the Gradle sources JAR is never sent to a storefront.
+proof targets. Storefront publication runs automatically for a valid pushed tag,
+or requires an explicit manual dispatch with `publish=true`; the Gradle sources
+JAR is never sent to a storefront.
 
 Every successful release writes an announcement to the GitHub Actions summary
 and GitHub Release. Discord and Telegram announcements are sent when their
@@ -113,13 +119,15 @@ though the already-created release remains available.
 ## Manual release commands
 
 ```powershell
-git switch main
+git switch support/fabric/1.21.1
 git pull --ff-only
 .\gradlew.ps1 clean test build
-git tag v<version>-mc<minecraft-version>
-git push origin v<version>-mc<minecraft-version>
+git tag v<version>-fabric-mc1.21.1
+git push origin support/fabric/1.21.1
+git push origin v<version>-fabric-mc1.21.1
 ```
 
 The release workflow must be inspected before tagging to confirm that it builds
-the intended target branch and uploads the complete artifact matrix. A tag push
-alone is not proof that every Minecraft version was published.
+the intended target branch and uploads the exact loader-qualified artifact. A
+tag push is the CI/CD trigger, but the GitHub Actions result and storefront
+status still need to be checked before announcing availability.

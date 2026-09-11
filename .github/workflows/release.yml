@@ -3,98 +3,209 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-*-mc*'
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without the leading v
+        description: Mod version without the leading v
+        required: true
+        type: string
+      loader:
+        description: Loader target to release
+        required: true
+        type: choice
+        options:
+          - fabric
+          - forge
+          - neoforge
+      minecraft_version:
+        description: Exact Minecraft version for the loader target
         required: true
         type: string
       publish:
-        description: Publish the already verified artifacts to Modrinth and CurseForge
+        description: Publish the verified artifact to Modrinth and CurseForge
         required: true
         default: false
         type: boolean
+
+concurrency:
+  group: gatehousemc-release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  build-fabric-neoforge:
-    name: Build and validate Fabric + NeoForge
+  resolve-release:
+    name: Resolve loader-qualified release identity
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      loader: ${{ steps.resolve.outputs.loader }}
+      minecraft: ${{ steps.resolve.outputs.minecraft }}
+      branch: ${{ steps.resolve.outputs.branch }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate tag or dispatch inputs
+        id: resolve
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_LOADER: ${{ inputs.loader }}
+          INPUT_MINECRAFT: ${{ inputs.minecraft_version }}
+        run: |
+          set -euo pipefail
+          expected=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '\r')
+          if [ "$EVENT_NAME" = "push" ]; then
+            tag="$REF_NAME"
+            if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?)-(fabric|forge|neoforge)-mc([0-9]+\.[0-9]+(\.[0-9]+)?)$ ]]; then
+              version="${BASH_REMATCH[1]}"
+              loader="${BASH_REMATCH[3]}"
+              minecraft="${BASH_REMATCH[4]}"
+            else
+              echo "Invalid release tag: $tag" >&2
+              echo 'Expected v<mod-version>-<loader>-mc<minecraft-version>.' >&2
+              exit 1
+            fi
+          else
+            version="$INPUT_VERSION"
+            loader="$INPUT_LOADER"
+            minecraft="$INPUT_MINECRAFT"
+            tag="v${version}-${loader}-mc${minecraft}"
+          fi
+
+          printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'
+          test "$version" = "$expected" || {
+            echo "Release $version does not match mod_version $expected" >&2
+            exit 1
+          }
+
+          case "$loader:$minecraft" in
+            fabric:1.21.1) branch='support/fabric/1.21.1' ;;
+            forge:1.20.1) branch='support/forge/1.20.1' ;;
+            neoforge:1.21.1) branch='support/neoforge/1.21.1' ;;
+            *)
+              echo "Unsupported release target: $loader $minecraft" >&2
+              echo 'Add the target to .github/support-matrix.yml and this resolver after live verification.' >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            git fetch --no-tags origin "refs/heads/$branch:refs/remotes/origin/$branch"
+            tag_commit=$(git rev-parse "refs/tags/$tag^{commit}")
+            branch_commit=$(git rev-parse "refs/remotes/origin/$branch^{commit}")
+            test "$tag_commit" = "$branch_commit" || {
+              echo "Tag $tag must point at the tip of $branch." >&2
+              echo "tag=$tag_commit branch=$branch_commit" >&2
+              exit 1
+            }
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "loader=$loader" >> "$GITHUB_OUTPUT"
+          echo "minecraft=$minecraft" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build-modern:
+    name: Build Fabric or NeoForge target
+    needs: resolve-release
+    if: >-
+      needs.resolve-release.result == 'success' &&
+      (needs.resolve-release.outputs.loader == 'fabric' || needs.resolve-release.outputs.loader == 'neoforge')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.resolve-release.outputs.branch }}
           fetch-depth: 0
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build
-        run: bash ./gradlew clean test build :platform-neoforge:build --stacktrace
-      - name: Validate and stage artifacts
+      - name: Build and validate target
         shell: bash
+        env:
+          TARGET_LOADER: ${{ needs.resolve-release.outputs.loader }}
+          TARGET_MINECRAFT: ${{ needs.resolve-release.outputs.minecraft }}
+          TARGET_VERSION: ${{ needs.resolve-release.outputs.version }}
         run: |
           set -euo pipefail
-          version=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '\r')
           mkdir -p dist
+          if [ "$TARGET_LOADER" = fabric ]; then
+            bash ./gradlew clean test build --stacktrace
+            artifact="build/libs/gatehousemc-${TARGET_VERSION}.jar"
+          else
+            bash ./gradlew clean test build :platform-neoforge:build --stacktrace
+            artifact="platform-neoforge/build/libs/gatehousemc-neoforge-mc${TARGET_MINECRAFT}-${TARGET_VERSION}.jar"
+          fi
           python tools/release/validate_artifact.py \
-            --artifact "build/libs/gatehousemc-${version}.jar" \
-            --loader fabric --minecraft 1.21.1 --version "$version"
-          python tools/release/validate_artifact.py \
-            --artifact "platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-${version}.jar" \
-            --loader neoforge --minecraft 1.21.1 --version "$version"
-          cp "build/libs/gatehousemc-${version}.jar" "dist/gatehousemc-fabric-mc1.21.1-${version}.jar"
-          cp "platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-${version}.jar" \
-            "dist/gatehousemc-neoforge-mc1.21.1-${version}.jar"
+            --artifact "$artifact" --loader "$TARGET_LOADER" \
+            --minecraft "$TARGET_MINECRAFT" --version "$TARGET_VERSION"
+          cp "$artifact" "dist/gatehousemc-${TARGET_LOADER}-mc${TARGET_MINECRAFT}-${TARGET_VERSION}.jar"
       - uses: actions/upload-artifact@v4
         with:
-          name: release-fabric-neoforge
+          name: release-${{ needs.resolve-release.outputs.loader }}-${{ needs.resolve-release.outputs.minecraft }}
           path: dist/*.jar
           if-no-files-found: error
 
   build-forge:
-    name: Build and validate Forge
+    name: Build Forge target
+    needs: resolve-release
+    if: >-
+      needs.resolve-release.result == 'success' &&
+      needs.resolve-release.outputs.loader == 'forge'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.resolve-release.outputs.branch }}
           fetch-depth: 0
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      # ForgeGradle 6 does not support Gradle 9+.
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.8'
-      - name: Build
-        run: gradle -PenableForge :platform-forge:build --stacktrace
-      - name: Validate and stage artifact
+      - name: Build and validate Forge target
         shell: bash
+        env:
+          TARGET_MINECRAFT: ${{ needs.resolve-release.outputs.minecraft }}
+          TARGET_VERSION: ${{ needs.resolve-release.outputs.version }}
         run: |
           set -euo pipefail
-          version=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '\r')
           mkdir -p dist
+          gradle -PenableForge :platform-forge:build --stacktrace
+          artifact="platform-forge/build/libs/gatehousemc-forge-mc${TARGET_MINECRAFT}-${TARGET_VERSION}-all.jar"
           python tools/release/validate_artifact.py \
-            --artifact "platform-forge/build/libs/gatehousemc-forge-mc1.20.1-${version}-all.jar" \
-            --loader forge --minecraft 1.20.1 --version "$version"
-          cp "platform-forge/build/libs/gatehousemc-forge-mc1.20.1-${version}-all.jar" \
-            "dist/gatehousemc-forge-mc1.20.1-${version}.jar"
+            --artifact "$artifact" --loader forge \
+            --minecraft "$TARGET_MINECRAFT" --version "$TARGET_VERSION"
+          cp "$artifact" "dist/gatehousemc-forge-mc${TARGET_MINECRAFT}-${TARGET_VERSION}.jar"
       - uses: actions/upload-artifact@v4
         with:
-          name: release-forge
+          name: release-forge-${{ needs.resolve-release.outputs.minecraft }}
           path: dist/*.jar
           if-no-files-found: error
 
   dedicated-server-e2e:
-    name: Clean dedicated-server E2E for all release artifacts
-    needs: [build-fabric-neoforge, build-forge]
+    name: Clean dedicated-server E2E for tagged target
+    needs: [resolve-release, build-modern, build-forge]
+    if: >-
+      always() && needs.resolve-release.result == 'success' &&
+      (needs.build-modern.result == 'success' || needs.build-forge.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-release.outputs.branch }}
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
@@ -107,79 +218,66 @@ jobs:
         run: npm ci
         working-directory: tools/e2e
       - uses: actions/setup-java@v5
+        if: needs.resolve-release.outputs.loader != 'forge'
         with:
           distribution: temurin
           java-version: '21'
-      - name: Run clean Fabric server smoke
-        run: >-
-          bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565
-          "$(find dist -maxdepth 1 -name 'gatehousemc-fabric-mc1.21.1-*.jar' -print -quit)" 1.21.1
       - uses: actions/setup-java@v5
+        if: needs.resolve-release.outputs.loader == 'forge'
         with:
           distribution: temurin
           java-version: '17'
-      - name: Run clean Forge server smoke
-        run: >-
-          bash tools/e2e/run-clean-server-smoke.sh forge .e2e-forge 25566
-          "$(find dist -maxdepth 1 -name 'gatehousemc-forge-mc1.20.1-*.jar' -print -quit)" 1.20.1
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-      - name: Run clean NeoForge server smoke
-        run: >-
-          bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-neoforge 25567
-          "$(find dist -maxdepth 1 -name 'gatehousemc-neoforge-mc1.21.1-*.jar' -print -quit)" 1.21.1
-
-  github-release:
-    name: Create GitHub release
-    needs: [build-fabric-neoforge, build-forge, dedicated-server-e2e]
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.release-info.outputs.version }}
-      tag: ${{ steps.release-info.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Resolve release identity
-        id: release-info
+      - name: Run clean target server smoke
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
-          INPUT_VERSION: ${{ inputs.version }}
+          TARGET_LOADER: ${{ needs.resolve-release.outputs.loader }}
+          TARGET_MINECRAFT: ${{ needs.resolve-release.outputs.minecraft }}
         run: |
           set -euo pipefail
-          expected=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '\r')
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            version="$INPUT_VERSION"
-            tag="v${version}"
-          else
-            tag="$REF_NAME"
-            version="${tag#v}"
-          fi
-          printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'
-          test "$version" = "$expected" || {
-            echo "Release $version does not match mod_version $expected" >&2
-            exit 1
-          }
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          artifact=$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)
+          test -n "$artifact"
+          case "$TARGET_LOADER" in
+            fabric) port=25565 ;;
+            forge) port=25566 ;;
+            neoforge) port=25567 ;;
+          esac
+          bash tools/e2e/run-clean-server-smoke.sh \
+            "$TARGET_LOADER" .e2e-server "$port" "$artifact" "$TARGET_MINECRAFT"
+
+  github-release:
+    name: Create loader-qualified GitHub release
+    needs: [resolve-release, build-modern, build-forge, dedicated-server-e2e]
+    if: >-
+      always() && needs.resolve-release.result == 'success' &&
+      needs.dedicated-server-e2e.result == 'success' &&
+      (needs.build-modern.result == 'success' || needs.build-forge.result == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ needs.resolve-release.outputs.version }}
+      loader: ${{ needs.resolve-release.outputs.loader }}
+      minecraft: ${{ needs.resolve-release.outputs.minecraft }}
+      tag: ${{ needs.resolve-release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-release.outputs.branch }}
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
           path: dist
           merge-multiple: true
-      - name: Compute checksums
+      - name: Compute checksum
         shell: bash
         run: |
           set -euo pipefail
+          test "$(find dist -maxdepth 1 -name '*.jar' | wc -l)" -eq 1
           sha256sum dist/*.jar > dist/SHA256SUMS
           cat dist/SHA256SUMS
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: GatehouseMC ${{ steps.release-info.outputs.version }}
-          tag_name: ${{ steps.release-info.outputs.tag }}
+          name: GatehouseMC ${{ needs.resolve-release.outputs.version }} — ${{ needs.resolve-release.outputs.loader }} ${{ needs.resolve-release.outputs.minecraft }}
+          tag_name: ${{ needs.resolve-release.outputs.tag }}
           body_path: CHANGELOG.md
           files: |
             dist/*.jar
@@ -188,12 +286,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
-    name: Publish verified artifacts
+    name: Publish verified loader/version artifact
     needs: github-release
-    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+    if: >-
+      needs.github-release.result == 'success' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish == true))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.github-release.outputs.tag }}
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
@@ -206,69 +309,70 @@ jobs:
         run: |
           test -n "$MODRINTH_TOKEN" || { echo 'Missing MODRINTH_TOKEN.' >&2; exit 1; }
           test -n "$CURSEFORGE_TOKEN" || { echo 'Missing CURSEFORGE_TOKEN.' >&2; exit 1; }
-      # Keep each loader/version pair as a separate platform version. This
-      # prevents Modrinth/CurseForge from inferring the wrong loader metadata.
-      - name: Publish Fabric 1.21.1
+      - name: Publish Fabric file
+        if: needs.github-release.outputs.loader == 'fabric'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: gatehousemc
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: dist/gatehousemc-fabric-mc1.21.1-${{ needs.github-release.outputs.version }}.jar
-          name: GatehouseMC ${{ needs.github-release.outputs.version }} — Fabric 1.21.1
-          version: ${{ needs.github-release.outputs.version }}+fabric.1.21.1
+          files: dist/gatehousemc-fabric-mc${{ needs.github-release.outputs.minecraft }}-${{ needs.github-release.outputs.version }}.jar
+          name: GatehouseMC ${{ needs.github-release.outputs.version }} — Fabric ${{ needs.github-release.outputs.minecraft }}
+          version: ${{ needs.github-release.outputs.version }}+fabric.${{ needs.github-release.outputs.minecraft }}
           version-type: release
           changelog-file: CHANGELOG.md
           loaders: fabric
           environment: dedicated-server
-          game-versions: 1.21.1
+          game-versions: ${{ needs.github-release.outputs.minecraft }}
           java: 21
           dependencies: fabric-api(required)
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
-      - name: Publish Forge 1.20.1
+      - name: Publish Forge file
+        if: needs.github-release.outputs.loader == 'forge'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: gatehousemc
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: dist/gatehousemc-forge-mc1.20.1-${{ needs.github-release.outputs.version }}.jar
-          name: GatehouseMC ${{ needs.github-release.outputs.version }} — Forge 1.20.1
-          version: ${{ needs.github-release.outputs.version }}+forge.1.20.1
+          files: dist/gatehousemc-forge-mc${{ needs.github-release.outputs.minecraft }}-${{ needs.github-release.outputs.version }}.jar
+          name: GatehouseMC ${{ needs.github-release.outputs.version }} — Forge ${{ needs.github-release.outputs.minecraft }}
+          version: ${{ needs.github-release.outputs.version }}+forge.${{ needs.github-release.outputs.minecraft }}
           version-type: release
           changelog-file: CHANGELOG.md
           loaders: forge
           environment: dedicated-server
-          game-versions: 1.20.1
+          game-versions: ${{ needs.github-release.outputs.minecraft }}
           java: 17
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
-      - name: Publish NeoForge 1.21.1
+      - name: Publish NeoForge file
+        if: needs.github-release.outputs.loader == 'neoforge'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: gatehousemc
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: dist/gatehousemc-neoforge-mc1.21.1-${{ needs.github-release.outputs.version }}.jar
-          name: GatehouseMC ${{ needs.github-release.outputs.version }} — NeoForge 1.21.1
-          version: ${{ needs.github-release.outputs.version }}+neoforge.1.21.1
+          files: dist/gatehousemc-neoforge-mc${{ needs.github-release.outputs.minecraft }}-${{ needs.github-release.outputs.version }}.jar
+          name: GatehouseMC ${{ needs.github-release.outputs.version }} — NeoForge ${{ needs.github-release.outputs.minecraft }}
+          version: ${{ needs.github-release.outputs.version }}+neoforge.${{ needs.github-release.outputs.minecraft }}
           version-type: release
           changelog-file: CHANGELOG.md
           loaders: neoforge
           environment: dedicated-server
-          game-versions: 1.21.1
+          game-versions: ${{ needs.github-release.outputs.minecraft }}
           java: 21
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
 
   announce:
-    name: Announce release
+    name: Announce loader-qualified release
     needs: github-release
     if: needs.github-release.result == 'success'
     runs-on: ubuntu-latest
@@ -276,6 +380,8 @@ jobs:
       contents: read
     env:
       RELEASE_VERSION: ${{ needs.github-release.outputs.version }}
+      RELEASE_LOADER: ${{ needs.github-release.outputs.loader }}
+      RELEASE_MINECRAFT: ${{ needs.github-release.outputs.minecraft }}
       RELEASE_TAG: ${{ needs.github-release.outputs.tag }}
       RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.github-release.outputs.tag }}
       MODRINTH_URL: https://modrinth.com/mod/gatehousemc
@@ -287,9 +393,7 @@ jobs:
       - name: Write release announcement summary
         run: |
           {
-            echo "## GatehouseMC ${RELEASE_VERSION} staged"
-            echo
-            echo "Loader targets: Fabric 1.21.1, Forge 1.20.1, NeoForge 1.21.1"
+            echo "## GatehouseMC ${RELEASE_VERSION} — ${RELEASE_LOADER} ${RELEASE_MINECRAFT} staged"
             echo
             echo "- GitHub: ${RELEASE_URL}"
             echo "- Modrinth: ${MODRINTH_URL}"
@@ -300,10 +404,9 @@ jobs:
         run: |
           python - <<'PY' > "$RUNNER_TEMP/discord-release.json"
           import json, os
-          version = os.environ["RELEASE_VERSION"]
-          targets = "Fabric 1.21.1, Forge 1.20.1, NeoForge 1.21.1"
+          target = f"{os.environ['RELEASE_LOADER']} {os.environ['RELEASE_MINECRAFT']}"
           message = (
-              f"🎉 GatehouseMC {version} is staged for {targets}.\n"
+              f"🎉 GatehouseMC {os.environ['RELEASE_VERSION']} is staged for {target}.\n"
               f"GitHub: {os.environ['RELEASE_URL']}\n"
               f"Modrinth: {os.environ['MODRINTH_URL']}\n"
               f"CurseForge: {os.environ['CURSEFORGE_URL']}"
@@ -321,11 +424,11 @@ jobs:
           test -n "$TELEGRAM_RELEASE_CHAT_ID" || { echo 'TELEGRAM_RELEASE_CHAT_ID is missing.' >&2; exit 1; }
           python - <<'PY' > "$RUNNER_TEMP/telegram-release.json"
           import json, os
-          version = os.environ["RELEASE_VERSION"]
+          target = f"{os.environ['RELEASE_LOADER']} {os.environ['RELEASE_MINECRAFT']}"
           print(json.dumps({
               "chat_id": os.environ["TELEGRAM_RELEASE_CHAT_ID"],
               "text": (
-                  f"🎉 GatehouseMC {version} is staged for Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1.\n"
+                  f"🎉 GatehouseMC {os.environ['RELEASE_VERSION']} is staged for {target}.\n"
                   f"GitHub: {os.environ['RELEASE_URL']}"
               ),
               "disable_web_page_preview": True,

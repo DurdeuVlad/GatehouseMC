@@ -74,15 +74,29 @@ The mod's distributed jar contains project code and allowed dependencies only.
 
 ### 5.1 Long-lived branches and artifact targets
 
-The repository tracks the primary implementation baseline on `main`. The full
-loader/version release state is maintained in [`.github/support-matrix.yml`](../.github/support-matrix.yml).
-Retained historical branches and downloads are not a promise of equal future
-feature support; a row becomes a current release target only after its own
-source build, artifact validation, and dedicated-server proof.
+The repository tracks integration on `main`. Exact loader/version maintenance
+branches and release identity are defined in
+[`docs/RELEASE_BRANCHING.md`](RELEASE_BRANCHING.md) and
+[`.github/support-matrix.yml`](../.github/support-matrix.yml). Retained
+historical branches and downloads are not a promise of equal future feature
+support; a row becomes a current release target only after its own source
+build, artifact validation, and dedicated-server proof.
+
+Current 1.1.x maintenance branches:
+
+| Branch | Minecraft | Java Runtime | Loader | Status |
+|---|---|---|---|---|
+| `main` | integration | 21 | all active targets | Active trunk |
+| `release/1.1.x` | release coordination | — | all active targets | Release line |
+| `support/fabric/1.21.1` | 1.21.1 | 21 | Fabric | Verified locally |
+| `support/forge/1.20.1` | 1.20.1 | 17 | Forge | Verified locally |
+| `support/neoforge/1.21.1` | 1.21.1 | 21 | NeoForge | Verified locally |
+
+The version-only branches listed below are retained historical compatibility
+branches from the 1.0.1 line.
 
 | Target   | Minecraft | Java Runtime | Loader | Status | Notes |
 |----------|-----------|--------------|--------|--------|-------|
-| `main`   | 1.21.1    | Java 21     | Fabric | Active trunk | Fast-forward mirror of `1.21.1`; all feature work merges here first |
 | `1.21.4` | 1.21.4    | Java 21     | Fabric | Active support | Separate binary build (`1.21.4+build.8`, API `0.119.4+1.21.4`) |
 | `1.21.1` | 1.21.1    | Java 21     | Fabric | LTS / primary | Baseline release target (`1.21.1+build.3`, API `0.116.17+1.21.1`) |
 | `1.20.6` | 1.20.6    | Java 21     | Fabric | Active support | Short-lived Java 21 release (`1.20.6+build.3`, API `0.100.8+1.20.6`) |
@@ -108,14 +122,14 @@ feat/*      feature work (merges to main)
 fix/*       bug/security fixes (merges to main, then cherry-pick to version branches)
 docs/*      documentation-only changes
 chore/*     build, tooling, dependency bumps
+support/<loader>/<minecraft>  exact loader/version maintenance
 ```
 
 ### 5.2 Merge direction
 
 ```
-feat/* ──► main ──► 1.21.1
-                         └─► version branches only when a target is actively maintained
-fix/*  ────────────────► applicable maintained targets
+ feat/* ──► main ──► support/<loader>/<minecraft>
+ fix/*  ────────────► main, then cherry-pick to applicable support branches
 ```
 
 - Features land on `main` first.
@@ -134,12 +148,15 @@ Supporting Minecraft 1.12.2 requires either:
 
 When a new Minecraft version becomes a target:
 
-1. Create a branch named after the version (e.g. `1.22.1`) from the nearest existing version branch.
+1. Create `support/<loader>/<minecraft>` (e.g. `support/fabric/1.22.1`) from
+   the nearest compatible support branch.
 2. Update `gradle.properties` with the new `minecraft_version`, `yarn_mappings`, and `fabric_version`.
 3. Verify the Mixin target (`PlayerManager#checkCanJoin`) exists in the new mapping set.
 4. Run `./gradlew clean test build` and boot a real dedicated server.
 5. Record verified version pins in `docs/RESEARCH.md`.
-6. Update this table.
+6. Add the branch and tag pattern to `.github/support-matrix.yml`.
+7. Verify the loader-qualified tag format
+   `v<mod-version>-<loader>-mc<minecraft-version>`.
 
 ### 5.5 Branch deprecation
 
@@ -147,7 +164,9 @@ A version branch is deprecated when the corresponding Minecraft release is no lo
 
 ### 5.6 Release branches
 
-Releases are tagged directly on the relevant version branch (e.g. `git tag v1.0.0` on `1.21.1`). No separate `release/*` staging branches are needed unless the release workflow requires pre-release review.
+Releases are tagged directly on the relevant support branch, for example
+`git tag v1.1.0-fabric-mc1.21.1` on `support/fabric/1.21.1`. Bare version tags
+are invalid. The release workflow creates one loader/version artifact per tag.
 
 ---
 

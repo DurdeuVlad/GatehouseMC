@@ -26,13 +26,18 @@ Node E2E client.
 - `/gatehouse` (with `/gh` and `/wlreq` aliases) command interface.
 - Discord JDA and Telegram Bot API adapters behind one core decision service.
 - No IP persistence and no claim that offline usernames are authenticated.
+- Active maintenance branches are `support/fabric/1.21.1`,
+  `support/forge/1.20.1`, and `support/neoforge/1.21.1`.
+- Canonical release tags are `v<mod-version>-<loader>-mc<minecraft-version>`;
+  each tag releases one loader/version artifact.
 
 ## Publication status
 
 - GitHub is public and contains the source repository.
 - Modrinth and CurseForge submissions contain the earlier files. The 1.1.x
-  workflow now stages loader-specific files; storefront publication remains a
-  guarded manual dispatch until the broader acceptance matrix is complete.
+  workflow now builds, tests, and stages one loader/version file per qualified
+  tag; a qualified tag publishes automatically once the configured storefront
+  secrets and release gates succeed.
 - GitHub Release `v1.0.0` is retained for history but is not production-ready;
   its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 

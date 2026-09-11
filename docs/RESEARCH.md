@@ -451,7 +451,7 @@ The following matrix documents the verified version pins, toolchain requirements
 | Minecraft | Yarn Mapping | Fabric API | Java Target | Key API Adaptations |
 |---|---|---|---|---|
 | **1.21.4** | `1.21.4+build.8` | `0.119.4+1.21.4` | Java 21 | Modern Fabric baseline |
-| **1.21.1** | `1.21.1+build.3` | `0.116.17+1.21.1` | Java 21 | Mod primary target (`main`) |
+| **1.21.1** | `1.21.1+build.3` | `0.116.17+1.21.1` | Java 21 | Fabric maintenance target (`support/fabric/1.21.1`) |
 | **1.20.6** | `1.20.6+build.3` | `0.100.8+1.20.6` | Java 21 | Short-lived Java 21 release |
 | **1.20.4** | `1.20.4+build.3` | `0.97.3+1.20.4` | Java 17 | `ExecutorService` try-finally compatibility in tests |
 | **1.20.1** | `1.20.1+build.10` | `0.92.12+1.20.1` | Java 17 | "Legacy gold standard" for 1.20 modpacks |

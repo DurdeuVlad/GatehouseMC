@@ -33,6 +33,7 @@ GatehouseMC is an operational workflow layer around Minecraft's native whitelist
 - **Source and issues:** [github.com/DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC) · [issue tracker](https://github.com/DurdeuVlad/GatehouseMC/issues)
 - **Publishing copy:** [Modrinth](docs/publishing/MODRINTH.md) · [CurseForge](docs/publishing/CURSEFORGE.md)
 - **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)
+- **Release branching:** [`docs/RELEASE_BRANCHING.md`](docs/RELEASE_BRANCHING.md)
 
 ## Build
 
@@ -103,6 +104,6 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-The current branch has passing Fabric/core tests, reproducible builds, artifact validation, and local clean dedicated-server smoke proof for all three 1.1.x proof targets. Storefront publication remains an explicit guarded dispatch; broader repeat-attempt, restart, approval-race, and real mod-stack coverage is still required before calling the release production-ready. See [`docs/TESTING.md`](docs/TESTING.md) and [`.github/support-matrix.yml`](.github/support-matrix.yml) for the exact state.
+The current branch has passing Fabric/core tests, reproducible builds, artifact validation, and local clean dedicated-server smoke proof for all three 1.1.x proof targets. Storefront publication is gated on a loader-qualified tag and the release workflow; broader repeat-attempt, restart, approval-race, and real mod-stack coverage is still required before calling the release production-ready. See [`docs/TESTING.md`](docs/TESTING.md) and [`.github/support-matrix.yml`](.github/support-matrix.yml) for the exact state.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.

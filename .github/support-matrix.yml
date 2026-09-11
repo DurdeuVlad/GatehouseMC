@@ -108,6 +108,8 @@ targets:
     loader: fabric
     minecraft: 1.21.1
     java: 21
+    branch: support/fabric/1.21.1
+    tag_pattern: v<mod-version>-fabric-mc1.21.1
     status: verified-local
     build: true
     artifact_validation: true
@@ -128,6 +130,8 @@ targets:
     loader: forge
     minecraft: 1.20.1
     java: 17
+    branch: support/forge/1.20.1
+    tag_pattern: v<mod-version>-forge-mc1.20.1
     status: verified-local
     build: true
     artifact_validation: true
@@ -137,6 +141,8 @@ targets:
     loader: neoforge
     minecraft: 1.21.1
     java: 21
+    branch: support/neoforge/1.21.1
+    tag_pattern: v<mod-version>-neoforge-mc1.21.1
     status: verified-local
     build: true
     artifact_validation: true

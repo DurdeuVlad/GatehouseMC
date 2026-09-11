@@ -62,6 +62,15 @@ docs/<topic>
 test/<surface>
 ```
 
+Loader/version maintenance uses `support/<loader>/<minecraft>` branches, for
+example `support/fabric/1.21.1` or `support/forge/1.20.1`. Keep loader-specific
+build, mapping, metadata, and packaging changes on the matching support branch.
+Cross-target core fixes land on `main` first and are then cherry-picked into
+the active support branches. See [`docs/RELEASE_BRANCHING.md`](docs/RELEASE_BRANCHING.md).
+
+Release tags must include all three identities:
+`v<mod-version>-<loader>-mc<minecraft-version>`.
+
 Use Conventional Commits:
 
 ```text
@@ -71,7 +80,7 @@ test(e2e): prove offline approval reconnect flow
 docs(research): pin 1.21.1 whitelist mappings
 ```
 
-Do not push directly to protected trunk/release branches.
+Do not push directly to protected trunk, release, or support branches.
 
 ---
 

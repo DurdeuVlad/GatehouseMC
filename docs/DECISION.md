@@ -173,3 +173,13 @@ This document records the accepted foundational decisions for Whitelist Request 
 - **Rejected:** One shared loader project with conditional source hacks; publishing a jar for a loader/version that only compiled but did not pass artifact and dedicated-server gates; silently using Gradle 9 for ForgeGradle.
 - **Consequences:** The first 1.1.x proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Older Fabric artifacts remain historical 1.0.1 compatibility entries until their per-version source builds and live-server tests are restored. CI builds the proof targets, while the support matrix prevents planned rows from being published accidentally.
 
+---
+
+## ADR-018 — Loader-qualified support branches and release tags
+
+- **Status:** Accepted
+- **Context:** A Minecraft version alone does not identify a distributable artifact. Fabric, Forge, and NeoForge have different APIs, toolchains, metadata, and server proofs, so a version-only branch or tag can publish the wrong binary.
+- **Decision:** Maintain active targets on `support/<loader>/<minecraft>` branches and identify releases as `v<mod-version>-<loader>-mc<minecraft-version>`. Keep `main` as the integration branch and use `release/<major>.<minor>.x` for release-line coordination. The release workflow resolves the tag to an allow-listed support branch and publishes exactly one validated loader/version artifact.
+- **Rejected:** Bare `v<version>` tags, version-only maintenance branches, or one multi-loader release tag that hides which artifact was tested and published.
+- **Consequences:** Each new loader/version target needs its own branch, support-matrix row, build lane, clean-server proof, and resolver entry before release. This creates a small amount of release bookkeeping but makes maintenance, rollback, and artifact provenance explicit.
+
