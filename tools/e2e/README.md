@@ -28,3 +28,16 @@ or `joined`). The harness also answers the
 The full release gate still requires a disposable clean server process and
 the scenario matrix in `docs/TESTING.md`; this script is the reusable client
 driver used by that gate.
+
+For a complete clean-server smoke, use the wrapper from the repository root:
+
+```bash
+bash tools/e2e/run-clean-server-smoke.sh fabric <server-dir> <port> <artifact> <minecraft-version>
+```
+
+The wrapper accepts `FABRIC_LOADER_VERSION`, `FABRIC_API_VERSION`, or a local
+`FABRIC_API_JAR` override so each supported Minecraft version can be tested
+against its matching Fabric dependencies. On Windows, Forge and NeoForge use
+their generated `win_args.txt` launch configuration directly; this avoids the
+installer-generated `run.bat` pause prompt while preserving the same server
+arguments.

@@ -13,6 +13,16 @@ artifact="$4"
 minecraft_version="$5"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 e2e_dir="$repo_root/tools/e2e"
+fabric_loader_version="${FABRIC_LOADER_VERSION:-0.19.5}"
+fabric_api_version="${FABRIC_API_VERSION:-0.116.17+1.21.1}"
+fabric_api_jar="${FABRIC_API_JAR:-}"
+
+[[ -f "$artifact" ]] || { echo "Artifact does not exist: $artifact" >&2; exit 1; }
+if [[ "$loader" == "fabric" && "$minecraft_version" != "1.21.1" \
+  && -z "${FABRIC_API_VERSION:-}" && -z "$fabric_api_jar" ]]; then
+  echo "Set FABRIC_API_VERSION or FABRIC_API_JAR for Fabric $minecraft_version" >&2
+  exit 2
+fi
 
 mkdir -p "$server_dir/mods"
 
@@ -24,11 +34,16 @@ case "$loader" in
     (
       cd "$server_dir"
       java -jar fabric-installer.jar server \
-        -mcversion "$minecraft_version" -loader 0.19.5 -downloadMinecraft
+        -mcversion "$minecraft_version" -loader "$fabric_loader_version" -downloadMinecraft
     )
-    curl --fail --silent --show-error --location \
-      "https://maven.fabricmc.net/net/fabricmc/fabric-api/0.116.17+1.21.1/fabric-api-0.116.17+1.21.1.jar" \
-      --output "$server_dir/mods/fabric-api.jar"
+    if [[ -n "$fabric_api_jar" ]]; then
+      [[ -f "$fabric_api_jar" ]] || { echo "Fabric API override does not exist: $fabric_api_jar" >&2; exit 1; }
+      cp "$fabric_api_jar" "$server_dir/mods/fabric-api.jar"
+    else
+      curl --fail --silent --show-error --location \
+        "https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/$fabric_api_version/fabric-api-$fabric_api_version.jar" \
+        --output "$server_dir/mods/fabric-api.jar"
+    fi
     launch=(java -jar fabric-server-launch.jar nogui)
     ;;
   forge)
@@ -39,7 +54,11 @@ case "$loader" in
       cd "$server_dir"
       java -jar forge-installer.jar --installServer
     )
-    launch=(bash run.sh nogui)
+    if command -v cmd.exe >/dev/null 2>&1 && [[ -f "$server_dir/run.bat" ]]; then
+      launch=(cmd.exe //c java @user_jvm_args.txt @libraries/net/minecraftforge/forge/1.20.1-47.4.23/win_args.txt nogui)
+    else
+      launch=(bash run.sh nogui)
+    fi
     ;;
   neoforge)
     curl --fail --silent --show-error --location \
@@ -49,7 +68,11 @@ case "$loader" in
       cd "$server_dir"
       java -jar neoforge-installer.jar --installServer
     )
-    launch=(bash run.sh nogui)
+    if command -v cmd.exe >/dev/null 2>&1 && [[ -f "$server_dir/run.bat" ]]; then
+      launch=(cmd.exe //c java @user_jvm_args.txt @libraries/net/neoforged/neoforge/21.1.201/win_args.txt nogui)
+    else
+      launch=(bash run.sh nogui)
+    fi
     ;;
   *)
     echo "unsupported loader: $loader" >&2
@@ -80,10 +103,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-(
-  cd "$server_dir"
-  exec setsid "${launch[@]}"
-) > "$server_log" 2>&1 &
+if command -v setsid >/dev/null 2>&1; then
+  (
+    cd "$server_dir"
+    exec setsid "${launch[@]}"
+  ) > "$server_log" 2>&1 &
+else
+  (
+    cd "$server_dir"
+    exec "${launch[@]}"
+  ) > "$server_log" 2>&1 &
+fi
 server_pid=$!
 
 for _ in {1..90}; do
