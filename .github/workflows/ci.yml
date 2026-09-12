@@ -114,34 +114,55 @@ jobs:
           white-list=true
           enforce-whitelist=true
           enforce-secure-profile=false
+          enable-rcon=true
+          rcon.port=25575
+          rcon.password=ci-test
           server-port=25565
           EOF
-          pushd "$server_dir"
-          java -jar fabric-server-launch.jar nogui > server.log 2>&1 &
-          server_pid=$!
-          popd
+          start_server() {
+            start_line_count=$(wc -l < "$server_dir/server.log" 2>/dev/null || echo 0)
+            pushd "$server_dir" >/dev/null
+            java -jar fabric-server-launch.jar nogui >> server.log 2>&1 &
+            server_pid=$!
+            popd >/dev/null
+            for attempt in $(seq 1 90); do
+              if tail -n +$((start_line_count + 1)) "$server_dir/server.log" | grep -q 'Done ('; then
+                break
+              fi
+              if ! kill -0 "$server_pid" 2>/dev/null; then
+                cat "$server_dir/server.log"
+                exit 1
+              fi
+              sleep 2
+            done
+            tail -n +$((start_line_count + 1)) "$server_dir/server.log" | grep -q 'Done (' || { cat "$server_dir/server.log"; exit 1; }
+          }
           cleanup() {
-            kill "$server_pid" 2>/dev/null || true
-            wait "$server_pid" 2>/dev/null || true
+            if [ -n "${server_pid:-}" ] && kill -0 "$server_pid" 2>/dev/null; then
+              kill "$server_pid" 2>/dev/null || true
+            fi
+            if [ -n "${server_pid:-}" ]; then
+              wait "$server_pid" 2>/dev/null || true
+            fi
           }
           trap cleanup EXIT
-          for attempt in $(seq 1 90); do
-            if grep -q 'Done (' "$server_dir/server.log"; then
-              break
-            fi
-            if ! kill -0 "$server_pid" 2>/dev/null; then
-              cat "$server_dir/server.log"
-              exit 1
-            fi
-            sleep 2
-          done
-          grep -q 'Done (' "$server_dir/server.log" || { cat "$server_dir/server.log"; exit 1; }
-          MC_EXPECTED_STATUS=rejected MC_HOST=127.0.0.1 MC_PORT=25565 npm --prefix tools/e2e run smoke
+          start_server
+          MC_HOST=127.0.0.1 MC_PORT=25565 RCON_PORT=25575 RCON_PASSWORD=ci-test \
+            MC_USERNAME=E2E_CI EXPECTED_OFFLINE_UUID=bb1655e1-5c33-3368-bf71-1eb9dc620cac \
+            DB_PATH="$server_dir/requests.sqlite" \
+            WHITELIST_PATH="$server_dir/whitelist.json" \
+            EVIDENCE_FILE="$server_dir/ci-gate-summary.json" \
+            npm --prefix tools/e2e run ci-gate
+          start_server
+          MC_EXPECTED_STATUS=joined MC_HOST=127.0.0.1 MC_PORT=25565 MC_USERNAME=E2E_CI \
+            npm --prefix tools/e2e run smoke
 
       - name: Upload dedicated-server log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gatehousemc-e2e-server-log-${{ github.run_id }}
-          path: ${{ runner.temp }}/gatehousemc-e2e-server/server.log
+          path: |
+            ${{ runner.temp }}/gatehousemc-e2e-server/server.log
+            ${{ runner.temp }}/gatehousemc-e2e-server/ci-gate-summary.json
           if-no-files-found: warn

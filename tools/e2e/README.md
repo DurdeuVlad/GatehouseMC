@@ -46,6 +46,11 @@ npm run release-gate
 after shutdown because the application uses WAL mode and the authoritative
 state may still be in the `-wal` sidecar while the server is running.
 
+CI uses the credential-free `ci-gate` command to exercise the core server path:
+unknown rejection, repeat-attempt deduplication, console approval, vanilla
+whitelist mutation, reconnect, and post-restart reconnect. It intentionally
+does not claim live provider delivery.
+
 The full release gate still requires a disposable clean server process and
 the scenario matrix in `docs/TESTING.md`; this script is the reusable client
 driver used by that gate.

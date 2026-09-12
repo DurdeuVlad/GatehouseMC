@@ -20,6 +20,10 @@ client.on('ping', (packet) => {
   if (client.state === 'configuration') client.write('pong', { id: packet.id })
 })
 client.on('playerJoin', () => finish({ status: 'joined', username }))
-client.on('disconnect', (packet) => finish({ status: 'rejected', username, reason: packet.reason }))
+client.on('disconnect', (packet) => {
+  const reasonText = typeof packet.reason === 'string' ? packet.reason : JSON.stringify(packet.reason)
+  const isWhitelistRejection = /whitelist request/i.test(reasonText ?? '')
+  finish({ status: isWhitelistRejection ? 'rejected' : 'unexpected_disconnect', username, reason: packet.reason })
+})
 client.on('error', (error) => finish({ status: 'error', message: error.message }))
 setTimeout(() => finish({ status: 'timeout', username }), 15000)

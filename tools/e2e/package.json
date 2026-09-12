@@ -12,6 +12,7 @@
   },
   "scripts": {
     "smoke": "node src/smoke.mjs",
-    "release-gate": "node src/release-gate.mjs"
+    "release-gate": "node src/release-gate.mjs",
+    "ci-gate": "node src/ci-gate.mjs"
   }
 }
