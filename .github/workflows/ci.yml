@@ -30,9 +30,44 @@ jobs:
           path: build/libs/gatehousemc-*.jar
           if-no-files-found: error
 
+  compatibility-matrix:
+    name: Compatibility ${{ matrix.minecraft }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { branch: '1.14.4', minecraft: '1.14.4', java: '17' }
+          - { branch: '1.15.2', minecraft: '1.15.2', java: '17' }
+          - { branch: '1.16.5', minecraft: '1.16.5', java: '17' }
+          - { branch: '1.17.1', minecraft: '1.17.1', java: '17' }
+          - { branch: '1.18.2', minecraft: '1.18.2', java: '17' }
+          - { branch: '1.19.2', minecraft: '1.19.2', java: '17' }
+          - { branch: '1.19.4', minecraft: '1.19.4', java: '17' }
+          - { branch: '1.20.1', minecraft: '1.20.1', java: '17' }
+          - { branch: '1.20.4', minecraft: '1.20.4', java: '17' }
+          - { branch: '1.20.6', minecraft: '1.20.6', java: '21' }
+          - { branch: '1.21.1', minecraft: '1.21.1', java: '21' }
+          - { branch: '1.21.4', minecraft: '1.21.4', java: '21' }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ matrix.branch }}-${{ hashFiles('**/*.gradle*', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Build and test compatibility branch
+        run: bash ./gradlew clean test build --stacktrace
+
   e2e-smoke:
     runs-on: ubuntu-latest
     needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -55,6 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')" = "1.21.1"
           server_dir="$RUNNER_TEMP/gatehousemc-e2e-server"
           mkdir -p "$server_dir/mods"
           curl --fail --silent --show-error --location \
