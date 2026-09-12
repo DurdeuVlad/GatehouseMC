@@ -22,7 +22,7 @@ jobs:
           path: ~/.gradle/caches
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
       - name: Build and test
-        run: ./gradlew clean test build --stacktrace
+        run: bash ./gradlew clean test build --stacktrace
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
