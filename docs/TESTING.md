@@ -474,12 +474,14 @@ A high-confidence pipeline should run:
 Exact Gradle/task names may differ after implementation, but the proof surfaces may not be silently removed.
 
 The main CI workflow also runs a compatibility build/test matrix against the
-maintained version branches (`1.14.4` through `1.21.4`) using the Java version
-documented for each branch. The dedicated-server E2E job is scoped to the
-1.21.1 `main` line; it must not be presented as proof for the separate binary
-branches. Provider credentials are intentionally not stored in CI, so the real
-Discord approval phase remains an opt-in release-candidate check with a
-disposable private test guild.
+maintained version branches (`1.14.4` through `1.21.4`). It uses a Java 21
+Gradle runtime because the pinned Loom plugin requires it, while each branch's
+compiler still enforces its documented Java 17 or Java 21 `--release` target.
+Native Java 17 runtime execution remains a separate verification task. The
+dedicated-server E2E job is scoped to the 1.21.1 `main` line; it must not be
+presented as proof for the separate binary branches. Provider credentials are
+intentionally not stored in CI, so the real Discord approval phase remains an
+opt-in release-candidate check with a disposable private test guild.
 
 ---
 

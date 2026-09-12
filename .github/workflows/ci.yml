@@ -37,15 +37,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { branch: '1.14.4', minecraft: '1.14.4', java: '17' }
-          - { branch: '1.15.2', minecraft: '1.15.2', java: '17' }
-          - { branch: '1.16.5', minecraft: '1.16.5', java: '17' }
-          - { branch: '1.17.1', minecraft: '1.17.1', java: '17' }
-          - { branch: '1.18.2', minecraft: '1.18.2', java: '17' }
-          - { branch: '1.19.2', minecraft: '1.19.2', java: '17' }
-          - { branch: '1.19.4', minecraft: '1.19.4', java: '17' }
-          - { branch: '1.20.1', minecraft: '1.20.1', java: '17' }
-          - { branch: '1.20.4', minecraft: '1.20.4', java: '17' }
+          - { branch: '1.14.4', minecraft: '1.14.4', java: '21' }
+          - { branch: '1.15.2', minecraft: '1.15.2', java: '21' }
+          - { branch: '1.16.5', minecraft: '1.16.5', java: '21' }
+          - { branch: '1.17.1', minecraft: '1.17.1', java: '21' }
+          - { branch: '1.18.2', minecraft: '1.18.2', java: '21' }
+          - { branch: '1.19.2', minecraft: '1.19.2', java: '21' }
+          - { branch: '1.19.4', minecraft: '1.19.4', java: '21' }
+          - { branch: '1.20.1', minecraft: '1.20.1', java: '21' }
+          - { branch: '1.20.4', minecraft: '1.20.4', java: '21' }
           - { branch: '1.20.6', minecraft: '1.20.6', java: '21' }
           - { branch: '1.21.1', minecraft: '1.21.1', java: '21' }
           - { branch: '1.21.4', minecraft: '1.21.4', java: '21' }
