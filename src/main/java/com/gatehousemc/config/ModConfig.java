@@ -11,8 +11,13 @@ public record ModConfig(Requests requests, Database database, Routing routing, D
     public record Routing(RoutingMode mode, List<String> providers) {
         public Routing { providers = List.copyOf(providers); }
     }
-    public record Discord(boolean enabled, String token, String guildId, String channelId,
+    public record Discord(boolean enabled, String token, String guildId, String channelId, String dmUserId,
                           List<String> allowedUserIds, List<String> allowedRoleIds) {
+        public Discord(boolean enabled, String token, String guildId, String channelId,
+                       List<String> allowedUserIds, List<String> allowedRoleIds) {
+            this(enabled, token, guildId, channelId, "", allowedUserIds, allowedRoleIds);
+        }
+
         public Discord { allowedUserIds = List.copyOf(allowedUserIds); allowedRoleIds = List.copyOf(allowedRoleIds); }
 
         @Override
@@ -21,6 +26,7 @@ public record ModConfig(Requests requests, Database database, Routing routing, D
                     "enabled=" + enabled +
                     ", guildId='" + guildId + '\'' +
                     ", channelId='" + channelId + '\'' +
+                    ", dmUserId='" + dmUserId + '\'' +
                     ", allowedUserIds=" + allowedUserIds +
                     ", allowedRoleIds=" + allowedRoleIds +
                     '}';
@@ -44,7 +50,7 @@ public record ModConfig(Requests requests, Database database, Routing routing, D
                 new Requests(1440, 10_000, 3),
                 new Database(configDir.resolve("requests.sqlite"), 5000),
                 new Routing(RoutingMode.PRIMARY_FALLBACK, List.of("discord", "telegram")),
-                new Discord(false, "", "", "", List.of(), List.of()),
+                new Discord(false, "", "", "", "", List.of(), List.of()),
                 new Telegram(false, "", "", List.of()),
                 "en_us"
         );

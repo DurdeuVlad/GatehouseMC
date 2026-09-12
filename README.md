@@ -44,7 +44,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The production artifact is written to `build/libs/gatehousemc-1.0.0.jar`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
+The production artifact is written to `build/libs/gatehousemc-1.0.1.jar`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
 
 ## Real-server smoke test
 
@@ -65,7 +65,7 @@ clean standalone server and restart/outage scenarios, is documented in
 
 ## Install and configure
 
-Put `gatehousemc-1.0.0.jar` in the server's `mods/` directory and start the server once. GatehouseMC creates:
+Put `gatehousemc-1.0.1.jar` in the server's `mods/` directory and start the server once. GatehouseMC creates:
 
 ```text
 config/gatehousemc/config.json
@@ -93,12 +93,28 @@ Minecraft commands are always available after the server starts:
 
 Discord and Telegram are disabled by default. Enable them only after setting stable administrator IDs and provider secrets. Secrets can use `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`; expanded values stay in memory and are never written back or included in status output.
 
+Discord normally publishes to a guild text channel:
+
+```json
+"discord": {
+  "enabled": true,
+  "token": "${DISCORD_TOKEN}",
+  "guildId": "<guild snowflake>",
+  "channelId": "<channel snowflake>",
+  "dmUserId": "",
+  "allowedUserIds": ["<administrator snowflake>"],
+  "allowedRoleIds": []
+}
+```
+
+For a private destination, set `dmUserId` to the administrator's Discord user ID, include that same ID in `allowedUserIds`, and leave `channelId` blank. Discord may still reject bot DMs because of mutual-guild or recipient privacy rules; a private test guild channel is the reliable isolated alternative.
+
 ## Trust warning
 
 Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice` grants access to the offline profile derived from the supplied name; it does not prove that a particular Microsoft/Mojang account owns that identity.
 
 ## Verification status
 
-All unit, component, architecture, router, and fake-transport tests pass. A real Fabric 1.21.1 dedicated server has proven: rejection -> persistence -> approval -> native whitelist mutation -> reconnect -> restart persistence, and distinct player-facing messages for first-request, pending, denied, blocked, and degraded states. The production jar nests SQLite and JDA and runs on a clean server with no additional dependencies.
+The 1.0.1 release gate requires the unit/component suite, a clean packaged-jar Fabric 1.21.1 server boot, offline rejection/persistence/deduplication, Discord publication, approval, vanilla whitelist mutation, reconnect, and restart checks. Results are recorded in the release PR and `docs/TESTING.md`; an unexecuted scenario is not treated as passing.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.

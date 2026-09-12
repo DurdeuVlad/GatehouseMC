@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "minecraft-protocol": "1.66.2"
+    "minecraft-protocol": "1.66.2",
+    "rcon-client": "4.2.5"
   },
   "scripts": {
     "smoke": "node src/smoke.mjs"

@@ -12,7 +12,7 @@ Before publishing the first release, ensure:
    ```powershell
    .\gradlew.ps1 clean test build
    ```
-2. The production jar exists at `build/libs/gatehousemc-1.0.0.jar`.
+2. The production jar exists at `build/libs/gatehousemc-1.0.1.jar`.
 3. The brand assets are available:
    - **Logo / Icon:** [`assets/gatehousemc_logo.png`](../assets/gatehousemc_logo.png) (1024×1024)
    - **Banner:** [`assets/gatehousemc_banner.png`](../assets/gatehousemc_banner.png) (1792×1024)
@@ -86,11 +86,11 @@ With secrets configured, triggering a release is as simple as tagging a commit:
 git checkout main
 git pull
 
-# 2. Tag the release version
-git tag v1.0.0
+# 2. Tag the release version for the Minecraft target
+git tag v1.0.1-mc1.21.1
 
 # 3. Push the tag to GitHub
-git push origin v1.0.0
+git push origin v1.0.1-mc1.21.1
 ```
 
 ### What GitHub Actions will automatically do:

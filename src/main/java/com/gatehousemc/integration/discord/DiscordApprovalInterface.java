@@ -15,6 +15,9 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
+import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
+import net.dv8tion.jda.api.events.session.ShutdownEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -65,8 +68,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         try {
             health = ProviderHealth.STARTING;
             JDA jda = JDABuilder.createDefault(config.token()).addEventListeners(this).build();
-            transport = new JdaDiscordTransport(jda, config.channelId());
-            health = ProviderHealth.HEALTHY;
+            transport = new JdaDiscordTransport(jda, config.dmUserId());
         } catch (RuntimeException error) {
             health = ProviderHealth.UNAVAILABLE;
         }
@@ -81,11 +83,32 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     }
 
     @Override
+    public void onReady(ReadyEvent event) {
+        health = ProviderHealth.HEALTHY;
+    }
+
+    @Override
+    public void onSessionDisconnect(SessionDisconnectEvent event) {
+        if (health != ProviderHealth.STOPPED) health = ProviderHealth.STARTING;
+    }
+
+    @Override
+    public void onShutdown(ShutdownEvent event) {
+        if (health != ProviderHealth.STOPPED) health = ProviderHealth.UNAVAILABLE;
+    }
+
+    @Override
     public CompletionStage<PublicationRef> publish(RequestView request) {
         DiscordTransport current = transport;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Discord is unavailable"));
-        return current.sendMessage(config.channelId(), render(request), request.id(), false)
-                .thenApply(messageId -> new PublicationRef(id(), config.channelId(), messageId));
+        String destination = destination();
+        CompletionStage<String> send;
+        try {
+            send = current.sendMessage(destination, render(request), request.id(), false);
+        } catch (RuntimeException error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return send.thenApply(messageId -> new PublicationRef(id(), destination, messageId));
     }
 
     @Override
@@ -157,12 +180,21 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     }
 
     private boolean authorized(ButtonInteractionEvent event) {
+        if (isDirectMessageMode()) {
+            return event.getGuild() == null
+                    && config.allowedUserIds().contains(event.getUser().getId())
+                    && config.dmUserId().equals(event.getUser().getId());
+        }
         if (event.getGuild() == null || !event.getGuild().getId().equals(config.guildId())) return false;
         if (config.allowedUserIds().contains(event.getUser().getId())) return true;
         Member member = event.getMember();
         if (member == null) return false;
         return member.getRoles().stream().map(Role::getId).anyMatch(config.allowedRoleIds()::contains);
     }
+
+    private boolean isDirectMessageMode() { return config.dmUserId() != null && !config.dmUserId().isBlank(); }
+
+    private String destination() { return isDirectMessageMode() ? config.dmUserId() : config.channelId(); }
 
     static String render(RequestView request) {
         return ApprovalMessageRenderer.render(request);

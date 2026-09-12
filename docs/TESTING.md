@@ -397,6 +397,7 @@ Example environment variables:
 WLREQ_TEST_DISCORD_TOKEN
 WLREQ_TEST_DISCORD_GUILD_ID
 WLREQ_TEST_DISCORD_CHANNEL_ID
+WLREQ_TEST_DISCORD_DM_USER_ID
 WLREQ_TEST_TELEGRAM_TOKEN
 WLREQ_TEST_TELEGRAM_CHAT_ID
 ```
@@ -408,6 +409,11 @@ Live smoke tests must:
 - update/resolve message;
 - never print token values;
 - clean up test messages when practical.
+
+DM-mode smoke is optional because Discord recipient privacy and mutual-guild
+rules can reject a bot DM even when the configured user and bot are members of
+the same test guild. The release gate uses a private test guild channel and
+must not claim DM delivery based on a channel-mode result.
 
 Do not make PR CI fail because a third-party service has a transient outage unless the repository explicitly decides to maintain dedicated integration infrastructure.
 

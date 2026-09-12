@@ -575,6 +575,7 @@ Recommended shape:
     "token": "${DISCORD_TOKEN}",
     "guildId": "123456789012345678",
     "channelId": "123456789012345678",
+    "dmUserId": "",
     "allowedUserIds": [],
     "allowedRoleIds": ["123456789012345678"]
   },
@@ -594,6 +595,12 @@ Requirements:
 - expanded secret values are never written back to disk;
 - `/wlreq reload` may reload non-structural provider/config values; database path changes may require restart;
 - config status logs redact secrets.
+
+Discord may use either a guild text channel (`guildId` + `channelId`) or a
+private destination (`dmUserId`). Exactly one destination must be configured.
+DM mode requires `dmUserId` to also appear in `allowedUserIds` and is subject
+to Discord mutual-guild and recipient privacy rules; a private test guild
+channel is the recommended reliable isolated deployment.
 
 ---
 

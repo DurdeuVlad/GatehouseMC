@@ -687,6 +687,7 @@ Use JDA as the gateway/REST client. The initial researched pin is listed in `RES
 Responsibilities:
 
 - connect/start/stop JDA;
+- remain `STARTING` until JDA emits `ReadyEvent`, and leave that state again during gateway disconnects;
 - publish request message;
 - create Approve/Deny/Block buttons;
 - authorize interaction by stable user/role IDs;
@@ -695,6 +696,10 @@ Responsibilities:
 - acknowledge interaction promptly;
 - render success/already-resolved/error response;
 - update publication on core state change.
+
+Publication updates resolve the persisted publication container ID. They must
+not silently switch to the current configured channel or DM recipient after a
+configuration change.
 
 Do not enable voice/audio modules. Do not enable `MESSAGE_CONTENT` unless an explicitly accepted feature later requires it.
 
