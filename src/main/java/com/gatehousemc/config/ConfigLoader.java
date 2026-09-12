@@ -122,11 +122,12 @@ public final class ConfigLoader {
                     stringValue(discord, "token", defaults.token()),
                     stringValue(discord, "guildId", defaults.guildId()),
                     stringValue(discord, "channelId", defaults.channelId()),
+                    stringValue(discord, "dmUserId", defaults.dmUserId()),
                     strings(discord, "allowedUserIds", defaults.allowedUserIds()).stream().map(String::trim).toList(),
                     strings(discord, "allowedRoleIds", defaults.allowedRoleIds()).stream().map(String::trim).toList()));
         } catch (IllegalArgumentException error) {
             LOGGER.warn("discord provider disabled: invalid configuration ({})", error.getMessage());
-            return new ModConfig.Discord(false, "", "", "", List.of(), List.of());
+            return new ModConfig.Discord(false, "", "", "", "", List.of(), List.of());
         }
     }
 
@@ -147,8 +148,14 @@ public final class ConfigLoader {
         if (!config.enabled()) return config;
         List<String> errors = new ArrayList<>();
         if (config.token().isBlank()) errors.add("token is blank");
-        if (!isDiscordId(config.guildId())) errors.add("guildId must be a Discord snowflake");
-        if (!isDiscordId(config.channelId())) errors.add("channelId must be a Discord snowflake");
+        boolean hasChannel = isDiscordId(config.channelId());
+        boolean hasDmUser = isDiscordId(config.dmUserId());
+        if (hasChannel == hasDmUser) errors.add("configure exactly one of channelId or dmUserId");
+        if (!hasDmUser && !isDiscordId(config.guildId())) {
+            errors.add("guildId must be a Discord snowflake for guild-channel delivery");
+        } else if (hasDmUser && !config.guildId().isBlank() && !isDiscordId(config.guildId())) {
+            errors.add("guildId must be blank or a Discord snowflake for DM delivery");
+        }
         if (config.allowedUserIds().isEmpty() && config.allowedRoleIds().isEmpty()) {
             errors.add("at least one allowed user or role is required");
         }
@@ -158,9 +165,12 @@ public final class ConfigLoader {
         if (config.allowedRoleIds().stream().anyMatch(roleId -> !isDiscordId(roleId))) {
             errors.add("allowedRoleIds must contain Discord snowflakes");
         }
+        if (hasDmUser && !config.allowedUserIds().contains(config.dmUserId())) {
+            errors.add("dmUserId must be included in allowedUserIds");
+        }
         if (!errors.isEmpty()) {
             LOGGER.warn("discord provider disabled: invalid configuration ({})", String.join("; ", errors));
-            return new ModConfig.Discord(false, "", "", "", List.of(), List.of());
+            return new ModConfig.Discord(false, "", "", "", "", List.of(), List.of());
         }
         return config;
     }
@@ -273,7 +283,7 @@ public final class ConfigLoader {
                 "  \"requests\": { \"denialCooldownMinutes\": 1440, \"queueCapacity\": 10000, \"commandPermissionLevel\": 3 },\n" +
                 "  \"database\": { \"path\": \"" + configDir.resolve("requests.sqlite").toString().replace("\\", "\\\\") + "\", \"busyTimeoutMs\": 5000 },\n" +
                 "  \"routing\": { \"mode\": \"PRIMARY_FALLBACK\", \"providers\": [\"discord\", \"telegram\"] },\n" +
-                "  \"discord\": { \"enabled\": false, \"token\": \"\", \"guildId\": \"\", \"channelId\": \"\", \"allowedUserIds\": [], \"allowedRoleIds\": [] },\n" +
+                "  \"discord\": { \"enabled\": false, \"token\": \"\", \"guildId\": \"\", \"channelId\": \"\", \"dmUserId\": \"\", \"allowedUserIds\": [], \"allowedRoleIds\": [] },\n" +
                 "  \"telegram\": { \"enabled\": false, \"token\": \"\", \"chatId\": \"\", \"allowedUserIds\": [] },\n" +
                 "  \"language\": \"en_us\"\n" +
                 "}\n";

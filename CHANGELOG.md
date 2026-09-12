@@ -2,6 +2,19 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.0.2 — Discord and release-gate fixes
+
+### Fixed
+- Nested the complete pinned JDA runtime dependency set in the distributable jar; a clean dedicated server no longer fails during Discord startup with missing OkHttp classes.
+- Kept Discord `STARTING` until JDA emits `ReadyEvent`, so the persistent outbox does not publish during gateway startup and trigger avoidable backoff.
+- Reused the persisted Discord publication destination when editing a resolved request.
+- Declared the E2E harness's pinned `rcon-client` dependency.
+- Hardened CI to boot a clean Minecraft 1.21.1 Fabric server before running the offline rejection smoke test and to archive its log.
+
+### Scope and verification
+- This release targets Minecraft 1.21.1, Fabric, and Java 21. Other Minecraft version branches are separate artifacts and are not covered by this jar.
+- The live test uses a private test guild containing only the test user and Gatehouse MC Test. Discord direct-message delivery remains subject to Discord's mutual-guild/privacy policy and is not used as the release-gate transport.
+
 ## 1.0.0 — Initial Release
 
 ### GatehouseMC Brand & Identity

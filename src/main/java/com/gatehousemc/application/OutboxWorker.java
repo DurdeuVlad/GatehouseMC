@@ -109,7 +109,11 @@ public final class OutboxWorker implements AutoCloseable {
     private void finish(OutboxEvent event, Throwable error) {
         try {
             if (error == null) repository.completeOutbox(event.id(), clock.now());
-            else repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
+            else {
+                LOGGER.warn("outbox.publish_failed eventId={} errorType={}",
+                        event.id(), rootCause(error).getClass().getSimpleName());
+                repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
+            }
         } catch (RuntimeException storageError) {
             LOGGER.warn("outbox.persistence.failed operation=finish errorType={}",
                     storageError.getClass().getSimpleName());
@@ -122,10 +126,13 @@ public final class OutboxWorker implements AutoCloseable {
     }
 
     private static String safeMessage(Throwable error) {
-        if (error == null) return "";
+        return error == null ? "" : rootCause(error).getClass().getSimpleName();
+    }
+
+    private static Throwable rootCause(Throwable error) {
         Throwable cause = error;
         while (cause.getCause() != null) cause = cause.getCause();
-        return cause.getClass().getSimpleName();
+        return cause;
     }
 
     private static <T extends Throwable> T findCause(Throwable error, Class<T> type) {

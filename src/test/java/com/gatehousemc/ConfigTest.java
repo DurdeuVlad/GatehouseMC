@@ -100,6 +100,62 @@ class ConfigTest {
     }
 
     @Test
+    void discordDmDeliveryRequiresTheRecipientInTheUserAllowlist(@TempDir Path configDir) {
+        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+                {
+                  "discord": {
+                    "enabled": true,
+                    "token": "token",
+                    "guildId": "123456789012345678",
+                    "dmUserId": "123456789012345679",
+                    "allowedUserIds": ["123456789012345678"],
+                    "allowedRoleIds": []
+                  }
+                }
+                """).getAsJsonObject(), configDir);
+
+        assertFalse(config.discord().enabled());
+    }
+
+    @Test
+    void discordDmDeliveryIsAValidPrivateDestination(@TempDir Path configDir) {
+        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+                {
+                  "discord": {
+                    "enabled": true,
+                    "token": "token",
+                    "guildId": "123456789012345678",
+                    "dmUserId": "123456789012345678",
+                    "allowedUserIds": ["123456789012345678"],
+                    "allowedRoleIds": []
+                  }
+                }
+                """).getAsJsonObject(), configDir);
+
+        assertTrue(config.discord().enabled());
+        assertEquals("123456789012345678", config.discord().dmUserId());
+        assertEquals("", config.discord().channelId());
+    }
+
+    @Test
+    void discordDmDeliveryDoesNotRequireGuildAccess(@TempDir Path configDir) {
+        ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
+                {
+                  "discord": {
+                    "enabled": true,
+                    "token": "token",
+                    "dmUserId": "123456789012345678",
+                    "allowedUserIds": ["123456789012345678"],
+                    "allowedRoleIds": []
+                  }
+                }
+                """).getAsJsonObject(), configDir);
+
+        assertTrue(config.discord().enabled());
+        assertEquals("", config.discord().guildId());
+    }
+
+    @Test
     void malformedProviderFieldIsDisabled(@TempDir Path configDir) {
         ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
                 { "discord": { "enabled": {} } }

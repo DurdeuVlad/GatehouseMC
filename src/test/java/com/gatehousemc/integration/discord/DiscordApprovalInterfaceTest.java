@@ -4,6 +4,8 @@ import com.gatehousemc.domain.*;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.integration.common.CallbackActionParser;
 import com.gatehousemc.port.ProviderHealth;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
+import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -34,6 +36,21 @@ class DiscordApprovalInterfaceTest {
         assertTrue(transport.lastText.contains("OFFLINE / UNAUTHENTICATED"));
         assertEquals(requestId, transport.lastRequestId);
         assertFalse(transport.lastDisabled);
+    }
+
+    @Test
+    void publishUsesConfiguredDmRecipientAsDestination() {
+        UUID requestId = UUID.randomUUID();
+        RequestView request = new RequestView(requestId, PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
+                1, Instant.EPOCH, Instant.EPOCH, null, null, null);
+        FakeDiscordTransport transport = new FakeDiscordTransport();
+        ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "", "user1", List.of("user1"), List.of());
+        DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, transport);
+
+        PublicationRef ref = discord.publish(request).toCompletableFuture().join();
+
+        assertEquals("user1", ref.containerId());
+        assertEquals("user1", transport.lastChannelId);
     }
 
     @Test
@@ -115,6 +132,19 @@ class DiscordApprovalInterfaceTest {
     }
 
     @Test
+    void gatewayLifecycleControlsProviderHealth() {
+        FakeDiscordTransport transport = new FakeDiscordTransport();
+        ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "channel1", List.of(), List.of());
+        DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, transport);
+
+        discord.onSessionDisconnect(null);
+        assertEquals(ProviderHealth.STARTING, discord.health());
+
+        discord.onReady(null);
+        assertEquals(ProviderHealth.HEALTHY, discord.health());
+    }
+
+    @Test
     void disabledProviderReportsUnavailableOnStart() {
         ModConfig.Discord config = new ModConfig.Discord(false, "", "guild1", "channel1", List.of(), List.of());
         DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null);
@@ -125,11 +155,13 @@ class DiscordApprovalInterfaceTest {
     private static final class FakeDiscordTransport implements DiscordTransport {
         String nextMessageId = "default";
         String lastText;
+        String lastChannelId;
         UUID lastRequestId;
         boolean lastDisabled;
 
         @Override
         public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+            lastChannelId = channelId;
             lastText = text;
             lastRequestId = requestId;
             lastDisabled = disabled;

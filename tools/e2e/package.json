@@ -6,9 +6,13 @@
     "node": ">=20"
   },
   "dependencies": {
-    "minecraft-protocol": "1.66.2"
+    "minecraft-protocol": "1.66.2",
+    "rcon-client": "4.2.5",
+    "sql.js": "1.14.2"
   },
   "scripts": {
-    "smoke": "node src/smoke.mjs"
+    "smoke": "node src/smoke.mjs",
+    "release-gate": "node src/release-gate.mjs",
+    "ci-gate": "node src/ci-gate.mjs"
   }
 }

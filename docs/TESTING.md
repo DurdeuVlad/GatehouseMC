@@ -397,6 +397,7 @@ Example environment variables:
 WLREQ_TEST_DISCORD_TOKEN
 WLREQ_TEST_DISCORD_GUILD_ID
 WLREQ_TEST_DISCORD_CHANNEL_ID
+WLREQ_TEST_DISCORD_DM_USER_ID
 WLREQ_TEST_TELEGRAM_TOKEN
 WLREQ_TEST_TELEGRAM_CHAT_ID
 ```
@@ -408,6 +409,11 @@ Live smoke tests must:
 - update/resolve message;
 - never print token values;
 - clean up test messages when practical.
+
+DM-mode smoke is optional because Discord recipient privacy and mutual-guild
+rules can reject a bot DM even when the configured user and bot are members of
+the same test guild. The release gate uses a private test guild channel and
+must not claim DM delivery based on a channel-mode result.
 
 Do not make PR CI fail because a third-party service has a transient outage unless the repository explicitly decides to maintain dedicated integration infrastructure.
 
@@ -466,6 +472,21 @@ A high-confidence pipeline should run:
 ```
 
 Exact Gradle/task names may differ after implementation, but the proof surfaces may not be silently removed.
+
+The main CI workflow also runs a compatibility build/test matrix against the
+maintained version branches (`1.14.4` through `1.21.4`). It uses a Java 21
+Gradle runtime because the pinned Loom plugin requires it, while each branch's
+compiler still enforces its documented Java 17 or Java 21 `--release` target.
+Native Java 17 runtime execution remains a separate verification task. The
+dedicated-server E2E job is scoped to the 1.21.1 `main` line; it runs the
+credential-free core gate for rejection, repeat-attempt deduplication,
+concurrent approval handling, console approval, vanilla whitelist mutation,
+reconnect, restart reconnect, and durable outbox retention while providers are
+unavailable. It
+must not be presented as proof for the separate binary branches. Provider
+credentials are intentionally not stored in CI, so the real Discord approval
+phase remains an opt-in release-candidate check with a disposable private test
+guild.
 
 ---
 
