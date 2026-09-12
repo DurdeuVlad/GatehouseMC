@@ -2,7 +2,7 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
-## 1.0.1 — Discord and release-gate fixes
+## 1.0.2 — Discord and release-gate fixes
 
 ### Fixed
 - Nested the complete pinned JDA runtime dependency set in the distributable jar; a clean dedicated server no longer fails during Discord startup with missing OkHttp classes.

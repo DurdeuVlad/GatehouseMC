@@ -44,7 +44,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The production artifact is written to `build/libs/gatehousemc-1.0.1.jar`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
+The production artifact is written to `build/libs/gatehousemc-1.0.2.jar`. The build nests SQLite and JDA so the jar can be installed on a clean Fabric server without external dependency mods.
 
 ## Real-server smoke test
 
@@ -65,7 +65,7 @@ clean standalone server and restart/outage scenarios, is documented in
 
 ## Install and configure
 
-Put `gatehousemc-1.0.1.jar` in the server's `mods/` directory and start the server once. GatehouseMC creates:
+Put `gatehousemc-1.0.2.jar` in the server's `mods/` directory and start the server once. GatehouseMC creates:
 
 ```text
 config/gatehousemc/config.json
@@ -115,6 +115,6 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-The 1.0.1 release gate requires the unit/component suite, a clean packaged-jar Fabric 1.21.1 server boot, offline rejection/persistence/deduplication, Discord publication, approval, vanilla whitelist mutation, reconnect, and restart checks. Results are recorded in the release PR and `docs/TESTING.md`; an unexecuted scenario is not treated as passing.
+The 1.0.2 release gate requires the unit/component suite, a clean packaged-jar Fabric 1.21.1 server boot, offline rejection/persistence/deduplication, Discord publication, approval, vanilla whitelist mutation, reconnect, and restart checks. Results are recorded in the release PR and `docs/TESTING.md`; an unexecuted scenario is not treated as passing.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.
