@@ -6,7 +6,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "minecraft-protocol": "1.66.2",
+    "minecraft-protocol": "1.68.0",
     "rcon-client": "4.2.5",
     "sql.js": "1.14.2"
   },
