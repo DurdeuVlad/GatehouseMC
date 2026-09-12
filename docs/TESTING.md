@@ -479,8 +479,10 @@ Gradle runtime because the pinned Loom plugin requires it, while each branch's
 compiler still enforces its documented Java 17 or Java 21 `--release` target.
 Native Java 17 runtime execution remains a separate verification task. The
 dedicated-server E2E job is scoped to the 1.21.1 `main` line; it runs the
-credential-free core gate for rejection, repeat-attempt deduplication, console
-approval, vanilla whitelist mutation, reconnect, and restart reconnect. It
+credential-free core gate for rejection, repeat-attempt deduplication,
+concurrent approval handling, console approval, vanilla whitelist mutation,
+reconnect, restart reconnect, and durable outbox retention while providers are
+unavailable. It
 must not be presented as proof for the separate binary branches. Provider
 credentials are intentionally not stored in CI, so the real Discord approval
 phase remains an opt-in release-candidate check with a disposable private test

@@ -104,7 +104,19 @@ async function inspectDatabase() {
     check('request is approved', rows[0].status === 'APPROVED', { status: rows[0].status })
     if (expectedOfflineUuid) check('request offline UUID', String(rows[0].requested_uuid).toLowerCase() === expectedOfflineUuid, { requestedUuid: rows[0].requested_uuid })
     check('repeat attempts were recorded', Number(rows[0].attempt_count) >= 2, { attemptCount: rows[0].attempt_count })
-    return rows[0]
+    const approvalAudit = db.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE request_id = ? AND event_type = 'REQUEST_APPROVED'")
+    approvalAudit.bind([rows[0].id])
+    const approvalAuditRow = approvalAudit.step() ? approvalAudit.getAsObject() : { count: 0 }
+    approvalAudit.free()
+    check('concurrent approval has one winner', Number(approvalAuditRow.count) === 1, { approvalAuditCount: approvalAuditRow.count })
+
+    const outboxStatement = db.prepare('SELECT event_type, state, attempts FROM integration_outbox WHERE aggregate_id = ? ORDER BY created_at')
+    outboxStatement.bind([rows[0].id])
+    const outbox = []
+    while (outboxStatement.step()) outbox.push(outboxStatement.getAsObject())
+    outboxStatement.free()
+    check('outbox stays durable while providers are unavailable', outbox.length >= 2 && outbox.some((event) => event.state !== 'COMPLETE'), { outbox })
+    return { row: rows[0], outbox }
   } finally {
     db.close()
   }
@@ -117,14 +129,17 @@ async function main() {
     check('initial unknown client rejected by GatehouseMC', first.code === 0 && first.result.status === 'rejected', { result: first.result })
     const repeat = await runSmoke('rejected')
     check('repeat attempt remains rejected', repeat.code === 0 && repeat.result.status === 'rejected', { result: repeat.result })
-    const decisionResponse = await command(`gatehouse approve ${username} ci`)
+    const decisionResponses = await Promise.all([
+      command(`gatehouse approve ${username} ci-approve`),
+      command(`gatehouse approve ${username} ci-race`)
+    ])
     await waitForWhitelistEntry()
     const joined = await runSmoke('joined')
     check('approved client reconnects', joined.code === 0 && joined.result.status === 'joined', { result: joined.result })
     await stopServer()
     serverStopped = true
-    const request = await inspectDatabase()
-    const evidence = { passed: true, username, expectedOfflineUuid, decisionResponse, request, checks }
+    const database = await inspectDatabase()
+    const evidence = { passed: true, username, expectedOfflineUuid, decisionResponses, request: database.row, outbox: database.outbox, checks }
     writeEvidence(evidence)
     console.log(JSON.stringify(evidence))
   } finally {
