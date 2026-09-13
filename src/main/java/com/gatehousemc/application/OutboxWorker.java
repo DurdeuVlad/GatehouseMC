@@ -11,8 +11,11 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +26,25 @@ public final class OutboxWorker implements AutoCloseable {
     private final ApprovalInterfaceRouter router;
     private final ClockPort clock;
     private final ScheduledExecutorService executor;
+    private final ConcurrentMap<UUID, FailureTracker> failureTrackers = new ConcurrentHashMap<>();
+
+    static final class FailureTracker {
+        String signature;
+        final Instant firstFailureTime;
+        Instant lastWarnTime;
+        int consecutiveFailures;
+
+        FailureTracker(String signature, Instant now) {
+            this.signature = signature;
+            this.firstFailureTime = now;
+            this.lastWarnTime = now;
+            this.consecutiveFailures = 1;
+        }
+
+        int consecutiveFailures() {
+            return consecutiveFailures;
+        }
+    }
 
     public OutboxWorker(WorkflowRepository repository, ApprovalInterfaceRouter router, ClockPort clock) {
         this.repository = repository;
@@ -59,13 +81,17 @@ public final class OutboxWorker implements AutoCloseable {
     private void process(OutboxEvent event) {
         WhitelistRequest request = repository.findById(event.aggregateId()).orElse(null);
         if (request == null) {
+            failureTrackers.remove(event.id());
             repository.completeOutbox(event.id(), clock.now());
             return;
         }
         switch (event.eventType()) {
             case "REQUEST_CREATED" -> processCreated(event, request);
             case "REQUEST_RESOLVED", "REQUEST_UPDATED" -> processUpdate(event, request);
-            default -> repository.completeOutbox(event.id(), clock.now());
+            default -> {
+                failureTrackers.remove(event.id());
+                repository.completeOutbox(event.id(), clock.now());
+            }
         }
     }
 
@@ -98,6 +124,7 @@ public final class OutboxWorker implements AutoCloseable {
     }
 
     private void retry(OutboxEvent event, Throwable error) {
+        logPublishFailure(event, error);
         try {
             repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
         } catch (RuntimeException storageError) {
@@ -108,15 +135,58 @@ public final class OutboxWorker implements AutoCloseable {
 
     private void finish(OutboxEvent event, Throwable error) {
         try {
-            if (error == null) repository.completeOutbox(event.id(), clock.now());
-            else {
-                LOGGER.warn("outbox.publish_failed eventId={} errorType={}",
-                        event.id(), rootCause(error).getClass().getSimpleName());
+            if (error == null) {
+                failureTrackers.remove(event.id());
+                repository.completeOutbox(event.id(), clock.now());
+            } else {
+                logPublishFailure(event, error);
                 repository.retryOutbox(event.id(), nextAttempt(event), safeMessage(error), clock.now());
             }
         } catch (RuntimeException storageError) {
             LOGGER.warn("outbox.persistence.failed operation=finish errorType={}",
                     storageError.getClass().getSimpleName());
+        }
+    }
+
+    private void logPublishFailure(OutboxEvent event, Throwable error) {
+        Throwable root = rootCause(error);
+        String errorType = root.getClass().getSimpleName();
+        String errorMessage = root.getMessage() != null ? root.getMessage() : "";
+        String failureSignature = errorType + ": " + errorMessage;
+        Instant now = clock.now();
+
+        FailureTracker tracker = failureTrackers.get(event.id());
+        if (tracker == null) {
+            if (failureTrackers.size() > 1000) {
+                failureTrackers.clear();
+            }
+            failureTrackers.put(event.id(), new FailureTracker(failureSignature, now));
+            LOGGER.warn("outbox.publish_failed eventId={} errorType={} message=\"{}\"",
+                    event.id(), errorType, errorMessage);
+            return;
+        }
+
+        boolean causeChanged = !Objects.equals(tracker.signature, failureSignature);
+        if (causeChanged) {
+            tracker.signature = failureSignature;
+            tracker.lastWarnTime = now;
+            tracker.consecutiveFailures = 1;
+            LOGGER.warn("outbox.publish_failed eventId={} errorType={} message=\"{}\" (failure reason changed)",
+                    event.id(), errorType, errorMessage);
+            return;
+        }
+
+        tracker.consecutiveFailures++;
+        boolean thresholdReached = (tracker.consecutiveFailures % 10 == 0)
+                || Duration.between(tracker.lastWarnTime, now).compareTo(Duration.ofHours(1)) >= 0;
+
+        if (thresholdReached) {
+            tracker.lastWarnTime = now;
+            LOGGER.warn("outbox.publish_failed eventId={} attempts={} errorType={} message=\"{}\" (still failing)",
+                    event.id(), event.attempts() + 1, errorType, errorMessage);
+        } else {
+            LOGGER.debug("outbox.publish_retry_failed eventId={} attempts={} errorType={} message=\"{}\"",
+                    event.id(), event.attempts() + 1, errorType, errorMessage);
         }
     }
 
@@ -126,7 +196,12 @@ public final class OutboxWorker implements AutoCloseable {
     }
 
     private static String safeMessage(Throwable error) {
-        return error == null ? "" : rootCause(error).getClass().getSimpleName();
+        if (error == null) return "";
+        Throwable root = rootCause(error);
+        String type = root.getClass().getSimpleName();
+        String msg = root.getMessage();
+        if (msg == null || msg.isBlank()) return type;
+        return type + ": " + (msg.length() > 255 ? msg.substring(0, 255) : msg);
     }
 
     private static Throwable rootCause(Throwable error) {
@@ -144,8 +219,17 @@ public final class OutboxWorker implements AutoCloseable {
         return null;
     }
 
+    FailureTracker failureTracker(UUID eventId) {
+        return failureTrackers.get(eventId);
+    }
+
+    void handleFinish(OutboxEvent event, Throwable error) {
+        finish(event, error);
+    }
+
     @Override
     public void close() {
+        failureTrackers.clear();
         executor.shutdown();
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) executor.shutdownNow();
