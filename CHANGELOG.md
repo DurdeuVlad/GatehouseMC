@@ -2,6 +2,18 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.0.2 — Discord outbox diagnostics, retry log noise reduction, and online-mode join fix
+
+### Fixed
+- Hardened Discord channel resolution in `JdaDiscordTransport` with REST fallback (`Route.Channels.GET_CHANNEL`) when local JDA cache misses.
+- Broadened Discord channel support from `TextChannel` to `StandardGuildMessageChannel`, supporting announcement/news channels (`NewsChannel`).
+- Replaced silent `IllegalStateException("Discord channel is unavailable")` with distinct, actionable diagnostic errors.
+- Added proactive startup reachability and permissions validation on JDA `ReadyEvent` in `DiscordApprovalInterface` to alert operators at boot time.
+- Reduced outbox worker log noise on repeated retry failures: logged full `WARN` with failure details on the first attempt (and on cause change or 10-attempt threshold), and downgraded intermediate retries with identical cause to `DEBUG`.
+- Verified outbox events never mark complete on failure and recover cleanly when destination is restored.
+- Fixed unhandled `IllegalArgumentException` in `GameProfileIdentity.toDomain()` on servers with `online-mode=true`, where the connecting player's real Mojang UUID doesn't match the offline-derived UUID that `PlayerIdentity`'s strict factory required (#57). Whitelist denials now always create a pending request instead of crashing the join path.
+- `FabricVanillaWhitelistAdapter` now also resolves the server's cached authentic Mojang profile (`UserCache`) when checking/removing whitelist entries on an online-mode server, and `GatehouseMod` registers the connecting profile with that cache on denial — so an approved player's real online-mode UUID is recognized correctly on reconnect, not just the offline-derived one.
+
 ## 1.0.0 — Initial Release
 
 ### GatehouseMC Brand & Identity
