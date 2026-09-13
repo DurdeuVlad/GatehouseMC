@@ -102,6 +102,9 @@ public final class GatehouseMod implements ModInitializer {
         FabricRuntime current = runtime;
         if (current == null) return new LiteralText(Messages.get("reject.not_whitelisted"));
         try {
+            if (current.server() != null && current.server().getUserCache() != null && profile != null) {
+                current.server().getUserCache().add(profile);
+            }
             return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
         } catch (Exception error) {
             LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
