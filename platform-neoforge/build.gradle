@@ -84,6 +84,10 @@ dependencies {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "com.google.code.gson", module: "gson"
     }
+
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
 processResources {
@@ -101,6 +105,10 @@ jar {
     archiveClassifier = ""
     from project(":core").sourceSets.main.output
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+test {
+    useJUnitPlatform()
 }
 
 tasks.withType(JavaCompile).configureEach {

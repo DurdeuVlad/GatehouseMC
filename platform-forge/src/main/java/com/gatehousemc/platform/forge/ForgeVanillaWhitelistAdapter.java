@@ -20,7 +20,13 @@ public final class ForgeVanillaWhitelistAdapter implements VanillaWhitelistPort 
 
     @Override
     public CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity) {
-        return onServerThread(() -> server.getPlayerList().getWhiteList().isWhiteListed(profile(identity)));
+        return onServerThread(() -> {
+            boolean allowed = server.getPlayerList().getWhiteList().isWhiteListed(profile(identity));
+            if (!allowed && server.usesAuthentication()) {
+                allowed = server.getPlayerList().getWhiteList().isWhiteListed(new GameProfile(identity.offlineUuid(), identity.exactUsername()));
+            }
+            return allowed;
+        });
     }
 
     @Override
@@ -36,12 +42,21 @@ public final class ForgeVanillaWhitelistAdapter implements VanillaWhitelistPort 
     public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
         return onServerThread(() -> {
             server.getPlayerList().getWhiteList().remove(profile(identity));
+            if (server.usesAuthentication()) {
+                server.getPlayerList().getWhiteList().remove(new GameProfile(identity.offlineUuid(), identity.exactUsername()));
+            }
             saveWhitelist();
             return null;
         });
     }
 
     private GameProfile profile(PlayerIdentity identity) {
+        if (server.usesAuthentication() && server.getProfileCache() != null) {
+            java.util.Optional<GameProfile> cached = server.getProfileCache().get(identity.exactUsername());
+            if (cached.isPresent()) {
+                return cached.get();
+            }
+        }
         return new GameProfile(identity.offlineUuid(), identity.exactUsername());
     }
 

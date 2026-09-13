@@ -76,6 +76,13 @@ dependencies {
         jarJar.pin(it, jda_version)
     }
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
 }
 
 processResources {

@@ -13,6 +13,7 @@ __pycache__/
 *.py[cod]
 tools/e2e/.env
 .e2e/
+.e2e-neoforge/
 .scratch/
 .env
 .env.*

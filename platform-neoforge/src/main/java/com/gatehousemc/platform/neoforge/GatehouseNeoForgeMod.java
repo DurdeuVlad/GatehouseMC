@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Mod(GatehouseNeoForgeMod.MOD_ID)
 public final class GatehouseNeoForgeMod {
     public static final String MOD_ID = "gatehousemc";
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(GatehouseNeoForgeMod.class);
     private static final ExecutorService STARTUP_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "gatehousemc-neoforge-startup");
         thread.setDaemon(true);
@@ -73,7 +74,15 @@ public final class GatehouseNeoForgeMod {
     public static Component handleWhitelistDenial(GameProfile profile) {
         NeoForgeRuntime current = runtime;
         if (current == null) return Component.translatable("multiplayer.disconnect.not_whitelisted");
-        return current.onWhitelistDenied(new NeoForgeRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
+        try {
+            if (current.server() != null && current.server().getProfileCache() != null && profile != null) {
+                current.server().getProfileCache().add(profile);
+            }
+            return current.onWhitelistDenied(new NeoForgeRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
+        } catch (Exception error) {
+            LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
+            return Component.translatable("multiplayer.disconnect.not_whitelisted");
+        }
     }
 
     public static NeoForgeRuntime runtime() { return runtime; }
