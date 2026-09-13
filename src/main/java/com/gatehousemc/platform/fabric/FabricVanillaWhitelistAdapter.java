@@ -17,7 +17,13 @@ public final class FabricVanillaWhitelistAdapter implements VanillaWhitelistPort
 
     @Override
     public CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity) {
-        return onServerThread(() -> server.getPlayerManager().getWhitelist().isAllowed(profile(identity)));
+        return onServerThread(() -> {
+            boolean allowed = server.getPlayerManager().getWhitelist().isAllowed(profile(identity));
+            if (!allowed && server.isOnlineMode()) {
+                allowed = server.getPlayerManager().getWhitelist().isAllowed(new GameProfile(identity.offlineUuid(), identity.exactUsername()));
+            }
+            return allowed;
+        });
     }
 
     @Override
@@ -32,11 +38,20 @@ public final class FabricVanillaWhitelistAdapter implements VanillaWhitelistPort
     public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
         return onServerThread(() -> {
             server.getPlayerManager().getWhitelist().remove(profile(identity));
+            if (server.isOnlineMode()) {
+                server.getPlayerManager().getWhitelist().remove(new GameProfile(identity.offlineUuid(), identity.exactUsername()));
+            }
             return null;
         });
     }
 
     private GameProfile profile(PlayerIdentity identity) {
+        if (server.isOnlineMode() && server.getUserCache() != null) {
+            GameProfile cached = server.getUserCache().findByName(identity.exactUsername());
+            if (cached != null) {
+                return cached;
+            }
+        }
         return new GameProfile(identity.offlineUuid(), identity.exactUsername());
     }
 
