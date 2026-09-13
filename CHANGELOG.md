@@ -2,6 +2,16 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.0.3 — Discord outbox diagnostics and retry log noise reduction
+
+### Fixed
+- Hardened Discord channel resolution in `JdaDiscordTransport` with REST fallback (`Route.Channels.GET_CHANNEL`) when local JDA cache misses.
+- Supported both standard text channels (`TextChannel`) and announcement channels (`NewsChannel`) via `StandardGuildMessageChannel`.
+- Replaced bare `IllegalStateException("Discord channel is unavailable")` with distinct, actionable diagnostic errors distinguishing: bot not in guild, channel not found in guild, unsupported channel type, and missing bot permissions (`VIEW_CHANNEL` / `SEND_MESSAGES`).
+- Added proactive startup reachability and permissions validation on JDA `ReadyEvent` in `DiscordApprovalInterface` to alert operators at boot time.
+- Reduced outbox worker log noise on repeated retry failures: logged full `WARN` with failure details on the first attempt (and on cause change or 10-attempt threshold), and downgraded intermediate retries with identical cause to `DEBUG`.
+- Verified outbox events never mark complete on failure and recover cleanly when destination is restored.
+
 ## 1.0.2 — Discord and release-gate fixes
 
 ### Fixed

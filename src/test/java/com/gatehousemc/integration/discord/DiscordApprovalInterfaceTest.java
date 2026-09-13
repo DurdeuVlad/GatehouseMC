@@ -4,6 +4,7 @@ import com.gatehousemc.domain.*;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.integration.common.CallbackActionParser;
 import com.gatehousemc.port.ProviderHealth;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -150,6 +152,86 @@ class DiscordApprovalInterfaceTest {
         DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null);
         discord.start();
         assertEquals(ProviderHealth.UNAVAILABLE, discord.health());
+    }
+
+    @Test
+    void onReadyWithJdaTransportValidatesConfiguredChannelProactively() {
+        net.dv8tion.jda.api.entities.Guild[] guildHolder = new net.dv8tion.jda.api.entities.Guild[1];
+        net.dv8tion.jda.api.entities.channel.concrete.TextChannel textChannel =
+                (net.dv8tion.jda.api.entities.channel.concrete.TextChannel) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(),
+                        new Class<?>[]{net.dv8tion.jda.api.entities.channel.concrete.TextChannel.class},
+                        (p, method, args) -> {
+                            if (method.getName().equals("getId")) return "channel1";
+                            if (method.getName().equals("getName")) return "whitelist";
+                            if (method.getName().equals("getType")) return net.dv8tion.jda.api.entities.channel.ChannelType.TEXT;
+                            if (method.getName().equals("getGuild")) return guildHolder[0];
+                            return null;
+                        });
+
+        net.dv8tion.jda.api.entities.SelfMember selfMember =
+                (net.dv8tion.jda.api.entities.SelfMember) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(),
+                        new Class<?>[]{net.dv8tion.jda.api.entities.SelfMember.class},
+                        (p, method, args) -> method.getName().equals("hasPermission") ? true : null);
+
+        net.dv8tion.jda.api.entities.Guild guild =
+                (net.dv8tion.jda.api.entities.Guild) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(),
+                        new Class<?>[]{net.dv8tion.jda.api.entities.Guild.class},
+                        (p, method, args) -> {
+                            if (method.getName().equals("getId")) return "guild1";
+                            if (method.getName().equals("getName")) return "GuildName";
+                            if (method.getName().equals("getGuildChannelById")) return textChannel;
+                            if (method.getName().equals("getSelfMember")) return selfMember;
+                            return null;
+                        });
+        guildHolder[0] = guild;
+
+        JDA jda = (JDA) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{JDA.class},
+                (p, method, args) -> {
+                    if (method.getName().equals("getGuildById")) return guild;
+                    if (method.getName().equals("getGuildChannelById")) return textChannel;
+                    return null;
+                });
+
+        JdaDiscordTransport jdaTransport = new JdaDiscordTransport(jda, "guild1", null);
+        ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "channel1", List.of(), List.of());
+        DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, jdaTransport);
+
+        assertDoesNotThrow(() -> discord.onReady(null));
+        assertEquals(ProviderHealth.HEALTHY, discord.health());
+    }
+
+    @Test
+    void publishPropagatesTransportFailureException() {
+        RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
+                1, Instant.EPOCH, Instant.EPOCH, null, null, null);
+        DiscordTransport failingTransport = new DiscordTransport() {
+            @Override
+            public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Discord bot lacks View Channel permission there"));
+            }
+
+            @Override
+            public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override public void start() {}
+            @Override public void stop() {}
+        };
+
+        ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "channel1", List.of(), List.of());
+        DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, failingTransport);
+
+        CompletionException ex = assertThrows(CompletionException.class,
+                () -> discord.publish(request).toCompletableFuture().join());
+
+        assertTrue(ex.getCause() instanceof IllegalStateException);
+        assertTrue(ex.getCause().getMessage().contains("Discord bot lacks View Channel permission there"));
     }
 
     private static final class FakeDiscordTransport implements DiscordTransport {
