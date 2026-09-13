@@ -2,17 +2,39 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
-## 1.1.0 — Multi-loader foundation
+## 1.1.0 — Native NeoForge and Forge support, multi-loader foundation, and cross-platform hardening
 
-- Added a loader-neutral runtime core shared by Fabric, Forge, and NeoForge.
-- Added source-build and clean-server proof targets for Fabric 1.21.1,
-  Forge 1.20.1, and NeoForge 1.21.1 with the required Java runtimes.
-- Added fail-closed artifact metadata/runtime validation and loader-specific
-  Modrinth/CurseForge release staging.
-- Added strict clean-server smoke automation for all three proof targets in CI
-  and tagged releases.
-- Older Fabric downloads remain historical 1.0.1 artifacts until their
-  per-version source builds and live-server gates are restored.
+- Added native NeoForge (1.21.1) and Forge (1.20.1) support without requiring Sinytra Connector.
+- Added a loader-neutral runtime core shared across Fabric, NeoForge, and Forge.
+- Ported the online-mode join crash fix (`GameProfileIdentity.toDomain()` non-validating factory and user profile caching) to NeoForge and Forge.
+- Integrated hardened Discord outbox delivery diagnostics and retry log noise reduction across all loaders.
+- Added source-build and clean-server proof targets for Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1.
+- Older Fabric downloads remain historical 1.0.1 artifacts until their per-version source builds and live-server gates are restored.
+
+## 1.0.3 — Discord outbox diagnostics, retry log noise reduction, and online-mode join fix
+
+### Fixed
+- Hardened Discord channel resolution in `JdaDiscordTransport` with REST fallback (`Route.Channels.GET_CHANNEL`) when local JDA cache misses.
+- Supported both standard text channels (`TextChannel`) and announcement channels (`NewsChannel`) via `StandardGuildMessageChannel`.
+- Replaced bare `IllegalStateException("Discord channel is unavailable")` with distinct, actionable diagnostic errors distinguishing: bot not in guild, channel not found in guild, unsupported channel type, and missing bot permissions (`VIEW_CHANNEL` / `SEND_MESSAGES`).
+- Added proactive startup reachability and permissions validation on JDA `ReadyEvent` in `DiscordApprovalInterface` to alert operators at boot time.
+- Reduced outbox worker log noise on repeated retry failures: logged full `WARN` with failure details on the first attempt (and on cause change or 10-attempt threshold), and downgraded intermediate retries with identical cause to `DEBUG`.
+- Verified outbox events never mark complete on failure and recover cleanly when destination is restored.
+- Fixed unhandled `IllegalArgumentException` in `GameProfileIdentity.toDomain()` on servers with `online-mode=true`, where the connecting player's real Mojang UUID doesn't match the offline-derived UUID that `PlayerIdentity`'s strict factory required (#57). Whitelist denials now always create a pending request instead of crashing the join path.
+- `FabricVanillaWhitelistAdapter` now also resolves the server's cached authentic Mojang profile (`UserCache`) when checking/removing whitelist entries on an online-mode server, and `GatehouseMod` registers the connecting profile with that cache on denial — so an approved player's real online-mode UUID is recognized correctly on reconnect, not just the offline-derived one.
+
+## 1.0.2 — Discord and release-gate fixes
+
+### Fixed
+- Nested the complete pinned JDA runtime dependency set in the distributable jar; a clean dedicated server no longer fails during Discord startup with missing OkHttp classes.
+- Kept Discord `STARTING` until JDA emits `ReadyEvent`, so the persistent outbox does not publish during gateway startup and trigger avoidable backoff.
+- Reused the persisted Discord publication destination when editing a resolved request.
+- Declared the E2E harness's pinned `rcon-client` dependency.
+- Hardened CI to boot a clean Minecraft 1.21.1 Fabric server before running the offline rejection smoke test and to archive its log.
+
+### Scope and verification
+- This release targets Minecraft 1.21.1, Fabric, and Java 21. Other Minecraft version branches are separate artifacts and are not covered by this jar.
+- The live test uses a private test guild containing only the test user and Gatehouse MC Test. Discord direct-message delivery remains subject to Discord's mutual-guild/privacy policy and is not used as the release-gate transport.
 
 ## 1.0.1 — Compatibility and release integrity
 

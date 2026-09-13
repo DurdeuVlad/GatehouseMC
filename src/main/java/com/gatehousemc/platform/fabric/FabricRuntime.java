@@ -52,6 +52,6 @@ public final class FabricRuntime implements AutoCloseable {
     public void close() { delegate.close(); }
 
     public record GameProfileIdentity(UUID uuid, String exactUsername) {
-        public PlayerIdentity toDomain() { return PlayerIdentity.of(uuid, exactUsername); }
+        public PlayerIdentity toDomain() { return PlayerIdentity.of(exactUsername); }
     }
 }

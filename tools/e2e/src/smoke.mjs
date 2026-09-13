@@ -28,8 +28,8 @@ client.on('ping', (packet) => {
 client.on('playerJoin', () => finish({ status: 'joined', username }))
 client.on('disconnect', (packet) => {
   const reason = typeof packet.reason === 'string' ? packet.reason : JSON.stringify(packet.reason)
-  const isWhitelistRejection = /not whitelisted|whitelist request|whitelisted/i.test(reason)
-  finish({ status: isWhitelistRejection ? 'rejected' : 'protocol_error', username, reason, version })
+  const isWhitelistRejection = /not whitelisted|whitelist request|whitelisted/i.test(reason ?? '')
+  finish({ status: isWhitelistRejection ? 'rejected' : 'unexpected_disconnect', username, reason, version })
 })
 client.on('error', (error) => finish({ status: 'error', message: error.message }))
 setTimeout(() => finish({ status: 'timeout', username }), 15000)

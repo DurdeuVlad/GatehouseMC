@@ -79,6 +79,7 @@ jobs:
     needs: fabric-and-neoforge
     if: >-
       github.ref == 'refs/heads/main' ||
+      github.base_ref == 'main' ||
       github.ref == 'refs/heads/support/fabric/1.21.1' ||
       github.ref == 'refs/heads/1.21.1'
     steps:
@@ -109,6 +110,7 @@ jobs:
     needs: forge
     if: >-
       github.ref == 'refs/heads/main' ||
+      github.base_ref == 'main' ||
       github.ref == 'refs/heads/support/forge/1.20.1'
     steps:
       - uses: actions/checkout@v4
@@ -140,6 +142,7 @@ jobs:
     needs: fabric-and-neoforge
     if: >-
       github.ref == 'refs/heads/main' ||
+      github.base_ref == 'main' ||
       github.ref == 'refs/heads/support/neoforge/1.21.1' ||
       github.ref == 'refs/heads/1.21.1'
     steps:

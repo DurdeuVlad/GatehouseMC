@@ -98,6 +98,22 @@ Minecraft commands are always available after the server starts:
 
 Discord and Telegram are disabled by default. Enable them only after setting stable administrator IDs and provider secrets. Secrets can use `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`; expanded values stay in memory and are never written back or included in status output.
 
+Discord normally publishes to a guild text channel:
+
+```json
+"discord": {
+  "enabled": true,
+  "token": "${DISCORD_TOKEN}",
+  "guildId": "<guild snowflake>",
+  "channelId": "<channel snowflake>",
+  "dmUserId": "",
+  "allowedUserIds": ["<administrator snowflake>"],
+  "allowedRoleIds": []
+}
+```
+
+For a private destination, set `dmUserId` to the administrator's Discord user ID, include that same ID in `allowedUserIds`, and leave `channelId` blank. Discord may still reject bot DMs because of mutual-guild or recipient privacy rules; a private test guild channel is the reliable isolated alternative.
+
 ## Trust warning
 
 Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice` grants access to the offline profile derived from the supplied name; it does not prove that a particular Microsoft/Mojang account owns that identity.

@@ -119,12 +119,15 @@ though the already-created release remains available.
 ## Manual release commands
 
 ```powershell
-git switch support/fabric/1.21.1
-git pull --ff-only
-.\gradlew.ps1 clean test build
-git tag v<version>-fabric-mc1.21.1
-git push origin support/fabric/1.21.1
-git push origin v<version>-fabric-mc1.21.1
+# 1. Ensure working directory is clean and on the main branch
+git checkout main
+git pull
+
+# 2. Tag the release version for the Minecraft target
+git tag v1.1.0-mc1.21.1
+
+# 3. Push the tag to GitHub
+git push origin v1.1.0-mc1.21.1
 ```
 
 The release workflow must be inspected before tagging to confirm that it builds

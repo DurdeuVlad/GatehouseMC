@@ -15,9 +15,16 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
+import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
+import net.dv8tion.jda.api.events.session.ShutdownEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -27,6 +34,8 @@ import java.util.concurrent.CompletionStage;
 
 /** Discord projection and interaction adapter. Business transitions remain in DecisionService. */
 public final class DiscordApprovalInterface extends ListenerAdapter implements ApprovalInterface {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DiscordApprovalInterface.class);
+
     private final ModConfig.Discord config;
     private final DecisionService decisions;
     private volatile ProviderHealth health = ProviderHealth.STOPPED;
@@ -65,9 +74,9 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         try {
             health = ProviderHealth.STARTING;
             JDA jda = JDABuilder.createDefault(config.token()).addEventListeners(this).build();
-            transport = new JdaDiscordTransport(jda, config.channelId());
-            health = ProviderHealth.HEALTHY;
+            transport = new JdaDiscordTransport(jda, config.guildId(), config.dmUserId());
         } catch (RuntimeException error) {
+            LOGGER.error("discord.start_failed: failed to initialize JDA", error);
             health = ProviderHealth.UNAVAILABLE;
         }
     }
@@ -81,11 +90,53 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     }
 
     @Override
+    public void onReady(ReadyEvent event) {
+        health = ProviderHealth.HEALTHY;
+        if (!isDirectMessageMode() && transport instanceof JdaDiscordTransport jdaTransport) {
+            String destination = destination();
+            if (destination != null && !destination.isBlank()) {
+                jdaTransport.validateChannel(destination).whenComplete((channel, error) -> {
+                    if (error != null) {
+                        Throwable cause = error.getCause() != null ? error.getCause() : error;
+                        LOGGER.error("discord.channel_unusable: GatehouseMC cannot publish to configured Discord channel {}: {}",
+                                destination, cause.getMessage());
+                    } else if (channel instanceof StandardGuildMessageChannel guildChannel) {
+                        LOGGER.info("discord.channel_verified: Connected to Discord channel '{}' ({}) in guild '{}'",
+                                guildChannel.getName(), guildChannel.getId(), guildChannel.getGuild().getName());
+                    }
+                });
+            }
+        }
+    }
+
+    @Override
+    public void onSessionDisconnect(SessionDisconnectEvent event) {
+        if (health != ProviderHealth.STOPPED) health = ProviderHealth.STARTING;
+    }
+
+    @Override
+    public void onShutdown(ShutdownEvent event) {
+        if (health != ProviderHealth.STOPPED) health = ProviderHealth.UNAVAILABLE;
+    }
+
+    @Override
     public CompletionStage<PublicationRef> publish(RequestView request) {
         DiscordTransport current = transport;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Discord is unavailable"));
-        return current.sendMessage(config.channelId(), render(request), request.id(), false)
-                .thenApply(messageId -> new PublicationRef(id(), config.channelId(), messageId));
+        String destination = destination();
+        CompletionStage<String> send;
+        try {
+            send = current.sendMessage(destination, render(request), request.id(), false);
+        } catch (RuntimeException error) {
+            LOGGER.error("discord.publish_failed destination={}: {}", destination, error.getMessage());
+            return CompletableFuture.failedFuture(error);
+        }
+        return send.thenApply(messageId -> new PublicationRef(id(), destination, messageId))
+                .exceptionallyCompose(error -> {
+                    Throwable cause = error.getCause() != null ? error.getCause() : error;
+                    LOGGER.error("discord.publish_failed destination={}: {}", destination, cause.getMessage());
+                    return CompletableFuture.failedFuture(cause);
+                });
     }
 
     @Override
@@ -157,12 +208,21 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     }
 
     private boolean authorized(ButtonInteractionEvent event) {
+        if (isDirectMessageMode()) {
+            return event.getGuild() == null
+                    && config.allowedUserIds().contains(event.getUser().getId())
+                    && config.dmUserId().equals(event.getUser().getId());
+        }
         if (event.getGuild() == null || !event.getGuild().getId().equals(config.guildId())) return false;
         if (config.allowedUserIds().contains(event.getUser().getId())) return true;
         Member member = event.getMember();
         if (member == null) return false;
         return member.getRoles().stream().map(Role::getId).anyMatch(config.allowedRoleIds()::contains);
     }
+
+    private boolean isDirectMessageMode() { return config.dmUserId() != null && !config.dmUserId().isBlank(); }
+
+    private String destination() { return isDirectMessageMode() ? config.dmUserId() : config.channelId(); }
 
     static String render(RequestView request) {
         return ApprovalMessageRenderer.render(request);
