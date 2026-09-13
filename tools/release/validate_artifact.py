@@ -29,7 +29,7 @@ def contains_path(archive: zipfile.ZipFile, name: str) -> bool:
     if name in names:
         return True
     for nested_name in names:
-        if not any(nested_name.startswith(prefix) for prefix in ("META-INF/jars/", "META-INF/jarjar/")):
+        if not any(nested_name.startswith(prefix) for prefix in ("META-INF/jars/", "META-INF/jarjar/", "META-INF/libraries/")):
             continue
         if not nested_name.endswith(".jar"):
             continue

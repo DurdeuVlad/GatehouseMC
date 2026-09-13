@@ -42,16 +42,18 @@ dependencies {
     // NeoForge's Jar-in-Jar loader keeps third-party libraries isolated from
     // Minecraft's module layer. Gson and SLF4J are supplied by Minecraft/
     // NeoForge, so exclude them from JDA instead of shipping duplicate modules.
-    def sqliteDependency = implementation("org.xerial:sqlite-jdbc:${sqlite_version}")
+    // NeoForge's Jar-in-Jar loader turns embedded jars into JPMS modules.
+    // When another mod (such as grieflogger) shades sqlite-jdbc into its root jar,
+    // shipping sqlite-jdbc via jarJar creates a fatal JPMS split-package collision
+    // (both modules export org.sqlite.date to downstream modules).
+    // Instead of jarJar, we bundle sqlite-jdbc as an internal resource library
+    // under META-INF/libraries/sqlite-jdbc.jar. SqliteDatabase dynamically loads
+    // it via URLClassLoader if org.sqlite.JDBC is not already available on the
+    // classpath, completely avoiding module layer export collisions.
+    implementation("org.xerial:sqlite-jdbc:${sqlite_version}")
     implementation("net.dv8tion:JDA:${jda_version}") {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "com.google.code.gson", module: "gson"
-    }
-    jarJar(sqliteDependency) {
-        version {
-            strictly "[${sqlite_version},${sqlite_version}.1)"
-            prefer sqlite_version
-        }
     }
     // NeoForge Jar-in-Jar selects direct coordinates. Keep JDA's complete
     // runtime graph explicit so enabling Discord does not depend on a library
@@ -62,8 +64,10 @@ dependencies {
     jarJar "com.fasterxml.jackson.core:jackson-core:2.22.0"
     jarJar "com.fasterxml.jackson.core:jackson-databind:2.22.0"
     jarJar "com.fasterxml.jackson.core:jackson-annotations:2.22"
-    jarJar "com.google.crypto.tink:tink:1.18.0"
-    jarJar "com.google.protobuf:protobuf-java:4.28.2"
+    // Tink and Protobuf are transitive voice dependencies of JDA. They are not
+    // used by GatehouseMC (which only uses text/interactions) and bundling
+    // protobuf breaks NeoForge's JPMS module layer when mods like grieflogger
+    // export com.google.protobuf packages.
     jarJar "com.neovisionaries:nv-websocket-client:2.14"
     jarJar "com.squareup.okhttp3:okhttp-jvm:5.4.0"
     jarJar "org.jetbrains.kotlin:kotlin-stdlib:2.2.21"
@@ -104,6 +108,10 @@ processResources {
 jar {
     archiveClassifier = ""
     from project(":core").sourceSets.main.output
+    from(configurations.additionalRuntimeClasspath.filter { it.name.startsWith("sqlite-jdbc-") }) {
+        into("META-INF/libraries")
+        rename { "sqlite-jdbc.jar" }
+    }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
