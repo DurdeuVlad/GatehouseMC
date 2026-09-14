@@ -3,12 +3,14 @@ name: Release
 on:
   push:
     tags:
-      - 'v*-mc*'
+      - 'v*-fabric-mc*'
+      - 'v*-forge-mc*'
+      - 'v*-neoforge-mc*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Release version without the leading v (for example 1.0.2)'
-        required: false
+      tag:
+        description: 'Existing loader-qualified tag to rebuild and republish'
+        required: true
         type: string
 
 permissions:
@@ -18,135 +20,188 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Check out release tag
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Verify release source is main
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GITHUB_SHA: ${{ github.sha }}
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            test "$GITHUB_REF" = "refs/heads/main" || {
-              echo "Manual releases must be dispatched from main." >&2
-              exit 1
-            }
-          else
-            git fetch origin main --no-tags
-            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
-              echo "Tag commit is not reachable from main." >&2
-              exit 1
-            }
-          fi
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Extract version info
-        id: version
+      - name: Resolve and verify release target
+        id: target
+        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
-          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          MOD_VER=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
-          MC_VER=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            CLEAN_VER="${INPUT_VERSION:-$MOD_VER}"
-            TAG_NAME="v${CLEAN_VER}-mc${MC_VER}"
+            tag="$INPUT_TAG"
           else
-            TAG_NAME="$REF_NAME"
-            if [[ "$TAG_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?)-mc([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-              CLEAN_VER="${BASH_REMATCH[1]}"
-              TAG_MC_VER="${BASH_REMATCH[3]}"
-            else
-              echo "Release tags must use v<version>-mc<minecraft-version>." >&2
-              exit 1
-            fi
-            if [ "$TAG_MC_VER" != "$MC_VER" ]; then
-              echo "Tag Minecraft target $TAG_MC_VER does not match $MC_VER." >&2
-              exit 1
-            fi
+            tag="$REF_NAME"
           fi
-          if [ "$CLEAN_VER" != "$MOD_VER" ]; then
-            echo "Release version $CLEAN_VER does not match mod_version $MOD_VER." >&2
+
+          release_sha=$(git rev-parse "$tag^{commit}")
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$release_sha" origin/main || {
+            echo "Release tag is not reachable from origin/main." >&2
             exit 1
-          fi
-          echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
-          echo "clean_version=${CLEAN_VER}" >> $GITHUB_OUTPUT
-          echo "mc_version=${MC_VER}" >> $GITHUB_OUTPUT
+          }
 
-      - name: Build and test mod
-        run: bash ./gradlew clean test build :platform-neoforge:build --stacktrace
+          mod_version=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          python tools/release/resolve_target.py \
+            --tag "$tag" \
+            --mod-version "$mod_version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Validate artifact identity
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ steps.target.outputs.java }}
+
+      - name: Set up Gradle wrapper lane
+        if: steps.target.outputs.gradle == 'wrapper'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Forge Gradle 8.8 lane
+        if: steps.target.outputs.gradle == '8.8'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Set up Node.js for dedicated-server smoke
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build selected loader artifact
+        shell: bash
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.clean_version }}
-          MINECRAFT_VERSION: ${{ steps.version.outputs.mc_version }}
+          LOADER: ${{ steps.target.outputs.loader }}
         run: |
           set -euo pipefail
-          source_jar="build/libs/gatehousemc-${RELEASE_VERSION}.jar"
-          test -f "$source_jar"
-          metadata=$(unzip -p "$source_jar" fabric.mod.json)
-          test "$(jq -r '.id' <<<"$metadata")" = "gatehousemc"
-          test "$(jq -r '.version' <<<"$metadata")" = "$RELEASE_VERSION"
-          test "$(jq -r '.depends.minecraft' <<<"$metadata")" = "$MINECRAFT_VERSION"
-          cp "$source_jar" "build/libs/gatehousemc-${MINECRAFT_VERSION}-${RELEASE_VERSION}.jar"
-          neoforge_jar="platform-neoforge/build/libs/gatehousemc-neoforge-mc${MINECRAFT_VERSION}-${RELEASE_VERSION}.jar"
-          test -f "$neoforge_jar"
+          case "$LOADER" in
+            fabric)
+              bash ./gradlew clean test build --stacktrace
+              ;;
+            forge)
+              gradle -PenableForge :platform-forge:build --stacktrace
+              ;;
+            neoforge)
+              bash ./gradlew clean test build :platform-neoforge:build --stacktrace
+              ;;
+            *)
+              echo "Unsupported release loader: $LOADER" >&2
+              exit 2
+              ;;
+          esac
 
-      - name: Compute SHA-256 Checksums
+      - name: Validate and checksum selected artifact
+        shell: bash
+        env:
+          ARTIFACT: ${{ steps.target.outputs.artifact }}
+          ARTIFACT_NAME: ${{ steps.target.outputs.artifact_name }}
+          LOADER: ${{ steps.target.outputs.loader }}
+          MINECRAFT: ${{ steps.target.outputs.minecraft }}
+          VERSION: ${{ steps.target.outputs.version }}
         run: |
+          set -euo pipefail
+          test -f "$ARTIFACT"
+          python tools/release/validate_artifact.py \
+            --artifact "$ARTIFACT" \
+            --loader "$LOADER" \
+            --minecraft "$MINECRAFT" \
+            --version "$VERSION"
           mkdir -p release-assets
-          cp "build/libs/gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar" release-assets/
-          cp "platform-neoforge/build/libs/gatehousemc-neoforge-mc${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar" release-assets/
-          cd release-assets
-          sha256sum *.jar > checksums.txt
-          cat checksums.txt
+          cp "$ARTIFACT" "release-assets/$ARTIFACT_NAME"
+          sha256sum "release-assets/$ARTIFACT_NAME" > release-assets/checksums.txt
+          cat release-assets/checksums.txt
+
+      - name: Install E2E dependencies
+        run: npm ci
+        working-directory: tools/e2e
+
+      - name: Run clean dedicated-server smoke gate
+        shell: bash
+        env:
+          LOADER: ${{ steps.target.outputs.loader }}
+          MINECRAFT: ${{ steps.target.outputs.minecraft }}
+          ARTIFACT: ${{ steps.target.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          bash tools/e2e/run-clean-server-smoke.sh \
+            "$LOADER" \
+            ".e2e-release-$LOADER" \
+            25565 \
+            "$ARTIFACT" \
+            "$MINECRAFT"
+
+      - name: Upload dedicated-server evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatehousemc-${{ steps.target.outputs.loader }}-e2e-${{ github.run_id }}
+          path: .e2e-release-${{ steps.target.outputs.loader }}/server.log
+          if-no-files-found: warn
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: GatehouseMC ${{ steps.version.outputs.clean_version }} (${{ steps.version.outputs.mc_version }})
-          tag_name: ${{ steps.version.outputs.tag }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
+          tag_name: ${{ steps.target.outputs.tag }}
           body_path: CHANGELOG.md
-          files: |
-            release-assets/*
+          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to Modrinth and CurseForge
+      - name: Publish to CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: release-assets/gatehousemc-${{ steps.version.outputs.mc_version }}-${{ steps.version.outputs.clean_version }}.jar
-          name: GatehouseMC ${{ steps.version.outputs.clean_version }} (${{ steps.version.outputs.mc_version }})
-          version: ${{ steps.version.outputs.clean_version }}+${{ steps.version.outputs.mc_version }}
+          files: release-assets/${{ steps.target.outputs.artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
+          version: ${{ steps.target.outputs.version }}-${{ steps.target.outputs.loader }}-mc${{ steps.target.outputs.minecraft }}
           version-type: release
           changelog-file: CHANGELOG.md
-          loaders: fabric
+          loaders: ${{ steps.target.outputs.loader }}
           environment: dedicated-server
-          game-versions: ${{ steps.version.outputs.mc_version }}
-          java: '21'
-          dependencies: |
-            fabric-api(required)
+          game-versions: ${{ steps.target.outputs.minecraft }}
+          java: ${{ steps.target.outputs.java }}
+          dependencies: ${{ steps.target.outputs.dependencies }}
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000
+
+      - name: Detect optional Modrinth credentials
+        id: modrinth
+        shell: bash
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          if [ -n "$MODRINTH_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to Modrinth
+        if: steps.modrinth.outputs.available == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: gatehousemc
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-assets/${{ steps.target.outputs.artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
+          version: ${{ steps.target.outputs.version }}-${{ steps.target.outputs.loader }}-mc${{ steps.target.outputs.minecraft }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: ${{ steps.target.outputs.loader }}
+          environment: dedicated-server
+          game-versions: ${{ steps.target.outputs.minecraft }}
+          java: ${{ steps.target.outputs.java }}
+          dependencies: ${{ steps.target.outputs.dependencies }}
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
