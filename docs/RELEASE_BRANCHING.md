@@ -59,6 +59,9 @@ after the tagged build and clean-server E2E gate pass when the required
 storefront secrets are configured. A guarded manual dispatch is available for
 controlled republishing.
 
+The earlier combined tag `v1.1.0-mc1.21.1` is retained for history. It is not a
+loader-qualified release target and must not be reused for additional files.
+
 ## Maintenance flow
 
 1. Open feature work from `main`.
@@ -69,5 +72,5 @@ controlled republishing.
    single matching artifact.
 6. Push the loader-qualified tag only after moderation, credentials, release
    notes, and the production publication decision are ready. The workflow
-   publishes automatically after the build and clean-server gate. Use
-   `publish=true` only for a controlled manual dispatch.
+   publishes automatically after the build and clean-server gate. Use the
+   manual `tag` input only to rebuild and republish an existing tag.

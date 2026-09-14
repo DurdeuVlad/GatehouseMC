@@ -35,20 +35,24 @@ Node E2E client.
 
 - GitHub is public and contains the source repository.
 - Modrinth and CurseForge submissions contain the earlier files. The 1.1.x
-  workflow now builds, tests, and stages one loader/version file per qualified
-  tag; a qualified tag publishes automatically once the configured storefront
-  secrets and release gates succeed.
-- GitHub Release `v1.0.0` is retained for history but is not production-ready;
-  its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
+  workflow builds, tests, validates, and publishes one loader/version file per
+  qualified tag. CurseForge credentials are required; Modrinth publication is
+  optional when its token is configured.
+- GitHub Release `v1.1.0-mc1.21.1` is retained as the earlier combined release.
+  New loader-specific files use the qualified tags documented in
+  `docs/RELEASE_BRANCHING.md`.
 
 ## Verification already executed
 
 ```text
-./gradlew.ps1 test --stacktrace                 PASS
-./gradlew.ps1 build --stacktrace                PASS
-tools/e2e: npm ci                               PASS
-tools/e2e: npm run smoke                        PASS (unwhitelisted rejection)
-tools/e2e: MC_EXPECTED_STATUS=joined npm run smoke PASS (approved reconnect)
+./gradlew.ps1 clean test build :platform-neoforge:build --stacktrace PASS
+Gradle 8.8 -PenableForge :platform-forge:build --stacktrace       PASS
+tools/release/validate_artifact.py (all three JARs)                PASS
+tools/release resolver unit tests (5)                              PASS
+tools/e2e: npm ci                                                   PASS
+clean-server smoke: Fabric 1.21.1                                  PASS
+clean-server smoke: Forge 1.20.1                                   PASS
+clean-server smoke: NeoForge 1.21.1                                PASS
 ```
 
 The current local implementation has passed the Fabric/core test suite,

@@ -110,11 +110,11 @@ targets:
     java: 21
     branch: support/fabric/1.21.1
     tag_pattern: v<mod-version>-fabric-mc1.21.1
-    status: verified-local
+    status: ready-to-publish
     build: true
     artifact_validation: true
     server_e2e: true
-    publish: false
+    publish: true
   - id: fabric-1.21.4
     loader: fabric
     minecraft: 1.21.4
@@ -132,22 +132,22 @@ targets:
     java: 17
     branch: support/forge/1.20.1
     tag_pattern: v<mod-version>-forge-mc1.20.1
-    status: verified-local
+    status: ready-to-publish
     build: true
     artifact_validation: true
     server_e2e: true
-    publish: false
+    publish: true
   - id: neoforge-1.21.1
     loader: neoforge
     minecraft: 1.21.1
     java: 21
     branch: support/neoforge/1.21.1
     tag_pattern: v<mod-version>-neoforge-mc1.21.1
-    status: verified-local
+    status: ready-to-publish
     build: true
     artifact_validation: true
     server_e2e: true
-    publish: false
+    publish: true
 
 planned:
   forge: [1.16.5, 1.18.2, 1.19.2, 1.19.4, 1.20.4, 1.20.6, 1.21.1]

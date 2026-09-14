@@ -29,7 +29,7 @@ GatehouseMC is an operational workflow layer around Minecraft's native whitelist
 
 - **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(submitted; pending moderation)*
 - **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(submitted; pending moderation)*
-- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(latest published line; 1.1.x is staged behind release gates)*
+- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(1.1.x publication is per loader/version tag)*
 - **Source and issues:** [github.com/DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC) · [issue tracker](https://github.com/DurdeuVlad/GatehouseMC/issues)
 - **Publishing copy:** [Modrinth](docs/publishing/MODRINTH.md) · [CurseForge](docs/publishing/CURSEFORGE.md)
 - **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)
@@ -120,6 +120,6 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-The current branch has passing Fabric/core tests, reproducible builds, artifact validation, and local clean dedicated-server smoke proof for all three 1.1.x proof targets. Storefront publication is gated on a loader-qualified tag and the release workflow; broader repeat-attempt, restart, approval-race, and real mod-stack coverage is still required before calling the release production-ready. See [`docs/TESTING.md`](docs/TESTING.md) and [`.github/support-matrix.yml`](.github/support-matrix.yml) for the exact state.
+The current 1.1.x proof targets have passing builds, artifact validation, and local clean dedicated-server smoke proof. Storefront publication runs per loader/version through a loader-qualified tag; broader repeat-attempt, restart, approval-race, and real mod-stack coverage is still required before calling the release production-ready. See [`docs/TESTING.md`](docs/TESTING.md) and [`.github/support-matrix.yml`](.github/support-matrix.yml) for the exact state.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.
