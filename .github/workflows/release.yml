@@ -179,8 +179,9 @@ jobs:
         shell: bash
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
         run: |
-          if [ -n "$MODRINTH_TOKEN" ]; then
+          if [ -n "$MODRINTH_TOKEN" ] && [ -n "$MODRINTH_PROJECT_ID" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
@@ -188,9 +189,12 @@ jobs:
 
       - name: Publish to Modrinth
         if: steps.modrinth.outputs.available == 'true'
+        # Modrinth is an optional mirror; a storefront/API issue must not
+        # invalidate the required CurseForge publication or GitHub Release.
+        continue-on-error: true
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          modrinth-id: gatehousemc
+          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: release-assets/${{ steps.target.outputs.artifact_name }}
           name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})

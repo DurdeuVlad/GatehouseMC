@@ -13,8 +13,10 @@ matrix gates and hosted release workflow succeed.
   for history. New installations should use a loader-qualified release.
 - Modrinth and CurseForge: the release workflow builds, validates, smoke-tests,
   and publishes exactly one loader/version artifact per loader-qualified tag.
-  CurseForge publication is required; Modrinth publication runs when its token
-  is configured. A guarded manual dispatch can republish an existing tag.
+  CurseForge publication is required. Modrinth is an optional, best-effort
+  mirror and runs only when both its token and project-ID secrets are
+  configured; a Modrinth failure does not invalidate the CurseForge upload or
+  GitHub Release. A guarded manual dispatch can republish an existing tag.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
@@ -92,13 +94,15 @@ dispatch:
 | Secret | Purpose |
 |---|---|
 | `MODRINTH_TOKEN` | Modrinth API token with version-creation permission |
+| `MODRINTH_PROJECT_ID` | Modrinth project's 8-character base62 ID |
 | `CURSEFORGE_TOKEN` | CurseForge API token |
 
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
-expanded secret values to disk. The workflow contains the non-secret project
-IDs for the existing `gatehousemc` listings; a loader-qualified tag is the
-CI/CD publish trigger. Do not create the tag until the target is ready for
-public publication.
+expanded secret values to disk. The CurseForge project ID is non-secret and
+is kept in the workflow; the Modrinth project ID is supplied as a secret so a
+stale token alone cannot trigger a failed mirror upload. A loader-qualified
+tag is the CI/CD publish trigger. Do not create the tag until the target is
+ready for public publication.
 
 The workflow fails closed if the required CurseForge token is missing, if the
 release version does not match `gradle.properties`, or if the JAR's internal
@@ -106,7 +110,8 @@ loader metadata does not match its target. Each GitHub Release contains exactly
 one proof-target JAR and its checksum. Storefront publication runs
 automatically for a valid pushed tag, or through the guarded manual dispatch;
 the Gradle sources JAR is never sent to a storefront. Modrinth publication is
-skipped when its optional token is not configured.
+skipped unless both optional Modrinth secrets are configured and remains
+best-effort when enabled.
 
 Every successful release is visible in the GitHub Actions run and GitHub
 Release. This release lane does not send external Discord or Telegram
