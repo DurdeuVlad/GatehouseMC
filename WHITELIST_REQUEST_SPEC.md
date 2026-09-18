@@ -456,6 +456,7 @@ Example logical form:
 wr:a:<request-uuid>
 wr:d:<request-uuid>
 wr:b:<request-uuid>
+wr:u:<request-uuid>
 ```
 
 The adapter must re-fetch core state and re-authorize the actor on every interaction. Never trust message text or callback state as authoritative.
