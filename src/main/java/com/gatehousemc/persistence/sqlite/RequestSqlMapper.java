@@ -38,6 +38,23 @@ final class RequestSqlMapper {
         }
     }
 
+    WhitelistRequest findLatestByName(String normalizedUsername) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "SELECT * FROM whitelist_requests WHERE normalized_name=? ORDER BY updated_at DESC, created_at DESC LIMIT 1")) {
+            statement.setString(1, normalizedUsername);
+            try (ResultSet result = statement.executeQuery()) { return result.next() ? readRequest(result) : null; }
+        }
+    }
+
+    WhitelistRequest findLatestTerminalByName(String normalizedUsername) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "SELECT * FROM whitelist_requests WHERE normalized_name=? AND status IN ('APPROVED','DENIED','BLOCKED') " +
+                        "ORDER BY updated_at DESC, created_at DESC LIMIT 1")) {
+            statement.setString(1, normalizedUsername);
+            try (ResultSet result = statement.executeQuery()) { return result.next() ? readRequest(result) : null; }
+        }
+    }
+
     List<WhitelistRequest> findByStatus(Optional<RequestStatus> status, int limit) throws SQLException {
         String sql = "SELECT * FROM whitelist_requests" + (status.isPresent() ? " WHERE status=?" : "") + " ORDER BY updated_at DESC LIMIT ?";
         try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
