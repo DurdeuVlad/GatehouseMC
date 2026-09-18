@@ -192,7 +192,8 @@ public final class GatehouseCommands {
         FabricRuntime runtime = supplier.get();
         if (runtime == null) return feedback(context, Messages.get("command.health_starting"));
         if (runtime.degraded()) {
-            return feedback(context, Messages.get("command.health_core_degraded", runtime.providerHealthSummary()));
+            return feedback(context, Messages.get("command.health_core_degraded", runtime.providerHealthSummary(),
+                    runtime.config().routing().mode(), runtime.config().database().path()));
         }
         ServerCommandSource source = context.getSource();
         runtime.commandExecutor().execute(() -> {
@@ -200,11 +201,13 @@ public final class GatehouseCommands {
                 long pending = runtime.repository().pendingOutboxCount();
                 source.getServer().execute(() -> source.sendFeedback(() -> Text.literal(
                         Messages.get("command.health_healthy", runtime.queueSize(), pending,
-                                runtime.providerHealthSummary())), false));
+                                runtime.providerHealthSummary(), runtime.config().routing().mode(),
+                                runtime.config().database().path())), false));
             } catch (RuntimeException error) {
                 source.getServer().execute(() -> source.sendFeedback(() -> Text.literal(
                         Messages.get("command.health_degraded", runtime.queueSize(), safeMessage(error),
-                                runtime.providerHealthSummary())), false));
+                                runtime.providerHealthSummary(), runtime.config().routing().mode(),
+                                runtime.config().database().path())), false));
             }
         });
         return 1;
