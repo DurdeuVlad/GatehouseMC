@@ -4,6 +4,7 @@ import com.gatehousemc.config.ConfigLoader;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.i18n.Messages;
 import com.gatehousemc.platform.fabric.command.GatehouseCommands;
+import com.gatehousemc.runtime.ReloadResult;
 import com.mojang.authlib.GameProfile;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -99,7 +101,7 @@ public final class GatehouseMod implements ModInitializer {
 
     public static Text handleWhitelistDenial(GameProfile profile) {
         FabricRuntime current = runtime;
-        if (current == null) return Text.literal(Messages.get("reject.not_whitelisted"));
+        if (current == null) return Text.literal(Messages.get("reject.starting"));
         try {
             if (current.server() != null && current.server().getUserCache() != null && profile != null) {
                 current.server().getUserCache().add(profile);
@@ -116,49 +118,57 @@ public final class GatehouseMod implements ModInitializer {
     }
 
     /**
-     * Reloads non-structural configuration without requiring a Minecraft
-     * restart. The SQLite path is intentionally structural because moving it
-     * while the server is running could split the workflow store.
-     * Runs asynchronously to avoid blocking the server thread on recovery.
+     * Reloads configuration without sacrificing a healthy current runtime when
+     * the replacement cannot start. A database path change remains structural
+     * while a healthy runtime owns the existing store.
      */
-    public static void reloadAsync() {
+    public static CompletableFuture<ReloadResult> reloadAsync() {
+        CompletableFuture<ReloadResult> result = new CompletableFuture<>();
         STARTUP_EXECUTOR.execute(() -> {
             FabricRuntime current;
             synchronized (RUNTIME_LOCK) {
                 current = runtime;
-                if (current == null || current.degraded()) return;
+                if (current == null || STOPPING.get()) {
+                    result.complete(ReloadResult.unavailable("runtime is not ready"));
+                    return;
+                }
             }
             Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
             try {
                 ModConfig next = ConfigLoader.loadOrDefault(configDir);
-                Messages.load(next.language());
-                if (!samePath(current.config().database().path(), next.database().path())) {
+                if (!current.degraded() && !samePath(current.config().database().path(), next.database().path())) {
                     LOGGER.warn("Config reload rejected: database.path changes require a server restart");
+                    result.complete(ReloadResult.restartRequired());
                     return;
                 }
+
                 FabricRuntime started = FabricRuntime.start(current.server(), next);
                 synchronized (RUNTIME_LOCK) {
-                    if (STOPPING.get()) {
+                    if (STOPPING.get() || runtime != current) {
                         started.close();
+                        result.complete(ReloadResult.unavailable("runtime changed while reload was in progress"));
                         return;
                     }
                     runtime = started;
                 }
                 current.close();
                 LOGGER.info("GatehouseMC configuration reloaded: {}", next.redactedSummary());
+                result.complete(ReloadResult.success());
             } catch (Exception error) {
-                LOGGER.error("Config reload failed; request workflow is degraded until the server is restarted", error);
-                synchronized (RUNTIME_LOCK) {
-                    if (!STOPPING.get()) {
-                        runtime = FabricRuntime.degraded(current.server(), current.config());
-                    }
-                }
-                current.close();
+                LOGGER.error("Config reload failed; previous GatehouseMC runtime remains active", error);
+                result.complete(ReloadResult.failed(safeMessage(error)));
             }
         });
+        return result;
     }
 
     private static boolean samePath(Path left, Path right) {
         return Objects.equals(left.toAbsolutePath().normalize(), right.toAbsolutePath().normalize());
+    }
+
+    private static String safeMessage(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 }
