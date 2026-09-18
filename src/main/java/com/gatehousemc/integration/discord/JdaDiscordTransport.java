@@ -77,7 +77,7 @@ final class JdaDiscordTransport implements DiscordTransport {
     @Override
     public CompletableFuture<Void> editMessage(String destination, String messageId, String text, UUID requestId, RequestStatus status) {
         return resolveChannel(destination).thenCompose(channel -> channel.editMessageById(messageId, text)
-                .setComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, disabled))))
+                .setComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, status))))
                 .submit())
                 .thenApply(message -> null);
     }
