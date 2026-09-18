@@ -166,16 +166,8 @@ public final class DecisionService {
             if (request.status() == RequestStatus.APPROVED) return null;
             WorkflowRepository.DecisionResultSnapshot result = repository.reopen(requestId, actor, reason, clock.now());
             result.request().ifPresent(this::refreshCache);
-            String message = switch (result.outcome()) {
-                case UNDONE -> Messages.get("decision.undone", actor.displayName());
-                case ACTIVE_REQUEST_EXISTS -> result.request()
-                        .map(active -> Messages.get("decision.active_request_exists",
-                                active.identity().exactUsername(), active.id()))
-                        .orElse(Messages.get("decision.active_request_exists_unknown"));
-                case FAILED -> Messages.get("decision.db_error");
-                default -> result.message();
-            };
-            return new DecisionResult(result.outcome(), result.request(), message);
+            return new DecisionResult(result.outcome(), result.request(),
+                    undoMessage(result.outcome(), result.request(), actor, result.message()));
         }, decisionExecutor).thenCompose(preflight -> {
             if (preflight != null) return CompletableFuture.completedFuture(preflight);
             return undoClaimAndFinalize(requestId, actor, reason);
@@ -188,7 +180,9 @@ public final class DecisionService {
                 .thenCompose(claim -> {
                     if (claim.outcome() != DecisionOutcome.RESOLVING) {
                         claim.request().ifPresent(this::refreshCache);
-                        return CompletableFuture.completedFuture(new DecisionResult(claim.outcome(), claim.request(), claim.message()));
+                        return CompletableFuture.completedFuture(new DecisionResult(
+                                claim.outcome(), claim.request(),
+                                undoMessage(claim.outcome(), claim.request(), actor, claim.message())));
                     }
                     WhitelistRequest request = claim.request().orElseThrow();
                     try {
@@ -198,6 +192,23 @@ public final class DecisionService {
                         return CompletableFuture.completedFuture(completeUndo(request, actor, reason, token, error));
                     }
                 });
+    }
+
+    private String undoMessage(DecisionOutcome outcome, Optional<WhitelistRequest> request,
+                               AdminPrincipal actor, String fallback) {
+        return switch (outcome) {
+            case UNDONE -> Messages.get("decision.undone", actor.displayName());
+            case ALREADY_PENDING -> Messages.get("decision.already_pending");
+            case RESOLVING -> Messages.get("decision.already_resolving");
+            case ALREADY_RESOLVED -> Messages.get("decision.already_resolved");
+            case NOT_FOUND -> Messages.get("decision.not_found");
+            case ACTIVE_REQUEST_EXISTS -> request
+                    .map(active -> Messages.get("decision.active_request_exists",
+                            active.identity().exactUsername(), active.id()))
+                    .orElse(Messages.get("decision.active_request_exists_unknown"));
+            case FAILED -> Messages.get("decision.db_error");
+            default -> fallback;
+        };
     }
 
     private DecisionResult completeUndo(WhitelistRequest request, AdminPrincipal actor, String reason,
