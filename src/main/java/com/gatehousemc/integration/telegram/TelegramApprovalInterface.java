@@ -187,7 +187,6 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
                             } else {
                                 answerCallback(callbackId, result.message(), false);
                             }
-                            refreshMessage(chatId, messageId, parsed.requestId());
                         });
             }
             case CANCEL -> {
@@ -252,14 +251,6 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         String text = message == null || message.isBlank() ? "" : ",\"text\":\"" + json(message) + "\"";
         api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"" + text
                 + (alert ? ",\"show_alert\":true" : "") + "}");
-    }
-
-    private void refreshMessage(String chatId, String messageId, UUID requestId) {
-        decisions.findRequest(requestId).ifPresent(request -> {
-            String payload = "{\"chat_id\":\"" + json(chatId) + "\",\"message_id\":\"" + json(messageId)
-                    + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(requestId, request.status()) + "}";
-            api.post("editMessageText", payload);
-        });
     }
 
     private static String json(String value) {
