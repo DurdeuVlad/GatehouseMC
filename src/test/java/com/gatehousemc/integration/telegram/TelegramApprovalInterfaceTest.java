@@ -36,6 +36,29 @@ class TelegramApprovalInterfaceTest {
     }
 
     @Test
+    void pendingMessageDoesNotOfferImpossibleUndo() {
+        UUID requestId = UUID.randomUUID();
+        String keyboard = TelegramApprovalInterface.keyboard(requestId, RequestStatus.PENDING);
+
+        assertTrue(keyboard.contains("wr:a:" + requestId));
+        assertTrue(keyboard.contains("wr:d:" + requestId));
+        assertTrue(keyboard.contains("wr:b:" + requestId));
+        assertFalse(keyboard.contains("wr:u:" + requestId));
+    }
+
+    @Test
+    void deniedMessageOffersReopenAndNoTerminalDecisionButtons() {
+        UUID requestId = UUID.randomUUID();
+        String keyboard = TelegramApprovalInterface.keyboard(requestId, RequestStatus.DENIED);
+
+        assertTrue(keyboard.contains("wr:u:" + requestId));
+        assertTrue(keyboard.contains("Reopen"));
+        assertFalse(keyboard.contains("wr:a:" + requestId));
+        assertFalse(keyboard.contains("wr:d:" + requestId));
+        assertFalse(keyboard.contains("wr:b:" + requestId));
+    }
+
+    @Test
     void publishFailsWhenTransportNull() {
         RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
