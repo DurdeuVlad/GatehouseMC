@@ -57,6 +57,7 @@
   "command.reload_succeeded": "Gatehouse configuration reloaded successfully.",
   "command.reload_failed": "Gatehouse reload failed; the previous runtime was kept unchanged: {0}",
   "command.reload_restart_required": "Reload rejected because database.path changed. Restart the server to apply a database path change.",
+  "command.operation_failed": "Gatehouse command failed: {0}",
   "command.decision_failed": "Decision failed: {0}",
   "provider.invalid_action": "Invalid whitelist request action.",
   "provider.not_authorized": "You are not authorized to resolve whitelist requests.",
