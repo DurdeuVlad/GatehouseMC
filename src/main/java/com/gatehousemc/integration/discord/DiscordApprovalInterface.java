@@ -139,6 +139,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         try {
             send = current.sendMessage(destination, render(request), request.id(), request.status());
         } catch (RuntimeException error) {
+            health = ProviderHealth.DEGRADED;
             LOGGER.error("discord.publish_failed destination={}: {}", destination, error.getMessage());
             return CompletableFuture.failedFuture(error);
         }
