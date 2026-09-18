@@ -4,6 +4,7 @@ import com.gatehousemc.application.DecisionService;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.domain.*;
 import com.gatehousemc.i18n.Messages;
+import com.gatehousemc.integration.common.ApprovalActionState;
 import com.gatehousemc.integration.common.ApprovalMessageRenderer;
 import com.gatehousemc.integration.common.CallbackActionParser;
 import com.gatehousemc.integration.common.CallbackActionParser.ParsedCallback;
@@ -126,7 +127,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         String destination = destination();
         CompletionStage<String> send;
         try {
-            send = current.sendMessage(destination, render(request), request.id(), false);
+            send = current.sendMessage(destination, render(request), request.id(), request.status());
         } catch (RuntimeException error) {
             LOGGER.error("discord.publish_failed destination={}: {}", destination, error.getMessage());
             return CompletableFuture.failedFuture(error);
@@ -143,7 +144,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     public CompletionStage<Void> update(PublicationRef publication, RequestView request) {
         DiscordTransport current = transport;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Discord is stopped"));
-        return current.editMessage(publication.containerId(), publication.messageId(), render(request), request.id(), request.status().isTerminal());
+        return current.editMessage(publication.containerId(), publication.messageId(), render(request), request.id(), request.status());
     }
 
     @Override
@@ -162,48 +163,84 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         switch (callback.kind()) {
             case PRIMARY -> {
                 Optional<RequestView> request = decisions.findRequest(callback.requestId());
-                String player = request.map(r -> r.identity().exactUsername()).orElse("?");
+                if (request.isEmpty()) {
+                    event.reply(Messages.get("confirm.expired")).setEphemeral(true).queue();
+                    return;
+                }
+                RequestView current = request.get();
+                if (!ApprovalActionState.canExecute(current.status(), callback.action())) {
+                    event.reply(ApprovalActionState.unavailableMessage(current.status())).setEphemeral(true).queue();
+                    return;
+                }
+                String player = current.identity().exactUsername();
                 String shortId = shortId(callback.requestId());
-                String confirmMsg = confirmMessage(callback.action(), player, shortId);
+                String confirmMsg = confirmMessage(callback.action(), player, shortId, current.status());
                 Button confirmBtn = Button.danger(CallbackActionParser.formatConfirm(callback.action(), callback.requestId()), Messages.get("button.confirm"));
                 Button cancelBtn = Button.secondary(CallbackActionParser.formatCancel(callback.requestId()), Messages.get("button.cancel"));
                 event.editMessage(confirmMsg).setComponents(ActionRow.of(confirmBtn, cancelBtn)).queue();
             }
             case CONFIRM -> {
+                Optional<RequestView> request = decisions.findRequest(callback.requestId());
+                if (request.isEmpty()) {
+                    event.reply(Messages.get("confirm.expired")).setEphemeral(true).queue();
+                    return;
+                }
+                if (!ApprovalActionState.canExecute(request.get().status(), callback.action())) {
+                    event.reply(ApprovalActionState.unavailableMessage(request.get().status())).setEphemeral(true).queue();
+                    return;
+                }
                 event.deferEdit().queue();
                 decisions.decide(callback.requestId(), callback.action(), principal, Optional.empty())
                         .thenAccept(result -> event.getHook().sendMessage(result.message()).setEphemeral(true).queue())
-                        .exceptionally(error -> { event.getHook().sendMessage(Messages.get("provider.decision_failed")).setEphemeral(true).queue(); return null; });
+                        .exceptionally(error -> {
+                            event.getHook().sendMessage(Messages.get("provider.decision_failed")).setEphemeral(true).queue();
+                            return null;
+                        });
             }
             case CANCEL -> {
                 Optional<RequestView> request = decisions.findRequest(callback.requestId());
                 if (request.isPresent()) {
                     String originalText = ApprovalMessageRenderer.render(request.get());
-                    event.editMessage(originalText).setComponents(ActionRow.of(Arrays.asList(actionButtons(callback.requestId(), request.get().status().isTerminal())))).queue();
+                    event.editMessage(originalText)
+                            .setComponents(ActionRow.of(Arrays.asList(actionButtons(callback.requestId(), request.get().status()))))
+                            .queue();
                 } else {
-                    event.editMessage(Messages.get("confirm.cancelled")).setComponents().queue();
+                    event.editMessage(Messages.get("confirm.expired")).setComponents().queue();
                 }
             }
         }
     }
 
-    private static String confirmMessage(DecisionAction action, String player, String shortId) {
+    private static String confirmMessage(DecisionAction action, String player, String shortId, RequestStatus status) {
         return switch (action) {
             case APPROVE -> Messages.get("confirm.approve", player, shortId);
             case DENY -> Messages.get("confirm.deny", player, shortId);
             case BLOCK -> Messages.get("confirm.block", player, shortId);
-            case UNDO -> Messages.get("confirm.undo", player, shortId);
+            case UNDO -> switch (status) {
+                case APPROVED -> Messages.get("confirm.undo_approval", player, shortId);
+                case DENIED -> Messages.get("confirm.reopen", player, shortId);
+                case BLOCKED -> Messages.get("confirm.unblock_reopen", player, shortId);
+                default -> Messages.get("confirm.undo", player, shortId);
+            };
         };
     }
 
     private static String shortId(UUID id) { return id.toString().substring(0, 8); }
 
-    static Button[] actionButtons(UUID requestId, boolean disabled) {
+    static Button[] actionButtons(UUID requestId, RequestStatus status) {
         return new Button[]{
-                Button.success(CallbackActionParser.formatPrimary(DecisionAction.APPROVE, requestId), Messages.get("button.approve")).withDisabled(disabled),
-                Button.danger(CallbackActionParser.formatPrimary(DecisionAction.DENY, requestId), Messages.get("button.deny")).withDisabled(disabled),
-                Button.secondary(CallbackActionParser.formatPrimary(DecisionAction.BLOCK, requestId), Messages.get("button.block")).withDisabled(disabled),
-                Button.secondary(CallbackActionParser.formatPrimary(DecisionAction.UNDO, requestId), Messages.get("button.undo")).withDisabled(disabled)
+                Button.success(CallbackActionParser.formatPrimary(DecisionAction.APPROVE, requestId),
+                        ApprovalActionState.label(status, DecisionAction.APPROVE))
+                        .withDisabled(!ApprovalActionState.canExecute(status, DecisionAction.APPROVE)),
+                Button.danger(CallbackActionParser.formatPrimary(DecisionAction.DENY, requestId),
+                        ApprovalActionState.label(status, DecisionAction.DENY))
+                        .withDisabled(!ApprovalActionState.canExecute(status, DecisionAction.DENY)),
+                Button.secondary(CallbackActionParser.formatPrimary(DecisionAction.BLOCK, requestId),
+                        ApprovalActionState.label(status, DecisionAction.BLOCK))
+                        .withDisabled(!ApprovalActionState.canExecute(status, DecisionAction.BLOCK)),
+                Button.secondary(CallbackActionParser.formatPrimary(DecisionAction.UNDO, requestId),
+                        ApprovalActionState.label(status, DecisionAction.UNDO))
+                        .withDisabled(!ApprovalActionState.canExecute(status, DecisionAction.UNDO))
         };
     }
 
