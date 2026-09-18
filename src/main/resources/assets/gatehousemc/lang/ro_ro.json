@@ -57,6 +57,7 @@
   "command.reload_succeeded": "Configuratia Gatehouse a fost reincarcata cu succes.",
   "command.reload_failed": "Reincarcarea Gatehouse a esuat; runtime-ul anterior a fost pastrat neschimbat: {0}",
   "command.reload_restart_required": "Reincarcarea a fost refuzata deoarece database.path s-a schimbat. Reporneste serverul pentru a aplica schimbarea caii bazei de date.",
+  "command.operation_failed": "Comanda Gatehouse a esuat: {0}",
   "command.decision_failed": "Decizia a esuat: {0}",
   "provider.invalid_action": "Actiune invalida pentru cererea whitelist.",
   "provider.not_authorized": "Nu esti autorizat sa solutionezi cereri whitelist.",
