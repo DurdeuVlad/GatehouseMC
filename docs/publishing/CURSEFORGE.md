@@ -45,8 +45,8 @@ FEATURES
 - Automatic whitelist request creation
 - Optional Discord and Telegram approval workflows
 - In-game commands: `/gatehouse`, `/gh`, and `/wlreq`
-- Approve, deny, block, unblock, undo, status, and reload actions
-- SQLite persistence and restart/outage recovery
+- Approve, deny, block, unblock, undo/reopen, status, and safe reload actions
+- SQLite persistence, terminal-decision recovery, and restart/outage recovery
 - Minecraft's native whitelist remains authoritative
 - Server-side only; no client IP addresses stored by default
 
