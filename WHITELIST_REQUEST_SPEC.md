@@ -365,30 +365,40 @@ Unblock removes that record. The historical request remains `BLOCKED` for audit.
 
 ### 9.1 Minecraft command interface
 
-Recommended root command:
+Primary root command:
 
 ```text
-/wlreq
+/gatehouse
 ```
+
+Backward-compatible aliases are `/gh` and `/wlreq`.
 
 Required subcommands:
 
 ```text
-/wlreq list [pending|approved|denied|blocked]
-/wlreq show <request-id|username>
-/wlreq approve <request-id|username> [reason...]
-/wlreq deny <request-id|username> [reason...]
-/wlreq block <request-id|username> [reason...]
-/wlreq unblock <username> [reason...]
-/wlreq status
-/wlreq reload
+/gatehouse list [pending|resolving|approved|denied|blocked]
+/gatehouse show <request-id|username>
+/gatehouse approve <request-id|username> [reason...]
+/gatehouse deny <request-id|username> [reason...]
+/gatehouse block <request-id|username> [reason...]
+/gatehouse unblock <username> [reason...]
+/gatehouse undo <request-id|username> [reason...]
+/gatehouse status
+/gatehouse reload
 ```
 
 Requirements:
 
 - console is allowed;
 - player command source requires configurable permission level (default operator level 3);
-- name lookups that are ambiguous because multiple historical requests exist must require request ID or choose the single active pending request only;
+- invoking the root command without a subcommand prints command help;
+- `list` prints complete request UUIDs that can be pasted into another command;
+- `show <username>` resolves the most recently updated historical request for that normalized username;
+- `approve`, `deny`, and `block` by username resolve only the current active request;
+- `undo <username>` resolves the most recently updated terminal request (`APPROVED`, `DENIED`, or `BLOCKED`);
+- a full request UUID always addresses that exact request;
+- undoing a historical request must fail explicitly if the same normalized username already has another `PENDING` or `RESOLVING` request;
+- commands remain registered during startup/degraded operation so `status` and actionable errors are available instead of an apparent unknown command;
 - commands call the same `DecisionService` used by bots.
 
 ### 9.2 Discord interface
@@ -406,10 +416,14 @@ Last attempt: <timestamp>
 Request: <short display id>
 ```
 
-Buttons:
+Buttons are state-aware:
 
 ```text
-[Approve] [Deny] [Block]
+PENDING:   [Approve] [Deny] [Block]
+RESOLVING: no actions
+APPROVED:  [Undo approval]
+DENIED:    [Reopen]
+BLOCKED:   [Unblock & reopen]
 ```
 
 Authorization supports:
@@ -419,24 +433,18 @@ Authorization supports:
 
 At least one configured allow rule must match unless an explicit “allow any guild admin” option is later added.
 
-After resolution, edit the message to show the terminal state and actor, and disable/remove action buttons.
+After resolution, edit the message to show the terminal state and actor. Terminal messages must retain the one legal recovery action instead of disabling every button.
 
 ### 9.3 Telegram interface
 
-Equivalent request message with inline keyboard:
-
-```text
-[✅ Approve]
-[❌ Deny]
-[🚫 Block]
-```
+Equivalent request message with a state-aware inline keyboard. Pending requests expose Approve/Deny/Block; terminal requests expose only the applicable Undo/Reopen action; resolving requests expose no action.
 
 Authorization supports:
 
 - allowed Telegram user IDs;
 - allowed chat/supergroup IDs.
 
-The callback must be acknowledged with `answerCallbackQuery` and the message updated after resolution.
+Every callback must be acknowledged with `answerCallbackQuery`. Confirmed decisions must surface success/failure feedback to the administrator and refresh the message to the authoritative current request state.
 
 ### 9.4 Callback/custom ID contract
 
@@ -470,10 +478,6 @@ Default priority:
 ### `FANOUT`
 
 Publish to every enabled provider. A decision in one provider updates all existing publications.
-
-### `FIRST_SUCCESS`
-
-Equivalent to primary/fallback without semantic “primary” naming; useful for future providers.
 
 `ALL_REQUIRED` is not required for v1.
 
