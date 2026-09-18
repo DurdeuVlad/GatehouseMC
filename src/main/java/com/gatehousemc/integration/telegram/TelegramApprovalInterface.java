@@ -14,6 +14,8 @@ import com.gatehousemc.port.ProviderHealth;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 
 /** Telegram Bot API adapter using Java 21 HttpClient and a dedicated long-polling thread. */
 public final class TelegramApprovalInterface implements ApprovalInterface {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TelegramApprovalInterface.class);
+
     private final ModConfig.Telegram config;
     private final DecisionService decisions;
     private volatile ProviderHealth health = ProviderHealth.STOPPED;
@@ -84,8 +88,11 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
         String payload = "{\"chat_id\":\"" + json(config.chatId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status()) + "}";
         return current.post("sendMessage", payload).thenApply(body -> {
+            health = ProviderHealth.HEALTHY;
             JsonObject message = body.getAsJsonObject("result");
             return new PublicationRef(id(), config.chatId(), message.get("message_id").getAsString());
+        }).whenComplete((ignored, error) -> {
+            if (error != null) health = ProviderHealth.DEGRADED;
         });
     }
 
@@ -94,7 +101,12 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
         String payload = "{\"chat_id\":\"" + json(publication.containerId()) + "\",\"message_id\":\"" + json(publication.messageId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status()) + "}";
-        return current.post("editMessageText", payload).thenApply(ignored -> null);
+        return current.post("editMessageText", payload).thenApply(ignored -> {
+            health = ProviderHealth.HEALTHY;
+            return (Void) null;
+        }).whenComplete((ignored, error) -> {
+            if (error != null) health = ProviderHealth.DEGRADED;
+        });
     }
 
     private void pollLoop() {
@@ -102,6 +114,9 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
             try {
                 String payload = "{\"timeout\":20,\"offset\":" + offset + ",\"allowed_updates\":[\"callback_query\"]}";
                 JsonArray updates = api.post("getUpdates", payload).join().getAsJsonArray("result");
+                if (health == ProviderHealth.DEGRADED) {
+                    LOGGER.info("telegram.poll_recovered: Telegram polling recovered");
+                }
                 health = ProviderHealth.HEALTHY;
                 updates.forEach(update -> {
                     JsonObject value = update.getAsJsonObject();
@@ -109,6 +124,9 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
                     if (value.has("callback_query")) handleCallback(value.getAsJsonObject("callback_query"));
                 });
             } catch (Exception error) {
+                if (health != ProviderHealth.DEGRADED) {
+                    LOGGER.warn("telegram.poll_failed: {}", safeMessage(error));
+                }
                 health = ProviderHealth.DEGRADED;
                 try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
             }
@@ -246,5 +264,11 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
 
     private static String json(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+    }
+
+    private static String safeMessage(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 }
