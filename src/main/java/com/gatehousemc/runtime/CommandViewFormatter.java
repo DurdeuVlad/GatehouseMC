@@ -40,7 +40,7 @@ public final class CommandViewFormatter {
     }
 
     private static void append(StringBuilder target, String label, Object value) {
-        if (!target.isEmpty()) target.append('\n');
+        if (target.length() > 0) target.append('\n');
         target.append(label).append(": ").append(value);
     }
 }
