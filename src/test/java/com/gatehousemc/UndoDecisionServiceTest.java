@@ -123,8 +123,9 @@ class UndoDecisionServiceTest {
                     .toCompletableFuture().join();
 
             Instant later = NOW.plus(Duration.ofDays(2));
+            RequestAdmissionCache laterCache = new RequestAdmissionCache(() -> later);
             WhitelistRequestService laterRequests = new WhitelistRequestService(
-                    repository, () -> later, Duration.ofDays(1), cache);
+                    repository, () -> later, Duration.ofDays(1), laterCache);
             laterRequests.recordAttempt(PlayerIdentity.of("UndoConflict"));
             UUID activeId = repository.findActiveByName("undoconflict").orElseThrow().id();
 
