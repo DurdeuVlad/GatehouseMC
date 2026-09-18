@@ -4,6 +4,7 @@ import com.gatehousemc.application.DecisionService;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.domain.*;
 import com.gatehousemc.i18n.Messages;
+import com.gatehousemc.integration.common.ApprovalActionState;
 import com.gatehousemc.integration.common.ApprovalMessageRenderer;
 import com.gatehousemc.integration.common.CallbackActionParser;
 import com.gatehousemc.integration.common.CallbackActionParser.ParsedCallback;
@@ -81,7 +82,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     public CompletionStage<PublicationRef> publish(RequestView request) {
         TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
-        String payload = "{\"chat_id\":\"" + json(config.chatId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), false) + "}";
+        String payload = "{\"chat_id\":\"" + json(config.chatId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status()) + "}";
         return current.post("sendMessage", payload).thenApply(body -> {
             JsonObject message = body.getAsJsonObject("result");
             return new PublicationRef(id(), config.chatId(), message.get("message_id").getAsString());
@@ -92,7 +93,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     public CompletionStage<Void> update(PublicationRef publication, RequestView request) {
         TelegramTransport current = api;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Telegram is stopped"));
-        String payload = "{\"chat_id\":\"" + json(publication.containerId()) + "\",\"message_id\":\"" + json(publication.messageId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status().isTerminal()) + "}";
+        String payload = "{\"chat_id\":\"" + json(publication.containerId()) + "\",\"message_id\":\"" + json(publication.messageId()) + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(request.id(), request.status()) + "}";
         return current.post("editMessageText", payload).thenApply(ignored -> null);
     }
 
@@ -122,8 +123,12 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         String messageId = message.get("message_id").getAsString();
         String userId = from.get("id").getAsString();
         ParsedCallback parsed = CallbackActionParser.parse(callback.get("data").getAsString());
-        if (parsed == null || !config.chatId().equals(chatId) || !config.allowedUserIds().contains(userId)) {
-            api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\",\"text\":\"" + json(Messages.get("provider.not_authorized_telegram")) + "\",\"show_alert\":true}");
+        if (parsed == null) {
+            answerCallback(callbackId, Messages.get("provider.invalid_action"), true);
+            return;
+        }
+        if (!config.chatId().equals(chatId) || !config.allowedUserIds().contains(userId)) {
+            answerCallback(callbackId, Messages.get("provider.not_authorized_telegram"), true);
             return;
         }
         AdminPrincipal principal = new AdminPrincipal("telegram", userId,
@@ -131,37 +136,67 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         switch (parsed.kind()) {
             case PRIMARY -> {
                 Optional<RequestView> request = decisions.findRequest(parsed.requestId());
-                String player = request.map(r -> r.identity().exactUsername()).orElse("?");
+                if (request.isEmpty()) {
+                    answerCallback(callbackId, Messages.get("confirm.expired"), true);
+                    return;
+                }
+                RequestView current = request.get();
+                if (!ApprovalActionState.canExecute(current.status(), parsed.action())) {
+                    answerCallback(callbackId, ApprovalActionState.unavailableMessage(current.status()), true);
+                    return;
+                }
+                String player = current.identity().exactUsername();
                 String shortId = parsed.requestId().toString().substring(0, 8);
-                String confirmText = confirmMessage(parsed.action(), player, shortId);
-                String keyboard = confirmKeyboard(parsed.action(), parsed.requestId());
-                api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
-                api.post("editMessageText", "{\"chat_id\":\"" + json(chatId) + "\",\"message_id\":\"" + json(messageId) + "\",\"text\":\"" + json(confirmText) + "\",\"reply_markup\":" + keyboard + "}");
+                String confirmText = confirmMessage(parsed.action(), player, shortId, current.status());
+                String confirmationKeyboard = confirmKeyboard(parsed.action(), parsed.requestId());
+                answerCallback(callbackId, "", false);
+                api.post("editMessageText", "{\"chat_id\":\"" + json(chatId) + "\",\"message_id\":\"" + json(messageId) + "\",\"text\":\"" + json(confirmText) + "\",\"reply_markup\":" + confirmationKeyboard + "}");
             }
             case CONFIRM -> {
-                api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
-                decisions.decide(parsed.requestId(), parsed.action(), principal, Optional.empty());
+                Optional<RequestView> request = decisions.findRequest(parsed.requestId());
+                if (request.isEmpty()) {
+                    answerCallback(callbackId, Messages.get("confirm.expired"), true);
+                    return;
+                }
+                if (!ApprovalActionState.canExecute(request.get().status(), parsed.action())) {
+                    answerCallback(callbackId, ApprovalActionState.unavailableMessage(request.get().status()), true);
+                    return;
+                }
+                decisions.decide(parsed.requestId(), parsed.action(), principal, Optional.empty())
+                        .whenComplete((result, error) -> {
+                            if (error != null) {
+                                answerCallback(callbackId, Messages.get("provider.decision_failed"), true);
+                            } else {
+                                answerCallback(callbackId, result.message(), false);
+                            }
+                            refreshMessage(chatId, messageId, parsed.requestId());
+                        });
             }
             case CANCEL -> {
                 Optional<RequestView> request = decisions.findRequest(parsed.requestId());
-                api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"}");
                 if (request.isPresent()) {
+                    answerCallback(callbackId, Messages.get("confirm.cancelled"), false);
                     String originalText = render(request.get());
-                    String originalKeyboard = keyboard(parsed.requestId(), request.get().status().isTerminal());
+                    String originalKeyboard = keyboard(parsed.requestId(), request.get().status());
                     api.post("editMessageText", "{\"chat_id\":\"" + json(chatId) + "\",\"message_id\":\"" + json(messageId) + "\",\"text\":\"" + json(originalText) + "\",\"reply_markup\":" + originalKeyboard + "}");
                 } else {
-                    api.post("editMessageText", "{\"chat_id\":\"" + json(chatId) + "\",\"message_id\":\"" + json(messageId) + "\",\"text\":\"" + json(Messages.get("confirm.cancelled")) + "\"}");
+                    answerCallback(callbackId, Messages.get("confirm.expired"), true);
                 }
             }
         }
     }
 
-    private static String confirmMessage(DecisionAction action, String player, String shortId) {
+    private static String confirmMessage(DecisionAction action, String player, String shortId, RequestStatus status) {
         return switch (action) {
             case APPROVE -> Messages.get("confirm.approve", player, shortId);
             case DENY -> Messages.get("confirm.deny", player, shortId);
             case BLOCK -> Messages.get("confirm.block", player, shortId);
-            case UNDO -> Messages.get("confirm.undo", player, shortId);
+            case UNDO -> switch (status) {
+                case APPROVED -> Messages.get("confirm.undo_approval", player, shortId);
+                case DENIED -> Messages.get("confirm.reopen", player, shortId);
+                case BLOCKED -> Messages.get("confirm.unblock_reopen", player, shortId);
+                default -> Messages.get("confirm.undo", player, shortId);
+            };
         };
     }
 
@@ -175,13 +210,38 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         return ApprovalMessageRenderer.render(request);
     }
 
-    private static String keyboard(UUID requestId, boolean disabled) {
-        if (disabled) return "{\"inline_keyboard\":[]}";
-        return "{\"inline_keyboard\":[[" +
-                "{\"text\":\"✅ " + json(Messages.get("button.approve")) + "\",\"callback_data\":\"" + json(CallbackActionParser.formatPrimary(DecisionAction.APPROVE, requestId)) + "\"}," +
-                "{\"text\":\"❌ " + json(Messages.get("button.deny")) + "\",\"callback_data\":\"" + json(CallbackActionParser.formatPrimary(DecisionAction.DENY, requestId)) + "\"}," +
-                "{\"text\":\"🚫 " + json(Messages.get("button.block")) + "\",\"callback_data\":\"" + json(CallbackActionParser.formatPrimary(DecisionAction.BLOCK, requestId)) + "\"}]," +
-                "[{\"text\":\"↩ " + json(Messages.get("button.undo")) + "\",\"callback_data\":\"" + json(CallbackActionParser.formatPrimary(DecisionAction.UNDO, requestId)) + "\"}]]}";
+    static String keyboard(UUID requestId, RequestStatus status) {
+        return switch (status) {
+            case PENDING -> "{\"inline_keyboard\":[[" +
+                    buttonJson("✅", ApprovalActionState.label(status, DecisionAction.APPROVE),
+                            CallbackActionParser.formatPrimary(DecisionAction.APPROVE, requestId)) + "," +
+                    buttonJson("❌", ApprovalActionState.label(status, DecisionAction.DENY),
+                            CallbackActionParser.formatPrimary(DecisionAction.DENY, requestId)) + "],[" +
+                    buttonJson("🚫", ApprovalActionState.label(status, DecisionAction.BLOCK),
+                            CallbackActionParser.formatPrimary(DecisionAction.BLOCK, requestId)) + "]]}";
+            case APPROVED, DENIED, BLOCKED -> "{\"inline_keyboard\":[[" +
+                    buttonJson("↩", ApprovalActionState.label(status, DecisionAction.UNDO),
+                            CallbackActionParser.formatPrimary(DecisionAction.UNDO, requestId)) + "]]}";
+            case RESOLVING -> "{\"inline_keyboard\":[]}";
+        };
+    }
+
+    private static String buttonJson(String icon, String label, String callback) {
+        return "{\"text\":\"" + icon + " " + json(label) + "\",\"callback_data\":\"" + json(callback) + "\"}";
+    }
+
+    private void answerCallback(String callbackId, String message, boolean alert) {
+        String text = message == null || message.isBlank() ? "" : ",\"text\":\"" + json(message) + "\"";
+        api.post("answerCallbackQuery", "{\"callback_query_id\":\"" + json(callbackId) + "\"" + text
+                + (alert ? ",\"show_alert\":true" : "") + "}");
+    }
+
+    private void refreshMessage(String chatId, String messageId, UUID requestId) {
+        decisions.findRequest(requestId).ifPresent(request -> {
+            String payload = "{\"chat_id\":\"" + json(chatId) + "\",\"message_id\":\"" + json(messageId)
+                    + "\",\"text\":\"" + json(render(request)) + "\",\"reply_markup\":" + keyboard(requestId, request.status()) + "}";
+            api.post("editMessageText", payload);
+        });
     }
 
     private static String json(String value) {
