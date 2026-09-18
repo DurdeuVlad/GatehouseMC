@@ -776,7 +776,7 @@ Telegram callback data has a small size limit; the action + canonical request UU
 
 Provider config validation errors disable that provider and surface status, rather than crashing Minecraft unless a core-required config (e.g. database path) is unusable.
 
-`/gatehouse reload` (or `/wlreq reload`) should restart affected providers safely. Do not change database path on live reload.
+`/gatehouse reload` (or `/wlreq reload`) builds a replacement runtime off-thread and swaps it in only after successful initialization. If replacement startup fails, the previous healthy runtime remains active and the invoking administrator receives the failure reason. A live `database.path` change is rejected with an explicit restart-required result while a healthy runtime owns the current store.
 
 ---
 
@@ -838,15 +838,14 @@ storage.degraded
 
 Never log provider tokens. Avoid logging full callback payloads if they may include sensitive metadata.
 
-`/wlreq status` should report:
+`/gatehouse status` (and aliases) must remain callable while the runtime is starting or degraded. At minimum it reports:
 
-- service health;
-- DB health/path (not credentials; SQLite only);
-- request queue depth;
-- outbox ready/retrying counts;
-- provider health;
-- routing mode;
-- Minecraft mode warnings (`online-mode`, whitelist enabled).
+- service state (`STARTING`, `HEALTHY`, or `DEGRADED`);
+- request queue depth when the runtime is healthy;
+- pending outbox delivery count when storage is available;
+- each configured provider's health, distinguishing disabled providers from degraded/unavailable providers.
+
+Additional DB/routing/Minecraft-mode diagnostics may be added without exposing secrets.
 
 ---
 

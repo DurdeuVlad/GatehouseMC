@@ -114,19 +114,19 @@ notifications.
 
 ## Manual release commands
 
-The support branches must already point at the reviewed 1.1.0 commit. Create
+The support branches must already point at the reviewed 1.1.1 commit. Create
 the tags locally from those branches, inspect them, and then push each tag:
 
 ```powershell
 git switch support/fabric/1.21.1
-git tag v1.1.0-fabric-mc1.21.1
-git push origin v1.1.0-fabric-mc1.21.1
+git tag v1.1.1-fabric-mc1.21.1
+git push origin v1.1.1-fabric-mc1.21.1
 git switch support/forge/1.20.1
-git tag v1.1.0-forge-mc1.20.1
-git push origin v1.1.0-forge-mc1.20.1
+git tag v1.1.1-forge-mc1.20.1
+git push origin v1.1.1-forge-mc1.20.1
 git switch support/neoforge/1.21.1
-git tag v1.1.0-neoforge-mc1.21.1
-git push origin v1.1.0-neoforge-mc1.21.1
+git tag v1.1.1-neoforge-mc1.21.1
+git push origin v1.1.1-neoforge-mc1.21.1
 ```
 
 The storefront version is loader-qualified as

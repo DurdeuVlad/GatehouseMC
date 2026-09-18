@@ -46,21 +46,21 @@ Players do **not** need a client-side mod, Discord account, or external registra
 - 🛡️ **Native whitelist authority:** Approval updates Minecraft's own `whitelist.json`.
 - 💬 **Optional Discord and Telegram workflows:** Review and resolve requests from your staff channels.
 - ⚡ **In-game administration:** Use `/gatehouse`, `/gh`, or `/wlreq`.
-- ↩️ **Safe reversals:** Approve, deny, block, unblock, undo, reload, and inspect request status.
+- ↩️ **Safe reversals:** Terminal Discord/Telegram messages keep the applicable Undo/Reopen action, and in-game commands can recover by username or full request UUID.
 - 💾 **Durable storage:** SQLite persistence and an outbox keep requests recoverable across restarts and provider outages.
 - 🚫 **No client dependency:** Install GatehouseMC on the dedicated server only.
 
 ## 💻 Commands
 
-- `/gatehouse list [pending|approved|denied|blocked]` — List requests.
+- `/gatehouse list [pending|resolving|approved|denied|blocked]` — List requests.
 - `/gatehouse show <request-id|username>` — View request details and history.
 - `/gatehouse approve <request-id|username> [reason]` — Approve and add to the vanilla whitelist.
 - `/gatehouse deny <request-id|username> [reason]` — Deny a request.
 - `/gatehouse block <request-id|username> [reason]` — Block future requests.
 - `/gatehouse unblock <username> [reason]` — Remove a username block.
 - `/gatehouse undo <request-id|username> [reason]` — Reopen or reverse the last decision.
-- `/gatehouse status` — Check worker and database health.
-- `/gatehouse reload` — Reload configuration.
+- `/gatehouse status` — Check core, queue, delivery, and provider health; remains usable while Gatehouse is starting/degraded.
+- `/gatehouse reload` — Reload configuration safely and report completion; a failed replacement keeps the current healthy runtime active.
 
 ## ⚙️ Installation
 

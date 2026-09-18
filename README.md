@@ -47,7 +47,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The Fabric 1.21.1 artifact is written to `build/libs/gatehousemc-1.1.0.jar`. NeoForge and Forge artifacts are written to their platform build directories. A release artifact is publishable only when its internal loader metadata and Minecraft dependency match its label; CI enforces this with `tools/release/validate_artifact.py`. Fabric nests its runtime libraries; Forge and NeoForge use loader-provided Gson/SLF4J and nest SQLite, JDA, and JDA's remaining runtime graph.
+The Fabric 1.21.1 artifact is written to `build/libs/gatehousemc-1.1.1.jar`. NeoForge and Forge artifacts are written to their platform build directories. A release artifact is publishable only when its internal loader metadata and Minecraft dependency match its label; CI enforces this with `tools/release/validate_artifact.py`. Fabric nests its runtime libraries; Forge and NeoForge use loader-provided Gson/SLF4J and nest SQLite, JDA, and JDA's remaining runtime graph.
 
 The Forge lane uses Gradle 8.8 because ForgeGradle 6 rejects Gradle 9+. Run it explicitly with `gradle -PenableForge :platform-forge:build`; the normal wrapper builds Fabric and NeoForge.
 
@@ -83,7 +83,7 @@ config/gatehousemc/requests.sqlite
 Minecraft commands are always available after the server starts:
 
 ```text
-/gatehouse list [pending|approved|denied|blocked]
+/gatehouse list [pending|resolving|approved|denied|blocked]
 /gatehouse show <request-id|username>
 /gatehouse approve <request-id|username> [reason...]
 /gatehouse deny <request-id|username> [reason...]
@@ -94,9 +94,13 @@ Minecraft commands are always available after the server starts:
 /gatehouse reload
 ```
 
+Run `/gatehouse` with no subcommand for the same usage summary. `list` prints complete request UUIDs. A username passed to `show` resolves its latest historical request; usernames passed to `approve`, `deny`, or `block` resolve only the active request; `undo <username>` resolves the latest approved/denied/blocked request. A full UUID always addresses that exact request. Historical undo refuses to create a second active request if the same username already has a pending/resolving request.
+
+`/gatehouse status` remains available while Gatehouse is starting or degraded and reports core/provider state. `/gatehouse reload` reports completion back to the invoking administrator and keeps the previous healthy runtime running if replacement startup fails; changing `database.path` still requires a server restart.
+
 *(Commands also respond to `/gh` and `/wlreq` aliases).*
 
-Discord and Telegram are disabled by default. Enable them only after setting stable administrator IDs and provider secrets. Secrets can use `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`; expanded values stay in memory and are never written back or included in status output.
+Discord and Telegram are disabled by default. Enable them only after setting stable administrator IDs and provider secrets. Provider actions are request-state-aware: pending requests expose Approve/Deny/Block; approved, denied, and blocked requests retain the appropriate Undo/Reopen recovery action; resolving requests expose no mutable action. Secrets can use `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`; expanded values stay in memory and are never written back or included in status output.
 
 Discord normally publishes to a guild text channel:
 

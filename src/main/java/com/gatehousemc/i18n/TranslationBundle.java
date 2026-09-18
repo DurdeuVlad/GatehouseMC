@@ -6,12 +6,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Immutable set of translations for a single language.
  * Falls back to the key itself if no translation is found.
  */
 public final class TranslationBundle {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TranslationBundle.class);
     private static final String RESOURCE_PREFIX = "/assets/gatehousemc/lang/";
     private static final String RESOURCE_SUFFIX = ".json";
 
@@ -36,6 +39,7 @@ public final class TranslationBundle {
         try (InputStream stream = TranslationBundle.class.getResourceAsStream(RESOURCE_PREFIX + normalized + RESOURCE_SUFFIX)) {
             if (stream == null) {
                 if (normalized.equals("en_us")) return new TranslationBundle(normalized, Map.of());
+                LOGGER.warn("language.unsupported configured={} fallback=en_us", normalized);
                 return load("en_us");
             }
             String json = new String(stream.readAllBytes(), StandardCharsets.UTF_8);

@@ -37,7 +37,7 @@ class DiscordApprovalInterfaceTest {
         assertTrue(transport.lastText.contains("TestPlayer"));
         assertTrue(transport.lastText.contains("OFFLINE / UNAUTHENTICATED"));
         assertEquals(requestId, transport.lastRequestId);
-        assertFalse(transport.lastDisabled);
+        assertEquals(RequestStatus.PENDING, transport.lastStatus);
     }
 
     @Test
@@ -206,17 +206,37 @@ class DiscordApprovalInterfaceTest {
     }
 
     @Test
+    void terminalRequestKeepsOnlyUndoAvailable() {
+        UUID requestId = UUID.randomUUID();
+        var buttons = DiscordApprovalInterface.actionButtons(requestId, RequestStatus.DENIED);
+
+        assertTrue(buttons[0].isDisabled());
+        assertTrue(buttons[1].isDisabled());
+        assertTrue(buttons[2].isDisabled());
+        assertFalse(buttons[3].isDisabled());
+        assertEquals("Reopen", buttons[3].getLabel());
+    }
+
+    @Test
+    void resolvingRequestDisablesEveryAction() {
+        UUID requestId = UUID.randomUUID();
+        var buttons = DiscordApprovalInterface.actionButtons(requestId, RequestStatus.RESOLVING);
+
+        for (var button : buttons) assertTrue(button.isDisabled());
+    }
+
+    @Test
     void publishPropagatesTransportFailureException() {
         RequestView request = new RequestView(UUID.randomUUID(), PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         DiscordTransport failingTransport = new DiscordTransport() {
             @Override
-            public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+            public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, RequestStatus status) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Discord bot lacks View Channel permission there"));
             }
 
             @Override
-            public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled) {
+            public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, RequestStatus status) {
                 return CompletableFuture.completedFuture(null);
             }
 
@@ -239,22 +259,22 @@ class DiscordApprovalInterfaceTest {
         String lastText;
         String lastChannelId;
         UUID lastRequestId;
-        boolean lastDisabled;
+        RequestStatus lastStatus;
 
         @Override
-        public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+        public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, RequestStatus status) {
             lastChannelId = channelId;
             lastText = text;
             lastRequestId = requestId;
-            lastDisabled = disabled;
+            lastStatus = status;
             return CompletableFuture.completedFuture(nextMessageId);
         }
 
         @Override
-        public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled) {
+        public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, RequestStatus status) {
             lastText = text;
             lastRequestId = requestId;
-            lastDisabled = disabled;
+            lastStatus = status;
             return CompletableFuture.completedFuture(null);
         }
 

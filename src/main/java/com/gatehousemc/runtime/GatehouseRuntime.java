@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -160,7 +161,7 @@ public final class GatehouseRuntime implements AutoCloseable {
         }
         return switch (known.kind()) {
             case BLOCKED -> new AdmissionResponse(known.kind(), Messages.get("reject.blocked"));
-            case DENIED -> new AdmissionResponse(known.kind(), Messages.get("reject.denied"));
+            case DENIED -> new AdmissionResponse(known.kind(), Messages.get("reject.denied", known.until()));
             case PENDING -> new AdmissionResponse(known.kind(), Messages.get("reject.pending", identity.exactUsername()));
             case UNKNOWN -> new AdmissionResponse(known.kind(), Messages.get("reject.unknown", identity.exactUsername()));
             case DEGRADED -> new AdmissionResponse(known.kind(), Messages.get("reject.unavailable"));
@@ -176,6 +177,28 @@ public final class GatehouseRuntime implements AutoCloseable {
     public Optional<WhitelistRequest> find(UUID id) { return repository == null ? Optional.empty() : repository.findById(id); }
     public Optional<WhitelistRequest> active(String username) {
         return repository == null ? Optional.empty() : repository.findActiveByName(username.toLowerCase(Locale.ROOT));
+    }
+
+    public Optional<WhitelistRequest> latest(String username) {
+        return repository == null ? Optional.empty() : repository.findLatestByName(username.toLowerCase(Locale.ROOT));
+    }
+
+    public Optional<WhitelistRequest> latestTerminal(String username) {
+        return repository == null ? Optional.empty()
+                : repository.findLatestTerminalByName(username.toLowerCase(Locale.ROOT));
+    }
+
+    public String providerHealthSummary() {
+        if (providers.isEmpty()) return "none";
+        StringJoiner summary = new StringJoiner(", ");
+        for (ApprovalInterface provider : providers) {
+            String state;
+            if ("discord".equals(provider.id()) && !config.discord().enabled()) state = "DISABLED";
+            else if ("telegram".equals(provider.id()) && !config.telegram().enabled()) state = "DISABLED";
+            else state = provider.health().name();
+            summary.add(provider.id() + "=" + state);
+        }
+        return summary.toString();
     }
 
     @Override

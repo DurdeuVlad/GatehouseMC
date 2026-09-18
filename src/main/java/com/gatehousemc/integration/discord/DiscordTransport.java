@@ -1,5 +1,7 @@
 package com.gatehousemc.integration.discord;
 
+import com.gatehousemc.domain.RequestStatus;
+
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -9,16 +11,16 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface DiscordTransport {
     /**
-     * Sends a message with approve/deny/block buttons to the specified channel.
+     * Sends a message with state-appropriate decision buttons to the specified channel.
      * @return the message ID
      */
-    CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled);
+    CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, RequestStatus status);
 
     /**
      * Edits an existing message and updates its buttons.
      * @return void on success
      */
-    CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled);
+    CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, RequestStatus status);
 
     /** Starts the transport (e.g. JDA connection). */
     void start();

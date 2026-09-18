@@ -2,6 +2,32 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.1.1 — Admin recovery and UX hardening
+
+### Fixed
+- Restored complete command parity across Fabric, Forge, and NeoForge: `list`, `show`, `approve`, `deny`, `block`, `undo`, `unblock`, `status`, and `reload`.
+- Kept the Gatehouse command tree visible while the runtime is starting or degraded so operators receive actionable Gatehouse diagnostics instead of an apparent unknown command.
+- Made `/gatehouse` without a subcommand print usage help; invalid list statuses now fail explicitly instead of silently listing every request.
+- Made `/gatehouse list` print complete, directly usable request UUIDs and added the `resolving` status filter.
+- Added deterministic historical username lookup: `show` uses the latest request, terminal decisions use the active request, and `undo` uses the latest terminal request.
+- Prevented historical undo from colliding with a newer active request for the same normalized username, and fixed `DecisionService` to preserve repository undo failure/conflict outcomes instead of reporting false success.
+- Forwarded optional unblock reasons consistently on all loaders.
+- Made `/gatehouse status` report startup/degraded state and provider health, and improved command/repository failure feedback.
+- Made reload transactional from the operator's perspective: replacement runtime startup must succeed before swap; failed reloads keep the previous healthy runtime active and report the failure to the invoking administrator.
+- Added Forge and NeoForge live reload support with the same database-path restart rule as Fabric.
+- Made Discord and Telegram actions state-aware. Pending requests expose Approve/Deny/Block; terminal requests retain the applicable Undo/Reopen action; resolving requests expose no mutable action.
+- Revalidated provider actions at confirmation time so stale buttons cannot silently apply an action that is no longer legal.
+- Made Telegram confirmed decisions return success/failure feedback and refresh the authoritative request message; malformed callbacks are now distinguished from authorization failures.
+- Made Discord channel validation affect reported provider health and added Telegram poll degradation/recovery diagnostics.
+- Made player-facing denial cooldown messages include the exact retry-after timestamp and added a distinct Gatehouse-starting rejection message.
+- Expanded request details with attempts, timestamps, resolver, resolution reason, and resolving action.
+
+### Tests and guardrails
+- Added state/action UX tests for provider controls.
+- Added a regression test for historical undo versus a newer active request.
+- Added cross-loader command-source parity checks so command drift is release-blocking.
+- Added command rendering tests proving listed request IDs are resolvable full UUIDs and resolution context is visible.
+
 ## 1.1.0 — Native NeoForge and Forge support, multi-loader foundation, and cross-platform hardening
 
 - Added native NeoForge (1.21.1) and Forge (1.20.1) support without requiring Sinytra Connector.

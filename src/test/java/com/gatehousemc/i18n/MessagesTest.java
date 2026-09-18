@@ -14,6 +14,8 @@ class MessagesTest {
         Messages.load("en_us");
         assertEquals("Approve", Messages.get("button.approve"));
         assertEquals("Undo", Messages.get("button.undo"));
+        assertEquals("Undo approval", Messages.get("button.undo_approval"));
+        assertEquals("Reopen", Messages.get("button.reopen"));
         assertTrue(Messages.get("reject.unknown", "Alice").contains("Alice"));
         assertTrue(Messages.get("reject.unknown").contains("{0}"));
     }
@@ -24,6 +26,7 @@ class MessagesTest {
         assertEquals("Aproba", Messages.get("button.approve"));
         assertEquals("Anuleaza", Messages.get("button.undo"));
         assertTrue(Messages.get("reject.unknown", "Bob").contains("Bob"));
+        assertEquals("Redeschide", Messages.get("button.reopen"));
     }
 
     @Test

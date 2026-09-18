@@ -57,8 +57,14 @@ public final class ConfigLoader {
         long cooldown = longValue(requests, "denialCooldownMinutes", defaults.requests().denialCooldownMinutes());
         int queue = intValue(requests, "queueCapacity", defaults.requests().queueCapacity());
         int permission = intValue(requests, "commandPermissionLevel", defaults.requests().commandPermissionLevel());
-        if (cooldown < 0 || queue < 1 || permission < 0 || permission > 4) {
-            throw new IllegalArgumentException("Invalid requests configuration");
+        if (cooldown < 0) {
+            throw new IllegalArgumentException("requests.denialCooldownMinutes must be non-negative");
+        }
+        if (queue < 1) {
+            throw new IllegalArgumentException("requests.queueCapacity must be at least 1");
+        }
+        if (permission < 0 || permission > 4) {
+            throw new IllegalArgumentException("requests.commandPermissionLevel must be between 0 and 4");
         }
 
         String configuredDbPath = stringValue(database, "path", defaults.database().path().toString()).trim();

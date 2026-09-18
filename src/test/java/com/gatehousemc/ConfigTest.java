@@ -62,6 +62,27 @@ class ConfigTest {
     }
 
     @Test
+    void invalidRequestSettingsNameTheBadField(@TempDir Path configDir) {
+        IllegalArgumentException cooldown = assertThrows(IllegalArgumentException.class,
+                () -> ConfigLoader.parse(JsonParser.parseString("""
+                        { "requests": { "denialCooldownMinutes": -1 } }
+                        """).getAsJsonObject(), configDir));
+        assertTrue(cooldown.getMessage().contains("requests.denialCooldownMinutes"));
+
+        IllegalArgumentException queue = assertThrows(IllegalArgumentException.class,
+                () -> ConfigLoader.parse(JsonParser.parseString("""
+                        { "requests": { "queueCapacity": 0 } }
+                        """).getAsJsonObject(), configDir));
+        assertTrue(queue.getMessage().contains("requests.queueCapacity"));
+
+        IllegalArgumentException permission = assertThrows(IllegalArgumentException.class,
+                () -> ConfigLoader.parse(JsonParser.parseString("""
+                        { "requests": { "commandPermissionLevel": 5 } }
+                        """).getAsJsonObject(), configDir));
+        assertTrue(permission.getMessage().contains("requests.commandPermissionLevel"));
+    }
+
+    @Test
     void duplicateRoutingProvidersAreRejected(@TempDir Path configDir) {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> ConfigLoader.parse(JsonParser.parseString("""

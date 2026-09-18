@@ -15,6 +15,10 @@ public interface WorkflowRepository extends AutoCloseable {
 
     Optional<WhitelistRequest> findActiveByName(String normalizedUsername);
 
+    Optional<WhitelistRequest> findLatestByName(String normalizedUsername);
+
+    Optional<WhitelistRequest> findLatestTerminalByName(String normalizedUsername);
+
     List<WhitelistRequest> findByStatus(Optional<RequestStatus> status, int limit);
 
     void savePublication(UUID requestId, PublicationRef publication, Instant now);

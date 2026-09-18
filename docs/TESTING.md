@@ -15,11 +15,11 @@ Run the modern lanes with Java 21 and the repository wrapper:
 ```bash
 ./gradlew clean test build :platform-neoforge:build
 python tools/release/validate_artifact.py \
-  --artifact build/libs/gatehousemc-1.1.0.jar \
-  --loader fabric --minecraft 1.21.1 --version 1.1.0
+  --artifact build/libs/gatehousemc-1.1.1.jar \
+  --loader fabric --minecraft 1.21.1 --version 1.1.1
 python tools/release/validate_artifact.py \
-  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.0.jar \
-  --loader neoforge --minecraft 1.21.1 --version 1.1.0
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.1.jar \
+  --loader neoforge --minecraft 1.21.1 --version 1.1.1
 ```
 
 Run the Forge lane with Java 17 and Gradle 8.8:
@@ -27,8 +27,8 @@ Run the Forge lane with Java 17 and Gradle 8.8:
 ```bash
 gradle -PenableForge :platform-forge:build
 python tools/release/validate_artifact.py \
-  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.0-all.jar \
-  --loader forge --minecraft 1.20.1 --version 1.1.0
+  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.1-all.jar \
+  --loader forge --minecraft 1.20.1 --version 1.1.1
 ```
 
 The validator checks the exact loader metadata, Minecraft dependency, entrypoint, icon, core classes, and nested SQLite runtime. It is intentionally fail-closed: no loader/version pair is publishable until its build, artifact validation, and clean dedicated-server E2E columns are all green.
@@ -64,6 +64,9 @@ Required surfaces:
 - outbox retry/backoff;
 - config parsing/validation/env expansion/redaction;
 - authorization policy value logic;
+- state-aware provider action availability and stale-confirmation rejection;
+- cross-loader command-tree parity, including undo/reload and full request IDs;
+- historical undo conflict behavior when another active request exists;
 - architecture import rules if implemented.
 
 ### Tier 2 — Component/integration tests without Minecraft process
@@ -140,11 +143,11 @@ server process:
 ```bash
 npm --prefix tools/e2e ci
 bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565 \
-  build/libs/gatehousemc-1.1.0.jar 1.21.1
+  build/libs/gatehousemc-1.1.1.jar 1.21.1
 bash tools/e2e/run-clean-server-smoke.sh forge .e2e-forge 25566 \
-  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.0-all.jar 1.20.1
+  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.1-all.jar 1.20.1
 bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-neoforge 25567 \
-  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.0.jar 1.21.1
+  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.1.jar 1.21.1
 ```
 
 ---
@@ -385,6 +388,34 @@ Do not add a dangerous production command solely for this test.
 
 ---
 
+### E2E-11 — Admin recovery command parity
+
+Run this scenario on every 1.1.x source-build loader target: Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1.
+
+1. Create a request for `E2E_Recovery`.
+2. Run `gatehouse list pending` and capture the complete request UUID from command output.
+3. Deny it by username and assert `DENIED`.
+4. Run `gatehouse show E2E_Recovery` and assert the denied historical request is shown with the same complete UUID.
+5. Run `gatehouse undo E2E_Recovery` and assert it returns to `PENDING`.
+6. Deny it again, then run `gatehouse undo <full-request-uuid>` and assert it returns to `PENDING`.
+7. Run `gatehouse status` and assert Gatehouse reports a meaningful health state.
+8. Run `gatehouse reload`, wait for the completion message, then run `gatehouse status` again and assert the runtime remains operational.
+
+The scenario fails if a supported loader reports an unknown/missing `undo` or `reload` command, if `list` emits only a shortened UUID, or if reload provides no completion result.
+
+### E2E-12 — Historical undo conflict
+
+Create and deny request A for one normalized username, advance beyond the denial cooldown, then create request B for the same username. Attempt to undo request A by its exact UUID.
+
+Assert:
+
+- Gatehouse reports that another active request already exists and includes request B's UUID;
+- request A remains terminal;
+- request B remains the only `PENDING`/`RESOLVING` request;
+- no whitelist/block side effect is applied to the wrong request.
+
+---
+
 ## 7. Provider/router component scenarios
 
 Real Discord/Telegram internet access is not required for every CI run. External services are inherently flaky and require secrets. Provider logic must be testable behind boundaries.
@@ -427,7 +458,21 @@ Adapter rejects and answers callback safely.
 
 ### P-07 — Stale button
 
-Request already resolved; button action returns already resolved and does not mutate state.
+Change the request state after an action is rendered but before confirmation.
+
+Assert the adapter re-fetches authoritative state, rejects an action that is no longer legal, and does not mutate the request.
+
+### P-08 — Terminal recovery controls
+
+For Discord and Telegram, update messages to each terminal status.
+
+Assert:
+
+- `APPROVED` exposes only the approval undo/recovery action;
+- `DENIED` exposes only Reopen;
+- `BLOCKED` exposes only Unblock & reopen;
+- `RESOLVING` exposes no mutable action;
+- Telegram confirms decisions with `answerCallbackQuery` feedback and refreshes the message afterward.
 
 ---
 

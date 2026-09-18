@@ -109,6 +109,36 @@ class UndoDecisionServiceTest {
     }
 
     @Test
+    void undoHistoricalDeniedRequestRefusesToCollideWithNewActiveRequest(@TempDir Path temp) throws Exception {
+        try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
+            WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ofDays(1), cache);
+            requests.recordAttempt(PlayerIdentity.of("UndoConflict"));
+            UUID historicalId = repository.findActiveByName("undoconflict").orElseThrow().id();
+            CountingWhitelist whitelist = new CountingWhitelist();
+            DecisionService decisions = new DecisionService(repository, whitelist, () -> NOW, cache, Duration.ofDays(1));
+
+            decisions.decide(historicalId, DecisionAction.DENY, AdminPrincipal.console(), Optional.empty())
+                    .toCompletableFuture().join();
+
+            Instant later = NOW.plus(Duration.ofDays(2));
+            RequestAdmissionCache laterCache = new RequestAdmissionCache(() -> later);
+            WhitelistRequestService laterRequests = new WhitelistRequestService(
+                    repository, () -> later, Duration.ofDays(1), laterCache);
+            laterRequests.recordAttempt(PlayerIdentity.of("UndoConflict"));
+            UUID activeId = repository.findActiveByName("undoconflict").orElseThrow().id();
+
+            var undoResult = decisions.decide(historicalId, DecisionAction.UNDO, AdminPrincipal.console(), Optional.empty())
+                    .toCompletableFuture().join();
+
+            assertEquals(DecisionOutcome.ACTIVE_REQUEST_EXISTS, undoResult.outcome());
+            assertEquals(RequestStatus.DENIED, repository.findById(historicalId).orElseThrow().status());
+            assertEquals(RequestStatus.PENDING, repository.findById(activeId).orElseThrow().status());
+        }
+    }
+
+    @Test
     void undoPendingRequestReturnsAlreadyPending(@TempDir Path temp) throws Exception {
         try (SqliteDatabase database = new SqliteDatabase(temp.resolve("requests.sqlite"), 5000);
              SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
