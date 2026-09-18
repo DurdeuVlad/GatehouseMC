@@ -100,6 +100,24 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
     }
 
     @Override
+    public synchronized Optional<WhitelistRequest> findLatestByName(String normalizedUsername) {
+        try {
+            return Optional.ofNullable(requests.findLatestByName(normalizedUsername));
+        } catch (SQLException exception) {
+            throw storageFailure("find_latest_request", exception);
+        }
+    }
+
+    @Override
+    public synchronized Optional<WhitelistRequest> findLatestTerminalByName(String normalizedUsername) {
+        try {
+            return Optional.ofNullable(requests.findLatestTerminalByName(normalizedUsername));
+        } catch (SQLException exception) {
+            throw storageFailure("find_latest_terminal_request", exception);
+        }
+    }
+
+    @Override
     public synchronized List<WhitelistRequest> findByStatus(Optional<RequestStatus> status, int limit) {
         try {
             return requests.findByStatus(status, limit);
@@ -279,6 +297,12 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 tx.rollbackQuietly();
                 return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(request), "Request is currently resolving");
             }
+            WhitelistRequest active = requests.findActiveByName(request.identity().normalizedUsername());
+            if (active != null && !active.id().equals(requestId)) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.ACTIVE_REQUEST_EXISTS, Optional.of(active),
+                        "Player already has active request " + active.id());
+            }
             boolean wasBlocked = request.status() == RequestStatus.BLOCKED;
             if (!requests.reopen(requestId, actor, reason, now)) {
                 tx.rollbackQuietly();
@@ -298,6 +322,18 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             return new DecisionResultSnapshot(DecisionOutcome.UNDONE, Optional.of(reopened), "Request reopened");
         } catch (SQLException exception) {
             tx.rollbackQuietly();
+            try {
+                WhitelistRequest target = requests.findById(requestId);
+                if (target != null) {
+                    WhitelistRequest active = requests.findActiveByName(target.identity().normalizedUsername());
+                    if (active != null && !active.id().equals(requestId)) {
+                        return new DecisionResultSnapshot(DecisionOutcome.ACTIVE_REQUEST_EXISTS, Optional.of(active),
+                                "Player already has active request " + active.id());
+                    }
+                }
+            } catch (SQLException ignored) {
+                // Preserve the original persistence failure below.
+            }
             return new DecisionResultSnapshot(DecisionOutcome.FAILED, Optional.empty(), "Database error while reopening request");
         } finally {
             tx.resetAutoCommit();
@@ -321,6 +357,12 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 tx.rollbackQuietly();
                 return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(request), "Request is currently resolving");
             }
+            WhitelistRequest active = requests.findActiveByName(request.identity().normalizedUsername());
+            if (active != null && !active.id().equals(requestId)) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.ACTIVE_REQUEST_EXISTS, Optional.of(active),
+                        "Player already has active request " + active.id());
+            }
             if (!requests.claimUndo(requestId, actor, reason, now, token)) {
                 tx.rollbackQuietly();
                 WhitelistRequest current = requests.findById(requestId);
@@ -334,6 +376,18 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(requests.findById(requestId)), "Undo claimed");
         } catch (SQLException exception) {
             tx.rollbackQuietly();
+            try {
+                WhitelistRequest target = requests.findById(requestId);
+                if (target != null) {
+                    WhitelistRequest active = requests.findActiveByName(target.identity().normalizedUsername());
+                    if (active != null && !active.id().equals(requestId)) {
+                        return new DecisionResultSnapshot(DecisionOutcome.ACTIVE_REQUEST_EXISTS, Optional.of(active),
+                                "Player already has active request " + active.id());
+                    }
+                }
+            } catch (SQLException ignored) {
+                // Preserve the original persistence failure below.
+            }
             return new DecisionResultSnapshot(DecisionOutcome.FAILED, Optional.empty(), "Database error while claiming undo");
         } finally {
             tx.resetAutoCommit();
