@@ -44,6 +44,9 @@ public final class ForgeRuntime implements AutoCloseable {
     public boolean degraded() { return delegate.degraded(); }
     public Optional<WhitelistRequest> find(UUID id) { return delegate.find(id); }
     public Optional<WhitelistRequest> active(String username) { return delegate.active(username); }
+    public Optional<WhitelistRequest> latest(String username) { return delegate.latest(username); }
+    public Optional<WhitelistRequest> latestTerminal(String username) { return delegate.latestTerminal(username); }
+    public String providerHealthSummary() { return delegate.providerHealthSummary(); }
     MinecraftServer server() { return server; }
 
     @Override
