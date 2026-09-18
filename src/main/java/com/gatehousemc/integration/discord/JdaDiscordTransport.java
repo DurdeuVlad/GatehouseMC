@@ -1,5 +1,6 @@
 package com.gatehousemc.integration.discord;
 
+import com.gatehousemc.domain.RequestStatus;
 import com.gatehousemc.i18n.Messages;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
@@ -66,15 +67,15 @@ final class JdaDiscordTransport implements DiscordTransport {
     }
 
     @Override
-    public CompletableFuture<String> sendMessage(String destination, String text, UUID requestId, boolean disabled) {
+    public CompletableFuture<String> sendMessage(String destination, String text, UUID requestId, RequestStatus status) {
         return resolveChannel(destination).thenCompose(channel -> channel.sendMessage(text)
-                .addComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, disabled))))
+                .addComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, status))))
                 .submit())
                 .thenApply(message -> message.getId());
     }
 
     @Override
-    public CompletableFuture<Void> editMessage(String destination, String messageId, String text, UUID requestId, boolean disabled) {
+    public CompletableFuture<Void> editMessage(String destination, String messageId, String text, UUID requestId, RequestStatus status) {
         return resolveChannel(destination).thenCompose(channel -> channel.editMessageById(messageId, text)
                 .setComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, disabled))))
                 .submit())
@@ -230,8 +231,8 @@ final class JdaDiscordTransport implements DiscordTransport {
         return null;
     }
 
-    private static Button[] actionButtons(UUID requestId, boolean disabled) {
-        return DiscordApprovalInterface.actionButtons(requestId, disabled);
+    private static Button[] actionButtons(UUID requestId, RequestStatus status) {
+        return DiscordApprovalInterface.actionButtons(requestId, status);
     }
 
     private static Throwable rootCause(Throwable error) {
