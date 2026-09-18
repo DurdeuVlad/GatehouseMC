@@ -3,6 +3,7 @@ package com.gatehousemc.platform.neoforge;
 import com.gatehousemc.config.ConfigLoader;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.i18n.Messages;
+import com.gatehousemc.runtime.ReloadResult;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.common.Mod;
@@ -13,6 +14,8 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,6 +30,7 @@ public final class GatehouseNeoForgeMod {
         return thread;
     });
     private static final AtomicBoolean STOPPING = new AtomicBoolean();
+    private static final Object RUNTIME_LOCK = new Object();
     private static volatile NeoForgeRuntime runtime;
 
     public GatehouseNeoForgeMod() {
@@ -36,34 +40,48 @@ public final class GatehouseNeoForgeMod {
     }
 
     private void onServerStarted(ServerStartedEvent event) {
-        STOPPING.set(false);
+        synchronized (RUNTIME_LOCK) {
+            STOPPING.set(false);
+            runtime = null;
+        }
         STARTUP_EXECUTOR.execute(() -> startRuntime(event.getServer(), FMLPaths.CONFIGDIR.get().resolve(MOD_ID)));
     }
 
     private static void startRuntime(net.minecraft.server.MinecraftServer server, Path configDir) {
-        if (STOPPING.get()) return;
+        synchronized (RUNTIME_LOCK) {
+            if (STOPPING.get()) return;
+        }
         ModConfig config = null;
         try {
             config = ConfigLoader.loadOrDefault(configDir);
             Messages.load(config.language());
             NeoForgeRuntime started = NeoForgeRuntime.start(server, config);
-            if (STOPPING.get() || runtime != null) {
-                started.close();
-                return;
+            synchronized (RUNTIME_LOCK) {
+                if (STOPPING.get() || runtime != null) {
+                    started.close();
+                    return;
+                }
+                runtime = started;
             }
-            runtime = started;
+            LOGGER.info("GatehouseMC started: {}", config.redactedSummary());
         } catch (Exception error) {
-            if (!STOPPING.get() && runtime == null) {
-                runtime = NeoForgeRuntime.degraded(server, config == null ? ModConfig.defaults(configDir) : config);
-                System.err.println("GatehouseMC failed to start: " + error.getMessage());
+            synchronized (RUNTIME_LOCK) {
+                if (!STOPPING.get() && runtime == null) {
+                    if (config != null) Messages.load(config.language());
+                    runtime = NeoForgeRuntime.degraded(server, config == null ? ModConfig.defaults(configDir) : config);
+                    LOGGER.error("storage.degraded: GatehouseMC request persistence is unavailable", error);
+                }
             }
         }
     }
 
     private void onServerStopping(ServerStoppingEvent event) {
-        STOPPING.set(true);
-        NeoForgeRuntime current = runtime;
-        runtime = null;
+        NeoForgeRuntime current;
+        synchronized (RUNTIME_LOCK) {
+            STOPPING.set(true);
+            current = runtime;
+            runtime = null;
+        }
         if (current != null) current.close();
     }
 
@@ -73,7 +91,7 @@ public final class GatehouseNeoForgeMod {
 
     public static Component handleWhitelistDenial(GameProfile profile) {
         NeoForgeRuntime current = runtime;
-        if (current == null) return Component.translatable("multiplayer.disconnect.not_whitelisted");
+        if (current == null) return Component.literal(Messages.get("reject.starting"));
         try {
             if (current.server() != null && current.server().getProfileCache() != null && profile != null) {
                 current.server().getProfileCache().add(profile);
@@ -81,9 +99,59 @@ public final class GatehouseNeoForgeMod {
             return current.onWhitelistDenied(new NeoForgeRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
         } catch (Exception error) {
             LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
-            return Component.translatable("multiplayer.disconnect.not_whitelisted");
+            return Component.literal(Messages.get("reject.unavailable"));
         }
     }
 
     public static NeoForgeRuntime runtime() { return runtime; }
+
+    public static CompletableFuture<ReloadResult> reloadAsync() {
+        CompletableFuture<ReloadResult> result = new CompletableFuture<>();
+        STARTUP_EXECUTOR.execute(() -> {
+            NeoForgeRuntime current;
+            synchronized (RUNTIME_LOCK) {
+                current = runtime;
+                if (current == null || STOPPING.get()) {
+                    result.complete(ReloadResult.unavailable("runtime is not ready"));
+                    return;
+                }
+            }
+            Path configDir = FMLPaths.CONFIGDIR.get().resolve(MOD_ID);
+            try {
+                ModConfig next = ConfigLoader.loadOrDefault(configDir);
+                if (!current.degraded() && !samePath(current.config().database().path(), next.database().path())) {
+                    LOGGER.warn("Config reload rejected: database.path changes require a server restart");
+                    result.complete(ReloadResult.restartRequired());
+                    return;
+                }
+
+                NeoForgeRuntime started = NeoForgeRuntime.start(current.server(), next);
+                synchronized (RUNTIME_LOCK) {
+                    if (STOPPING.get() || runtime != current) {
+                        started.close();
+                        result.complete(ReloadResult.unavailable("runtime changed while reload was in progress"));
+                        return;
+                    }
+                    runtime = started;
+                }
+                current.close();
+                LOGGER.info("GatehouseMC configuration reloaded: {}", next.redactedSummary());
+                result.complete(ReloadResult.success());
+            } catch (Exception error) {
+                LOGGER.error("Config reload failed; previous GatehouseMC runtime remains active", error);
+                result.complete(ReloadResult.failed(safeMessage(error)));
+            }
+        });
+        return result;
+    }
+
+    private static boolean samePath(Path left, Path right) {
+        return Objects.equals(left.toAbsolutePath().normalize(), right.toAbsolutePath().normalize());
+    }
+
+    private static String safeMessage(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+    }
 }
