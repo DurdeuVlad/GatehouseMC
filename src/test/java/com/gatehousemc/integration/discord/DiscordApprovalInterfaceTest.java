@@ -262,7 +262,7 @@ class DiscordApprovalInterfaceTest {
         RequestStatus lastStatus;
 
         @Override
-        public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+        public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, RequestStatus status) {
             lastChannelId = channelId;
             lastText = text;
             lastRequestId = requestId;
@@ -271,10 +271,10 @@ class DiscordApprovalInterfaceTest {
         }
 
         @Override
-        public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled) {
+        public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, RequestStatus status) {
             lastText = text;
             lastRequestId = requestId;
-            lastDisabled = disabled;
+            lastStatus = status;
             return CompletableFuture.completedFuture(null);
         }
 
