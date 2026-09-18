@@ -92,22 +92,32 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
 
     @Override
     public void onReady(ReadyEvent event) {
-        health = ProviderHealth.HEALTHY;
-        if (!isDirectMessageMode() && transport instanceof JdaDiscordTransport jdaTransport) {
+        if (isDirectMessageMode()) {
+            health = ProviderHealth.HEALTHY;
+            return;
+        }
+        if (transport instanceof JdaDiscordTransport jdaTransport) {
             String destination = destination();
             if (destination != null && !destination.isBlank()) {
+                health = ProviderHealth.STARTING;
                 jdaTransport.validateChannel(destination).whenComplete((channel, error) -> {
                     if (error != null) {
+                        health = ProviderHealth.DEGRADED;
                         Throwable cause = error.getCause() != null ? error.getCause() : error;
                         LOGGER.error("discord.channel_unusable: GatehouseMC cannot publish to configured Discord channel {}: {}",
                                 destination, cause.getMessage());
-                    } else if (channel instanceof StandardGuildMessageChannel guildChannel) {
-                        LOGGER.info("discord.channel_verified: Connected to Discord channel '{}' ({}) in guild '{}'",
-                                guildChannel.getName(), guildChannel.getId(), guildChannel.getGuild().getName());
+                    } else {
+                        health = ProviderHealth.HEALTHY;
+                        if (channel instanceof StandardGuildMessageChannel guildChannel) {
+                            LOGGER.info("discord.channel_verified: Connected to Discord channel '{}' ({}) in guild '{}'",
+                                    guildChannel.getName(), guildChannel.getId(), guildChannel.getGuild().getName());
+                        }
                     }
                 });
+                return;
             }
         }
+        health = ProviderHealth.HEALTHY;
     }
 
     @Override
@@ -132,8 +142,12 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
             LOGGER.error("discord.publish_failed destination={}: {}", destination, error.getMessage());
             return CompletableFuture.failedFuture(error);
         }
-        return send.thenApply(messageId -> new PublicationRef(id(), destination, messageId))
+        return send.thenApply(messageId -> {
+                    health = ProviderHealth.HEALTHY;
+                    return new PublicationRef(id(), destination, messageId);
+                })
                 .exceptionallyCompose(error -> {
+                    health = ProviderHealth.DEGRADED;
                     Throwable cause = error.getCause() != null ? error.getCause() : error;
                     LOGGER.error("discord.publish_failed destination={}: {}", destination, cause.getMessage());
                     return CompletableFuture.failedFuture(cause);
@@ -144,7 +158,8 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
     public CompletionStage<Void> update(PublicationRef publication, RequestView request) {
         DiscordTransport current = transport;
         if (current == null) return CompletableFuture.failedFuture(new IllegalStateException("Discord is stopped"));
-        return current.editMessage(publication.containerId(), publication.messageId(), render(request), request.id(), request.status());
+        return current.editMessage(publication.containerId(), publication.messageId(), render(request), request.id(), request.status())
+                .whenComplete((ignored, error) -> health = error == null ? ProviderHealth.HEALTHY : ProviderHealth.DEGRADED);
     }
 
     @Override
