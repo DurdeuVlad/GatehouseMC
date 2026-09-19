@@ -196,7 +196,9 @@ Every release should record:
 Expected public distribution:
 
 - GitHub repository — public source and issue tracker; GitHub Releases is the
-  authoritative tagged source/checksum channel. `v1.0.0` is published.
+  authoritative tagged source/checksum channel. The earlier combined
+  `v1.1.0-mc1.21.1` release is retained for history; new files use
+  loader-qualified tags.
 - Modrinth — submitted mod distribution; currently pending moderation.
 - CurseForge — submitted secondary distribution; currently pending moderation.
 

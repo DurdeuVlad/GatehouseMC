@@ -9,13 +9,12 @@ gates are green.
 ## Current publication state
 
 - GitHub repository: public — <https://github.com/DurdeuVlad/GatehouseMC>
-- GitHub Release: `v1.0.0` remains archived with invalid legacy labels. Do not
-  use it for installation.
-- Modrinth and CurseForge: the release workflow stages Fabric 1.21.1, Forge
-  1.20.1, and NeoForge 1.21.1 independently. A loader-qualified tag publishes
-  that one verified artifact automatically when both storefront secrets are
-  configured; a guarded manual dispatch remains available for a controlled
-  republish.
+- GitHub Release: the earlier combined `v1.1.0-mc1.21.1` release is retained
+  for history. New installations should use a loader-qualified release.
+- Modrinth and CurseForge: the release workflow builds, validates, smoke-tests,
+  and publishes exactly one loader/version artifact per loader-qualified tag.
+  CurseForge publication is required; Modrinth publication runs when its token
+  is configured. A guarded manual dispatch can republish an existing tag.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
 
@@ -94,41 +93,45 @@ dispatch:
 |---|---|
 | `MODRINTH_TOKEN` | Modrinth API token with version-creation permission |
 | `CURSEFORGE_TOKEN` | CurseForge API token |
-| `DISCORD_RELEASE_WEBHOOK_URL` | Optional Discord webhook for release announcements |
-| `TELEGRAM_RELEASE_BOT_TOKEN` | Optional Telegram bot token for release announcements |
-| `TELEGRAM_RELEASE_CHAT_ID` | Optional Telegram chat/channel ID paired with the release bot token |
 
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
-expanded secret values to disk. With both storefront tokens configured, a
-loader-qualified tag is the CI/CD publish trigger; do not create the tag until
-the target is ready for public publication.
+expanded secret values to disk. The workflow contains the non-secret project
+IDs for the existing `gatehousemc` listings; a loader-qualified tag is the
+CI/CD publish trigger. Do not create the tag until the target is ready for
+public publication.
 
-The workflow fails closed if either publishing token is missing, if the release
-version does not match `gradle.properties`, or if any JAR's internal loader
-metadata does not match its target. GitHub Releases are staged from all three
-proof targets. Storefront publication runs automatically for a valid pushed tag,
-or requires an explicit manual dispatch with `publish=true`; the Gradle sources
-JAR is never sent to a storefront.
+The workflow fails closed if the required CurseForge token is missing, if the
+release version does not match `gradle.properties`, or if the JAR's internal
+loader metadata does not match its target. Each GitHub Release contains exactly
+one proof-target JAR and its checksum. Storefront publication runs
+automatically for a valid pushed tag, or through the guarded manual dispatch;
+the Gradle sources JAR is never sent to a storefront. Modrinth publication is
+skipped when its optional token is not configured.
 
-Every successful release writes an announcement to the GitHub Actions summary
-and GitHub Release. Discord and Telegram announcements are sent when their
-optional repository secrets are configured. A configured notification channel
-is treated as a real check: delivery failures are visible in Actions even
-though the already-created release remains available.
+Every successful release is visible in the GitHub Actions run and GitHub
+Release. This release lane does not send external Discord or Telegram
+notifications.
 
 ## Manual release commands
 
+The support branches must already point at the reviewed 1.1.0 commit. Create
+the tags locally from those branches, inspect them, and then push each tag:
+
 ```powershell
-# 1. Ensure working directory is clean and on the main branch
-git checkout main
-git pull
-
-# 2. Tag the release version for the Minecraft target
+git switch support/fabric/1.21.1
 git tag v1.2.0-fabric-mc1.21.1
-
-# 3. Push the tag to GitHub
 git push origin v1.2.0-fabric-mc1.21.1
+git switch support/forge/1.20.1
+git tag v1.2.0-forge-mc1.20.1
+git push origin v1.2.0-forge-mc1.20.1
+git switch support/neoforge/1.21.1
+git tag v1.2.0-neoforge-mc1.21.1
+git push origin v1.2.0-neoforge-mc1.21.1
 ```
+
+The storefront version is loader-qualified as
+`<version>-<loader>-mc<minecraft-version>` so Fabric and NeoForge 1.21.1 do
+not collide in the same project.
 
 The release workflow must be inspected before tagging to confirm that it builds
 the intended target branch and uploads the exact loader-qualified artifact. A

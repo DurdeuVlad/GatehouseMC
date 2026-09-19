@@ -27,17 +27,17 @@ class MatrixContractTest(unittest.TestCase):
             validate_support_matrix.validate_target(target, self.matrix["release_version"])
 
     def test_resolver_requires_qualified_ready_target(self):
-        target = resolve_target.resolve(self.matrix, "1.2.0", "fabric", "1.21.1", True)
+        target = resolve_target.resolve_matrix(self.matrix, "1.2.0", "fabric", "1.21.1", True)
         self.assertEqual(target["id"], "fabric-1.21.1")
         with self.assertRaises(SystemExit):
-            resolve_target.resolve(self.matrix, "1.2.0", "fabric", "1.14.4", True)
+            resolve_target.resolve_matrix(self.matrix, "1.2.0", "fabric", "1.14.4", True)
 
     def test_resolver_rejects_wrong_version(self):
         with self.assertRaises(SystemExit):
-            resolve_target.resolve(self.matrix, "1.0.1", "fabric", "1.21.1", False)
+            resolve_target.resolve_matrix(self.matrix, "1.0.1", "fabric", "1.21.1", False)
 
     def test_branch_metadata_matches_current_target(self):
-        target = resolve_target.resolve(self.matrix, "1.2.0", "fabric", "1.21.1", True)
+        target = resolve_target.resolve_matrix(self.matrix, "1.2.0", "fabric", "1.21.1", True)
         props = validate_branch_metadata.parse_properties(
             (ROOT / "gradle.properties").read_text(encoding="utf-8")
         )

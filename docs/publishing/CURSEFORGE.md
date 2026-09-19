@@ -15,8 +15,8 @@ approval.
 - Source code: GitHub — <https://github.com/DurdeuVlad/GatehouseMC>.
 - Comments: enabled; issue tracking remains the public GitHub issue tracker.
 - Files: only artefacts whose internal loader and Minecraft metadata match
-  their labels may be published. The old v1.0.0 multi-version submission
-  remains on hold because its non-1.21.1 labelled files contain 1.21.1 metadata.
+  their labels may be published. The earlier combined `v1.1.0-mc1.21.1`
+  submission remains history-only; new files use loader-qualified tags.
 - Media: the project has a neutral multi-version banner. Keep the square
   project logo available as the canonical icon.
 

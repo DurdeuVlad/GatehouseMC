@@ -39,6 +39,9 @@ Node E2E client.
   workflow now builds, tests, and stages one loader/version file per qualified
   tag; a qualified tag publishes automatically once the configured storefront
   secrets and release gates succeed.
+- GitHub Release `v1.1.0-mc1.21.1` is retained as the earlier combined release.
+  New loader-specific files use the qualified tags documented in
+  `docs/RELEASE_BRANCHING.md`.
 - GitHub Release `v1.0.0` is retained for history but is not production-ready;
   its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 
