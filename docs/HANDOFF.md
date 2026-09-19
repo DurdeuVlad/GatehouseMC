@@ -15,7 +15,7 @@ Node E2E client.
 
 ## Current baseline
 
-- Primary 1.1.x source-build targets: Fabric 1.21.1 (Java 21), Forge 1.20.1
+- Primary 1.2.0 source-build targets: Fabric 1.21.1 (Java 21), Forge 1.20.1
   (Java 17), and NeoForge 1.21.1 (Java 21).
 - Historical Fabric 1.0.1 artifacts exist for Minecraft 1.14.4 through 1.21.4;
   current rebuild/publish state is authoritative in `.github/support-matrix.yml`.
@@ -23,7 +23,8 @@ Node E2E client.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
 - SQLite workflow store and persistent outbox.
-- `/gatehouse` (with `/gh` and `/wlreq` aliases) command interface.
+- `/gatehouse` command interface; `/gh` and `/wlreq` are intentionally not
+  registered in the 1.2.0 contract.
 - Discord JDA and Telegram Bot API adapters behind one core decision service.
 - No IP persistence and no claim that offline usernames are authenticated.
 - Active maintenance branches are `support/fabric/1.21.1`,
@@ -34,62 +35,49 @@ Node E2E client.
 ## Publication status
 
 - GitHub is public and contains the source repository.
-- Modrinth and CurseForge submissions contain the earlier files. The 1.1.x
-  workflow builds, tests, validates, and publishes one loader/version file per
-  qualified tag. CurseForge credentials are required; Modrinth publication is
-  optional when its token is configured.
+- Modrinth and CurseForge submissions contain the earlier files. The 1.2.0
+  workflow now builds, tests, and stages one loader/version file per qualified
+  tag; a qualified tag publishes automatically once the configured storefront
+  secrets and release gates succeed.
 - GitHub Release `v1.1.0-mc1.21.1` is retained as the earlier combined release.
   New loader-specific files use the qualified tags documented in
   `docs/RELEASE_BRANCHING.md`.
+- GitHub Release `v1.0.0` is retained for history but is not production-ready;
+  its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 
 ## Verification already executed
 
-```text
-./gradlew.ps1 clean test build :platform-neoforge:build --stacktrace PASS
-Gradle 8.8 -PenableForge :platform-forge:build --stacktrace       PASS
-tools/release/validate_artifact.py (all three JARs)                PASS
-tools/release resolver unit tests (5)                              PASS
-tools/e2e: npm ci                                                   PASS
-clean-server smoke: Fabric 1.21.1                                  PASS
-clean-server smoke: Forge 1.20.1                                   PASS
-clean-server smoke: NeoForge 1.21.1                                PASS
-```
-
-The current local implementation has passed the Fabric/core test suite,
-reproducibly builds the three 1.1.x proof artifacts, and has local clean-server
-smoke proof on Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Compilation
-alone is not being reported as production proof.
+The 1.2.0 local evidence includes passing root/Fabric and NeoForge tests/builds,
+a passing Forge Gradle 8.8 build/test lane, artifact validation for all three
+jars, and the complete isolated clean-server M9 matrix: 29 checks each on
+Fabric 1.21.1/Java 21, Forge 1.20.1/Java 17, and NeoForge 1.21.1/Java 21.
+Machine-readable summaries are in `build/e2e/artifacts/`; retained server logs
+are in `build/e2e/logs/`. The runs used loopback-only disposable servers and no
+provider credentials.
 
 ## What Devin should do next
 
 The local issue backlog and the public GitHub issue tracker are the source of
 execution order. Start with the open P0 issues, not with broad refactoring.
 
-The remaining production gates are:
+The remaining release actions are:
 
-1. Run the full clean-artifact E2E matrix from `docs/TESTING.md` for Fabric,
-   Forge, and NeoForge, extending the verified smoke paths with the full
-   workflow scenarios.
-2. Add repeat-attempt, deny, block/unblock, restart persistence, non-whitelist
-   rejection, and interrupted-approval scenarios.
-3. Run the packaged artifact against a representative real mod stack; the
-   clean Fabric smoke server is not enough for compatibility claims.
-4. Exercise provider adapters with fake transports and prove authorization,
+1. Run the packaged artifact against a representative real mod stack; clean
+   server proof is not enough for compatibility claims.
+2. Complete guided provider setup/binding and exercise provider adapters with
+   fake transports, proving authorization,
    publication reconciliation, and provider outage recovery.
-5. Review migrations, dependency licenses, release metadata, and checksums.
-6. Make CI run the appropriate unit/component gates and archive E2E evidence.
-7. Do not label the project production-ready until M6/M7 acceptance criteria
-   are green or explicitly accepted by a maintainer.
+3. Review migrations, dependency licenses, release metadata, and checksums.
+4. Make CI run the appropriate unit/component gates and archive E2E evidence.
+5. Obtain maintainer authorization before publication.
 
 ## Important known risks
 
-- The new Forge and NeoForge packaged jars have build/metadata validation and
-  local clean standalone server smoke proof. CI now provisions all three proof
-  lanes, but that workflow still needs to run successfully on the hosted
-  repository before it is treated as release evidence.
+- The local matrix does not cover arbitrary third-party mod stacks; compatibility
+  claims still require a representative modpack test.
 - Real Discord and Telegram credentials were not used. Their adapters need
   fake-transport coverage and optional secret-backed smoke tests.
-- The full acceptance matrix is not automated yet.
+- The full M9 acceptance matrix is automated by `tools/e2e/src/m9-matrix.mjs`.
 - GitHub Actions is configured, but the private repository's jobs currently
   cannot start because GitHub reports an account billing/spending-limit
   failure. Re-run the workflow after the account billing state is fixed.

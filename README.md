@@ -8,7 +8,7 @@
   <a href="https://github.com/DurdeuVlad/GatehouseMC/releases/latest"><img src="https://img.shields.io/github/v/release/DurdeuVlad/GatehouseMC?color=brightgreen&label=Release" alt="Latest GitHub release"></a>
   <a href="https://modrinth.com/mod/gatehousemc"><img src="https://img.shields.io/badge/Modrinth-Submitted%20for%20review-F5A623?logo=modrinth&logoColor=white" alt="Modrinth submitted for review"></a>
   <a href="https://www.curseforge.com/minecraft/mc-mods/gatehousemc"><img src="https://img.shields.io/badge/CurseForge-Pending%20review-F5A623?logo=curseforge&logoColor=white" alt="CurseForge pending review"></a>
-  <img src="https://img.shields.io/badge/Minecraft-1.20.1%20%7C%201.21.1-brightgreen.svg" alt="Current 1.1.x proof targets">
+  <img src="https://img.shields.io/badge/Minecraft-1.20.1%20%7C%201.21.1-brightgreen.svg" alt="Current 1.2.0 proof targets">
   <img src="https://img.shields.io/badge/Loaders-Fabric%20%7C%20Forge%20%7C%20NeoForge-blue.svg" alt="Fabric, Forge, and NeoForge">
   <img src="https://img.shields.io/badge/Side-Server--Only-orange.svg" alt="Server-Side Only">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
@@ -20,16 +20,16 @@ GatehouseMC is an operational workflow layer around Minecraft's native whitelist
 
 ## Requirements
 
-- 1.1.x source-build targets: Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1
+- 1.2.0 source-build targets: Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1
 - Java 17 for Forge 1.20.1; Java 21 for Fabric/NeoForge 1.21.1
-- Historical 1.0.1 Fabric artifacts exist for 1.14.4–1.21.4, but they are not claimed as rebuilt 1.1.x targets until the [support matrix](.github/support-matrix.yml) says so
+- Historical 1.0.1 Fabric artifacts exist for 1.14.4–1.21.4; they are not 1.2.0 release targets.
 - `online-mode=false` and `white-list=true` for the supported offline-mode workflow
 
 ## Downloads & Distribution
 
 - **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(submitted; pending moderation)*
 - **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(submitted; pending moderation)*
-- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(1.1.x publication is per loader/version tag)*
+- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(1.2.0 is staged behind release gates)*
 - **Source and issues:** [github.com/DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC) · [issue tracker](https://github.com/DurdeuVlad/GatehouseMC/issues)
 - **Publishing copy:** [Modrinth](docs/publishing/MODRINTH.md) · [CurseForge](docs/publishing/CURSEFORGE.md)
 - **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)
@@ -47,7 +47,7 @@ On Windows PowerShell:
 .\gradlew.ps1 clean test build
 ```
 
-The Fabric 1.21.1 artifact is written to `build/libs/gatehousemc-1.1.0.jar`. NeoForge and Forge artifacts are written to their platform build directories. A release artifact is publishable only when its internal loader metadata and Minecraft dependency match its label; CI enforces this with `tools/release/validate_artifact.py`. Fabric nests its runtime libraries; Forge and NeoForge use loader-provided Gson/SLF4J and nest SQLite, JDA, and JDA's remaining runtime graph.
+The Fabric 1.21.1 artifact is written to `build/libs/gatehousemc-1.2.0.jar`. NeoForge and Forge artifacts are written to their platform build directories. A release artifact is publishable only when its internal loader metadata and Minecraft dependency match its label; CI enforces this with `tools/release/validate_artifact.py`. Fabric nests its runtime libraries; Forge and NeoForge use loader-provided Gson/SLF4J and nest SQLite, JDA, and JDA's remaining runtime graph.
 
 The Forge lane uses Gradle 8.8 because ForgeGradle 6 rejects Gradle 9+. Run it explicitly with `gradle -PenableForge :platform-forge:build`; the normal wrapper builds Fabric and NeoForge.
 
@@ -83,7 +83,7 @@ config/gatehousemc/requests.sqlite
 Minecraft commands are always available after the server starts:
 
 ```text
-/gatehouse list [pending|approved|denied|blocked]
+/gatehouse requests [pending|resolving|approved|denied|blocked|all] [page]
 /gatehouse show <request-id|username>
 /gatehouse approve <request-id|username> [reason...]
 /gatehouse deny <request-id|username> [reason...]
@@ -94,7 +94,7 @@ Minecraft commands are always available after the server starts:
 /gatehouse reload
 ```
 
-*(Commands also respond to `/gh` and `/wlreq` aliases).*
+`/gatehouse` is the only public textual command root. The default request filter is `pending`, with ten requests per page.
 
 Discord and Telegram are disabled by default. Enable them only after setting stable administrator IDs and provider secrets. Secrets can use `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`; expanded values stay in memory and are never written back or included in status output.
 
@@ -120,6 +120,10 @@ Raw offline mode does not verify ownership of a Minecraft name. Approving `Alice
 
 ## Verification status
 
-The current 1.1.x proof targets have passing builds, artifact validation, and local clean dedicated-server smoke proof. Storefront publication runs per loader/version through a loader-qualified tag; broader repeat-attempt, restart, approval-race, and real mod-stack coverage is still required before calling the release production-ready. See [`docs/TESTING.md`](docs/TESTING.md) and [`.github/support-matrix.yml`](.github/support-matrix.yml) for the exact state.
+The current branch has passing core/Fabric/NeoForge compilation and unit tests,
+Forge Gradle 8.8 verification, artifact validation, and the complete isolated
+29-check dedicated-server matrix on all three proof targets. Publication still
+requires maintainer authorization. See [`docs/TESTING.md`](docs/TESTING.md) and
+[`.github/support-matrix.yml`](.github/support-matrix.yml) for the exact state.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`WHITELIST_REQUEST_SPEC.md`](WHITELIST_REQUEST_SPEC.md), [`docs/HANDOFF.md`](docs/HANDOFF.md), [`docs/OSS.md`](docs/OSS.md), and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for project policy and release procedures.

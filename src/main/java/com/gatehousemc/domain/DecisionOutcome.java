@@ -7,6 +7,7 @@ public enum DecisionOutcome {
     UNDONE,
     ALREADY_RESOLVED,
     ALREADY_PENDING,
+    CONFLICT,
     RESOLVING,
     NOT_FOUND,
     FAILED

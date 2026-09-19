@@ -1,6 +1,6 @@
 schema: 1
 project: GatehouseMC
-release_line: 1.1.x
+release_line: 1.2.x
 
 # This file is the release source of truth. A row is not publishable merely
 # because it is listed: publish requires build=true, artifact_validation=true,
@@ -12,7 +12,7 @@ release_gates:
 
 targets:
   # These artifacts existed in the 1.0.1 Fabric release. They remain part of
-  # the compatibility inventory, but are not 1.1.x source-build targets until
+  # the compatibility inventory, but are not 1.2.0 source-build targets until
   # their old per-version Gradle projects are restored and rerun.
   - id: fabric-1.14.4
     loader: fabric

@@ -47,11 +47,11 @@ class TelegramApprovalInterfaceTest {
     }
 
     @Test
-    void disabledProviderReportsUnavailableOnStart() {
+    void disabledProviderReportsDisabledOnStart() {
         ModConfig.Telegram config = new ModConfig.Telegram(false, "", "chat1", List.of());
         TelegramApprovalInterface telegram = new TelegramApprovalInterface(config, null);
         telegram.start();
-        assertEquals(ProviderHealth.UNAVAILABLE, telegram.health());
+        assertEquals(ProviderHealth.DISABLED, telegram.health());
     }
 
     @Test

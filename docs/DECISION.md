@@ -158,7 +158,8 @@ This document records the accepted foundational decisions for Whitelist Request 
   - Official mod id is `gatehousemc`.
   - Jar output name is `gatehousemc-<version>.jar`.
   - Java base package is `com.gatehousemc`.
-  - Primary command is `/gatehouse` with aliases `/gh` and `/wlreq`.
+  - Primary and only public textual command root is `/gatehouse`; the 1.2.0
+    command contract intentionally removes `/gh` and `/wlreq` aliases.
   - Default config path is `config/gatehousemc/` with transparent automatic migration from legacy `config/whitelistrequest/`.
   - In-jar assets and translation bundles are housed under `/assets/gatehousemc/`.
 - **Consequences:** Consistent, unified branding across repository, jar metadata, fabric loader, documentation, and operational interfaces while retaining 100% backward compatibility for existing deployments.
@@ -171,7 +172,7 @@ This document records the accepted foundational decisions for Whitelist Request 
 - **Context:** GatehouseMC needs Fabric, Forge, and NeoForge artifacts without copying request, decision, persistence, or provider logic into each loader adapter. ForgeGradle 6 also rejects the Gradle 9 toolchain used by modern Fabric/NeoForge builds.
 - **Decision:** Keep business logic in a loader-neutral `core` module. Each loader owns only its lifecycle, command, whitelist, and Mixin adapter. Fabric and NeoForge use the Gradle 9.5 wrapper; Forge 1.20.1 is an explicitly isolated Gradle 8.8 lane selected with `-PenableForge`. Every distributable jar is checked for its own loader metadata, exact Minecraft dependency, entrypoint, and nested runtime dependencies before release.
 - **Rejected:** One shared loader project with conditional source hacks; publishing a jar for a loader/version that only compiled but did not pass artifact and dedicated-server gates; silently using Gradle 9 for ForgeGradle.
-- **Consequences:** The first 1.1.x proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Older Fabric artifacts remain historical 1.0.1 compatibility entries until their per-version source builds and live-server tests are restored. CI builds the proof targets, while the support matrix prevents planned rows from being published accidentally.
+- **Consequences:** The 1.2.0 proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Older artifacts remain historical compatibility entries until their per-version source builds and live-server tests are restored. CI builds the proof targets, while the support matrix prevents planned rows from being published accidentally.
 
 ---
 

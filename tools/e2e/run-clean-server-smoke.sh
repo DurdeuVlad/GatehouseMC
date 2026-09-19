@@ -16,6 +16,9 @@ e2e_dir="$repo_root/tools/e2e"
 fabric_loader_version="${FABRIC_LOADER_VERSION:-0.19.5}"
 fabric_api_version="${FABRIC_API_VERSION:-0.116.17+1.21.1}"
 fabric_api_jar="${FABRIC_API_JAR:-}"
+rcon_port="${E2E_RCON_PORT:-}"
+rcon_password="${E2E_RCON_PASSWORD:-}"
+driver="${E2E_DRIVER:-smoke}"
 
 [[ -f "$artifact" ]] || { echo "Artifact does not exist: $artifact" >&2; exit 1; }
 if [[ "$loader" == "fabric" && "$minecraft_version" != "1.21.1" \
@@ -45,6 +48,11 @@ case "$loader" in
         --output "$server_dir/mods/fabric-api.jar"
     fi
     launch=(java -jar fabric-server-launch.jar nogui)
+    if command -v cmd.exe >/dev/null 2>&1; then
+      restart_command_json='["java","-jar","fabric-server-launch.jar","nogui"]'
+    else
+      restart_command_json='["java","-jar","fabric-server-launch.jar","nogui"]'
+    fi
     ;;
   forge)
     curl --fail --silent --show-error --location \
@@ -56,8 +64,10 @@ case "$loader" in
     )
     if command -v cmd.exe >/dev/null 2>&1 && [[ -f "$server_dir/run.bat" ]]; then
       launch=(cmd.exe //c java @user_jvm_args.txt @libraries/net/minecraftforge/forge/1.20.1-47.4.23/win_args.txt nogui)
+      restart_command_json='["java","@user_jvm_args.txt","@libraries/net/minecraftforge/forge/1.20.1-47.4.23/win_args.txt","nogui"]'
     else
       launch=(bash run.sh nogui)
+      restart_command_json='["bash","run.sh","nogui"]'
     fi
     ;;
   neoforge)
@@ -70,8 +80,10 @@ case "$loader" in
     )
     if command -v cmd.exe >/dev/null 2>&1 && [[ -f "$server_dir/run.bat" ]]; then
       launch=(cmd.exe //c java @user_jvm_args.txt @libraries/net/neoforged/neoforge/21.1.201/win_args.txt nogui)
+      restart_command_json='["java","@user_jvm_args.txt","@libraries/net/neoforged/neoforge/21.1.201/win_args.txt","nogui"]'
     else
       launch=(bash run.sh nogui)
+      restart_command_json='["bash","run.sh","nogui"]'
     fi
     ;;
   *)
@@ -88,17 +100,36 @@ white-list=true
 enforce-secure-profile=false
 server-port=$port
 EOF
+if [[ -n "$rcon_port" || -n "$rcon_password" ]]; then
+  [[ -n "$rcon_port" && -n "$rcon_password" ]] || {
+    echo "E2E_RCON_PORT and E2E_RCON_PASSWORD must be provided together" >&2
+    exit 2
+  }
+  cat >> "$server_dir/server.properties" <<EOF
+enable-rcon=true
+rcon.port=$rcon_port
+rcon.password=$rcon_password
+EOF
+fi
 
 server_log="$server_dir/server.log"
 server_pid=''
 cleanup() {
   if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
-    kill -- "-$server_pid" 2>/dev/null || kill "$server_pid" 2>/dev/null || true
+    if command -v taskkill.exe >/dev/null 2>&1; then
+      taskkill.exe /PID "$server_pid" /T /F >/dev/null 2>&1 || true
+    else
+      kill -- "-$server_pid" 2>/dev/null || kill "$server_pid" 2>/dev/null || true
+    fi
     for _ in {1..15}; do
       kill -0 "$server_pid" 2>/dev/null || return 0
       sleep 1
-    done
-    kill -KILL -- "-$server_pid" 2>/dev/null || kill -KILL "$server_pid" 2>/dev/null || true
+      done
+    if command -v taskkill.exe >/dev/null 2>&1; then
+      taskkill.exe /PID "$server_pid" /T /F >/dev/null 2>&1 || true
+    else
+      kill -KILL -- "-$server_pid" 2>/dev/null || kill -KILL "$server_pid" 2>/dev/null || true
+    fi
   fi
 }
 trap cleanup EXIT
@@ -132,11 +163,25 @@ if ! grep -qE 'Done \([0-9.]+s\)!' "$server_log"; then
   exit 1
 fi
 
-MC_HOST=127.0.0.1 \
-MC_PORT="$port" \
-MC_VERSION="$minecraft_version" \
-MC_USERNAME="E2E_${loader}" \
-MC_EXPECTED_STATUS=rejected \
-npm --prefix "$e2e_dir" run smoke
+if [[ "$driver" == "smoke" ]]; then
+  MC_HOST=127.0.0.1 \
+  MC_PORT="$port" \
+  MC_VERSION="$minecraft_version" \
+  MC_USERNAME="E2E_${loader}" \
+  MC_EXPECTED_STATUS=rejected \
+  npm --prefix "$e2e_dir" run smoke
+else
+  MC_HOST=127.0.0.1 \
+  MC_PORT="$port" \
+  MC_VERSION="$minecraft_version" \
+  MC_USERNAME="E2E_Bob" \
+  RCON_PORT="$rcon_port" \
+  RCON_PASSWORD="$rcon_password" \
+  M9_SERVER_DIR="$server_dir" \
+  M9_SERVER_COMMAND_JSON="$restart_command_json" \
+  M9_LOADER="$loader" \
+  M9_MINECRAFT_VERSION="$minecraft_version" \
+  npm --prefix "$e2e_dir" run "$driver"
+fi
 
 echo "clean ${loader} ${minecraft_version} server smoke passed"

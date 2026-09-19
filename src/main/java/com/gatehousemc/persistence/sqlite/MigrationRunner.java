@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 final class MigrationRunner {
-    private static final int CURRENT_VERSION = 1;
+    private static final int CURRENT_VERSION = 2;
 
     private MigrationRunner() {}
 
@@ -82,6 +82,10 @@ final class MigrationRunner {
             applyVersionOne(connection);
             return;
         }
+        if (version == 2) {
+            applyVersionTwo(connection);
+            return;
+        }
         throw new SQLException("No migration registered for schema version: " + version);
     }
 
@@ -119,6 +123,16 @@ final class MigrationRunner {
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT, event_type TEXT NOT NULL, actor_provider TEXT, " +
                     "actor_external_id TEXT, actor_display_name TEXT, details_json TEXT, created_at INTEGER NOT NULL, " +
                     "FOREIGN KEY(request_id) REFERENCES whitelist_requests(id))");
+        }
+    }
+
+    private static void applyVersionTwo(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS provider_setup_sessions (" +
+                    "provider TEXT NOT NULL, code_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, " +
+                    "expires_at INTEGER NOT NULL, consumed INTEGER NOT NULL DEFAULT 0)");
+            statement.execute("CREATE INDEX IF NOT EXISTS ix_provider_setup_sessions_provider " +
+                    "ON provider_setup_sessions(provider, expires_at)");
         }
     }
 }

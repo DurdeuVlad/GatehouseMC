@@ -2,9 +2,9 @@
 
 This guide describes the repeatable release process for GatehouseMC across
 GitHub Releases, Modrinth, and CurseForge. The published `1.0.1` line is the
-historical Fabric compatibility release. The `1.1.x` line adds isolated Forge
-and NeoForge proof targets; its current targets are release-ready when the
-matrix gates and hosted release workflow succeed.
+historical Fabric compatibility release. The `1.2.0` line adds the canonical
+administration workflow across the isolated Forge and NeoForge proof targets and is not production-publishable until the matrix
+gates are green.
 
 ## Current publication state
 
@@ -119,14 +119,14 @@ the tags locally from those branches, inspect them, and then push each tag:
 
 ```powershell
 git switch support/fabric/1.21.1
-git tag v1.1.0-fabric-mc1.21.1
-git push origin v1.1.0-fabric-mc1.21.1
+git tag v1.2.0-fabric-mc1.21.1
+git push origin v1.2.0-fabric-mc1.21.1
 git switch support/forge/1.20.1
-git tag v1.1.0-forge-mc1.20.1
-git push origin v1.1.0-forge-mc1.20.1
+git tag v1.2.0-forge-mc1.20.1
+git push origin v1.2.0-forge-mc1.20.1
 git switch support/neoforge/1.21.1
-git tag v1.1.0-neoforge-mc1.21.1
-git push origin v1.1.0-neoforge-mc1.21.1
+git tag v1.2.0-neoforge-mc1.21.1
+git push origin v1.2.0-neoforge-mc1.21.1
 ```
 
 The storefront version is loader-qualified as

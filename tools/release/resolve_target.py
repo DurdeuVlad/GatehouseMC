@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Resolve and validate a loader-qualified Gatehouse release tag."""
+"""Resolve and validate a loader-qualified Gatehouse release tag, and resolve
+ready loader/Minecraft targets from the support matrix."""
 
 from __future__ import annotations
 
@@ -68,6 +69,36 @@ def resolve(tag: str, mod_version: str) -> dict[str, str]:
         "artifact_name": artifact_name,
         "dependencies": "fabric-api(required)" if loader == "fabric" else "",
     }
+
+
+def fail(message: str) -> None:
+    raise SystemExit(f"release target resolution failed: {message}")
+
+
+def resolve_matrix(
+    data: dict, version: str, loader: str, minecraft: str, require_ready: bool
+) -> dict:
+    matches = [
+        target
+        for target in data["targets"]
+        if target["loader"] == loader and target["minecraft"] == minecraft
+    ]
+    if len(matches) != 1:
+        fail(f"no unique target for {loader} {minecraft}")
+    target = matches[0]
+    if version != data["release_version"] or target["mod_version"] != version:
+        fail(
+            f"target version {version} does not match matrix release {data['release_version']}"
+        )
+    if require_ready:
+        if not target.get("ready"):
+            fail(f"{target['id']} is not ready")
+        if not all(
+            target["gates"].get(name)
+            for name in ("build", "artifact_validation", "server_e2e")
+        ):
+            fail(f"{target['id']} has incomplete release gates")
+    return target
 
 
 def main() -> int:

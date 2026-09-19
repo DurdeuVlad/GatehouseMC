@@ -17,7 +17,11 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
+import com.gatehousemc.application.admin.AdminCommandResult;
+import com.gatehousemc.application.admin.AdminCommandResultCode;
 
 public final class GatehouseMod implements ModInitializer {
     public static final String MOD_ID = "gatehousemc";
@@ -28,6 +32,7 @@ public final class GatehouseMod implements ModInitializer {
         return thread;
     });
     private static final AtomicBoolean STOPPING = new AtomicBoolean();
+    private static final AtomicBoolean RELOADING = new AtomicBoolean();
     private static final Object RUNTIME_LOCK = new Object();
     private static volatile FabricRuntime runtime;
 
@@ -78,6 +83,7 @@ public final class GatehouseMod implements ModInitializer {
             config = ConfigLoader.loadOrDefault(configDir);
             Messages.load(config.language());
             FabricRuntime started = FabricRuntime.start(server, config);
+            started.setReloadHandler(GatehouseMod::reloadAsync);
             synchronized (RUNTIME_LOCK) {
                 if (STOPPING.get() || runtime != null) {
                     started.close();
@@ -121,41 +127,65 @@ public final class GatehouseMod implements ModInitializer {
      * while the server is running could split the workflow store.
      * Runs asynchronously to avoid blocking the server thread on recovery.
      */
-    public static void reloadAsync() {
+    public static CompletionStage<AdminCommandResult> reloadAsync() {
+        CompletableFuture<AdminCommandResult> result = new CompletableFuture<>();
+        if (!RELOADING.compareAndSet(false, true)) {
+            result.complete(AdminCommandResult.error(AdminCommandResultCode.INVALID_STATE,
+                    "A Gatehouse reload is already in progress."));
+            return result;
+        }
         STARTUP_EXECUTOR.execute(() -> {
-            FabricRuntime current;
-            synchronized (RUNTIME_LOCK) {
-                current = runtime;
-                if (current == null || current.degraded()) return;
-            }
-            Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
             try {
-                ModConfig next = ConfigLoader.loadOrDefault(configDir);
-                Messages.load(next.language());
-                if (!samePath(current.config().database().path(), next.database().path())) {
-                    LOGGER.warn("Config reload rejected: database.path changes require a server restart");
-                    return;
-                }
-                FabricRuntime started = FabricRuntime.start(current.server(), next);
+                FabricRuntime current;
                 synchronized (RUNTIME_LOCK) {
-                    if (STOPPING.get()) {
-                        started.close();
+                    current = runtime;
+                    if (current == null || current.degraded()) {
+                        result.complete(AdminCommandResult.error(AdminCommandResultCode.UNAVAILABLE,
+                                "Gatehouse runtime is unavailable; reload cannot start."));
                         return;
                     }
-                    runtime = started;
                 }
-                current.close();
-                LOGGER.info("GatehouseMC configuration reloaded: {}", next.redactedSummary());
-            } catch (Exception error) {
-                LOGGER.error("Config reload failed; request workflow is degraded until the server is restarted", error);
-                synchronized (RUNTIME_LOCK) {
-                    if (!STOPPING.get()) {
-                        runtime = FabricRuntime.degraded(current.server(), current.config());
+                Path configDir = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);
+                FabricRuntime started = null;
+                boolean installed = false;
+                try {
+                    ModConfig next = ConfigLoader.loadOrDefault(configDir);
+                    if (!samePath(current.config().database().path(), next.database().path())) {
+                        LOGGER.warn("Config reload rejected: database.path changes require a server restart");
+                        result.complete(AdminCommandResult.error(AdminCommandResultCode.INVALID_ARGUMENT,
+                                "database.path changes require a server restart"));
+                        return;
                     }
+                    started = FabricRuntime.start(current.server(), next);
+                    started.setReloadHandler(GatehouseMod::reloadAsync);
+                    synchronized (RUNTIME_LOCK) {
+                        if (STOPPING.get()) {
+                            started.close();
+                            result.complete(AdminCommandResult.error(AdminCommandResultCode.UNAVAILABLE,
+                                    "Gatehouse server is stopping."));
+                            return;
+                        }
+                        runtime = started;
+                        installed = true;
+                    }
+                    Messages.load(next.language());
+                    current.close();
+                    LOGGER.info("GatehouseMC configuration reloaded: {}", next.redactedSummary());
+                    result.complete(AdminCommandResult.success("Gatehouse configuration reloaded."));
+                } catch (Exception error) {
+                    // Transactional reload: a failed candidate must never replace a
+                    // working runtime with a degraded one.
+                    if (started != null && !installed) started.close();
+                    Messages.load(current.config().language());
+                    LOGGER.error("Config reload failed; keeping the current GatehouseMC runtime", error);
+                    result.complete(AdminCommandResult.error(AdminCommandResultCode.FAILED,
+                            "Config reload failed; the current runtime was kept."));
                 }
-                current.close();
+            } finally {
+                RELOADING.set(false);
             }
         });
+        return result;
     }
 
     private static boolean samePath(Path left, Path right) {
