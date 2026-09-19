@@ -45,14 +45,14 @@ Players do **not** need a client-side mod, Discord account, or external registra
 - 🚪 **Automatic requests:** A rejected, unwhitelisted join creates or refreshes a request.
 - 🛡️ **Native whitelist authority:** Approval updates Minecraft's own `whitelist.json`.
 - 💬 **Optional Discord and Telegram workflows:** Review and resolve requests from your staff channels.
-- ⚡ **In-game administration:** Use `/gatehouse`, `/gh`, or `/wlreq`.
+- ⚡ **In-game administration:** Use `/gatehouse`.
 - ↩️ **Safe reversals:** Approve, deny, block, unblock, undo, reload, and inspect request status.
 - 💾 **Durable storage:** SQLite persistence and an outbox keep requests recoverable across restarts and provider outages.
 - 🚫 **No client dependency:** Install GatehouseMC on the dedicated server only.
 
 ## 💻 Commands
 
-- `/gatehouse list [pending|approved|denied|blocked]` — List requests.
+- `/gatehouse requests [pending|resolving|approved|denied|blocked|all] [page]` — List requests.
 - `/gatehouse show <request-id|username>` — View request details and history.
 - `/gatehouse approve <request-id|username> [reason]` — Approve and add to the vanilla whitelist.
 - `/gatehouse deny <request-id|username> [reason]` — Deny a request.
@@ -69,7 +69,7 @@ Players do **not** need a client-side mod, Discord account, or external registra
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-The 1.1.x source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Use only the exact loader/version entry marked public in the [support matrix](../../.github/support-matrix.yml); build artifacts under review are not production support claims.
+The 1.2.0 source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Use only the exact loader/version entry marked public in the [support matrix](../../.github/support-matrix.yml); build artifacts under review are not production support claims.
 
 ## 🔒 Offline-Mode Notice
 

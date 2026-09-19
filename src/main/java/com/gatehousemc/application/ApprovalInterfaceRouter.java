@@ -83,6 +83,8 @@ public final class ApprovalInterfaceRouter {
     private boolean enabled(ApprovalInterface provider) {
         return provider.health() != ProviderHealth.STARTING
                 && provider.health() != ProviderHealth.UNAVAILABLE
+                && provider.health() != ProviderHealth.DISABLED
+                && provider.health() != ProviderHealth.SETUP_REQUIRED
                 && provider.health() != ProviderHealth.STOPPED;
     }
 }

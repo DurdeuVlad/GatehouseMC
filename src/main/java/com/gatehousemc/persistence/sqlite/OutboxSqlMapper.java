@@ -21,6 +21,23 @@ final class OutboxSqlMapper {
     }
 
     void insert(String type, UUID aggregateId, Instant now) throws SQLException {
+        if ("REQUEST_ATTEMPT_UPDATED".equals(type)) {
+            try (PreparedStatement existing = tx.connection().prepareStatement(
+                    "SELECT 1 FROM integration_outbox WHERE aggregate_id=? AND event_type='REQUEST_ATTEMPT_UPDATED' AND state='READY' LIMIT 1")) {
+                existing.setString(1, aggregateId.toString());
+                try (ResultSet result = existing.executeQuery()) {
+                    if (result.next()) return;
+                }
+            }
+        } else if (!"REQUEST_CREATED".equals(type)) {
+            try (PreparedStatement supersede = tx.connection().prepareStatement(
+                    "UPDATE integration_outbox SET state='COMPLETE', updated_at=?, last_error='superseded' "
+                            + "WHERE aggregate_id=? AND event_type='REQUEST_ATTEMPT_UPDATED' AND state='READY'")) {
+                supersede.setLong(1, SqliteWorkflowRepository.millis(now));
+                supersede.setString(2, aggregateId.toString());
+                supersede.executeUpdate();
+            }
+        }
         try (PreparedStatement statement = tx.connection().prepareStatement(
                 "INSERT INTO integration_outbox(id,event_type,aggregate_id,payload_json,state,attempts,available_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)")) {
             statement.setString(1, UUID.randomUUID().toString());
@@ -68,6 +85,11 @@ final class OutboxSqlMapper {
         update("UPDATE integration_outbox SET state='READY', attempts=attempts+1, available_at=?, updated_at=?, last_error=? WHERE id=? AND state='PROCESSING'", outboxId, now, nextAttempt, error);
     }
 
+    void defer(UUID outboxId, Instant nextAttempt, Instant now) {
+        update("UPDATE integration_outbox SET state='READY', available_at=?, updated_at=? WHERE id=? AND state='PROCESSING'",
+                outboxId, now, nextAttempt, null);
+    }
+
     long pendingCount() throws SQLException {
         try (PreparedStatement statement = tx.connection().prepareStatement("SELECT COUNT(*) FROM integration_outbox WHERE state!='COMPLETE'")) {
             try (ResultSet result = statement.executeQuery()) {
@@ -82,8 +104,12 @@ final class OutboxSqlMapper {
                 try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
                     statement.setLong(1, SqliteWorkflowRepository.millis(nextAttempt));
                     statement.setLong(2, SqliteWorkflowRepository.millis(now));
-                    statement.setString(3, error);
-                    statement.setString(4, id.toString());
+                    if (sql.contains("last_error")) {
+                        statement.setString(3, error);
+                        statement.setString(4, id.toString());
+                    } else {
+                        statement.setString(3, id.toString());
+                    }
                     statement.executeUpdate();
                 }
             } else {

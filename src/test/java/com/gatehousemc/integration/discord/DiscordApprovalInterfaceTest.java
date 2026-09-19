@@ -37,7 +37,41 @@ class DiscordApprovalInterfaceTest {
         assertTrue(transport.lastText.contains("TestPlayer"));
         assertTrue(transport.lastText.contains("OFFLINE / UNAUTHENTICATED"));
         assertEquals(requestId, transport.lastRequestId);
-        assertFalse(transport.lastDisabled);
+        assertEquals(RequestStatus.PENDING, transport.lastStatus);
+    }
+
+    @Test
+    void updateToApprovedSendsUndoFollowUpReply() {
+        UUID requestId = UUID.randomUUID();
+        RequestView approved = new RequestView(requestId, PlayerIdentity.of("TestPlayer"), RequestStatus.APPROVED,
+                1, Instant.EPOCH, Instant.EPOCH, Instant.EPOCH, new AdminPrincipal("discord", "mod", "mod"), null);
+        FakeDiscordTransport transport = new FakeDiscordTransport();
+        ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "channel1", List.of(), List.of());
+        DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, transport);
+        PublicationRef publication = new PublicationRef("discord", "channel1", "cardMsg1");
+
+        discord.update(publication, approved).toCompletableFuture().join();
+
+        assertEquals(RequestStatus.APPROVED, transport.lastStatus);
+        assertEquals(1, transport.followUpCalls);
+        assertEquals("cardMsg1", transport.lastReferenceMessageId);
+        assertEquals(RequestStatus.APPROVED, transport.lastFollowUpStatus);
+    }
+
+    @Test
+    void updateToPendingDoesNotSendFollowUp() {
+        UUID requestId = UUID.randomUUID();
+        RequestView pending = new RequestView(requestId, PlayerIdentity.of("TestPlayer"), RequestStatus.PENDING,
+                1, Instant.EPOCH, Instant.EPOCH, null, null, null);
+        FakeDiscordTransport transport = new FakeDiscordTransport();
+        ModConfig.Discord config = new ModConfig.Discord(true, "token", "guild1", "channel1", List.of(), List.of());
+        DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null, transport);
+        PublicationRef publication = new PublicationRef("discord", "channel1", "cardMsg1");
+
+        discord.update(publication, pending).toCompletableFuture().join();
+
+        assertEquals(RequestStatus.PENDING, transport.lastStatus);
+        assertEquals(0, transport.followUpCalls);
     }
 
     @Test
@@ -147,11 +181,11 @@ class DiscordApprovalInterfaceTest {
     }
 
     @Test
-    void disabledProviderReportsUnavailableOnStart() {
+    void disabledProviderReportsDisabledOnStart() {
         ModConfig.Discord config = new ModConfig.Discord(false, "", "guild1", "channel1", List.of(), List.of());
         DiscordApprovalInterface discord = new DiscordApprovalInterface(config, null);
         discord.start();
-        assertEquals(ProviderHealth.UNAVAILABLE, discord.health());
+        assertEquals(ProviderHealth.DISABLED, discord.health());
     }
 
     @Test
@@ -211,13 +245,19 @@ class DiscordApprovalInterfaceTest {
                 1, Instant.EPOCH, Instant.EPOCH, null, null, null);
         DiscordTransport failingTransport = new DiscordTransport() {
             @Override
-            public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+            public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, RequestStatus status) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Discord bot lacks View Channel permission there"));
             }
 
             @Override
-            public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled) {
+            public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, RequestStatus status) {
                 return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public CompletableFuture<String> sendActionFollowUp(String channelId, String referenceMessageId, String text,
+                                                                UUID requestId, RequestStatus status) {
+                return CompletableFuture.completedFuture("followup");
             }
 
             @Override public void start() {}
@@ -238,24 +278,39 @@ class DiscordApprovalInterfaceTest {
         String nextMessageId = "default";
         String lastText;
         String lastChannelId;
+        String lastReferenceMessageId;
         UUID lastRequestId;
-        boolean lastDisabled;
+        RequestStatus lastStatus;
+        RequestStatus lastFollowUpStatus;
+        int followUpCalls;
 
         @Override
-        public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, boolean disabled) {
+        public CompletableFuture<String> sendMessage(String channelId, String text, UUID requestId, RequestStatus status) {
             lastChannelId = channelId;
             lastText = text;
             lastRequestId = requestId;
-            lastDisabled = disabled;
+            lastStatus = status;
             return CompletableFuture.completedFuture(nextMessageId);
         }
 
         @Override
-        public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, boolean disabled) {
+        public CompletableFuture<Void> editMessage(String channelId, String messageId, String text, UUID requestId, RequestStatus status) {
             lastText = text;
             lastRequestId = requestId;
-            lastDisabled = disabled;
+            lastStatus = status;
             return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public CompletableFuture<String> sendActionFollowUp(String channelId, String referenceMessageId, String text,
+                                                            UUID requestId, RequestStatus status) {
+            followUpCalls++;
+            lastChannelId = channelId;
+            lastReferenceMessageId = referenceMessageId;
+            lastText = text;
+            lastRequestId = requestId;
+            lastFollowUpStatus = status;
+            return CompletableFuture.completedFuture("followup-" + followUpCalls);
         }
 
         @Override

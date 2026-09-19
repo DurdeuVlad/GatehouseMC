@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class SqliteWorkflowRepository implements WorkflowRepository {
@@ -33,10 +34,18 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
 
     @Override
     public synchronized AttemptOutcome recordAttempt(PlayerIdentity identity, Instant now, Duration denialCooldown) {
-        return recordAttempt(identity, now, denialCooldown, 3);
+        return recordAttempt(identity, now, denialCooldown, 1, 3);
     }
 
-    private AttemptOutcome recordAttempt(PlayerIdentity identity, Instant now, Duration denialCooldown, int retriesRemaining) {
+    @Override
+    public synchronized AttemptOutcome recordAttempt(PlayerIdentity identity, Instant now, Duration denialCooldown,
+                                                     long attemptDelta) {
+        if (attemptDelta < 1) throw new IllegalArgumentException("attemptDelta must be positive");
+        return recordAttempt(identity, now, denialCooldown, attemptDelta, 3);
+    }
+
+    private AttemptOutcome recordAttempt(PlayerIdentity identity, Instant now, Duration denialCooldown,
+                                         long attemptDelta, int retriesRemaining) {
         try {
             tx.begin();
             if (blocks.isBlocked(identity.normalizedUsername())) {
@@ -46,9 +55,9 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             }
             WhitelistRequest active = requests.findActiveByName(identity.normalizedUsername());
             if (active != null) {
-                requests.updateAttemptTimestamps(active.id(), now);
+                requests.updateAttemptTimestamps(active.id(), now, attemptDelta);
                 audit.record(active.id(), "ATTEMPT_UPDATED", null, AuditStore.jsonField("exactUsername", identity.exactUsername()), now);
-                outbox.insert("REQUEST_UPDATED", active.id(), now);
+                outbox.insert("REQUEST_ATTEMPT_UPDATED", active.id(), now);
                 tx.commit();
                 return AttemptOutcome.of(AttemptState.PENDING, requests.findById(active.id()));
             }
@@ -63,7 +72,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             }
             UUID id = UUID.randomUUID();
             WhitelistRequest created = new WhitelistRequest(id, identity, RequestStatus.PENDING, now, now, now, now,
-                    1, null, null, null, null, null);
+                    attemptDelta, null, null, null, null, null);
             requests.insert(created);
             outbox.insert("REQUEST_CREATED", id, now);
             audit.record(id, "REQUEST_CREATED", null, AuditStore.emptyJson(), now);
@@ -73,7 +82,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             tx.rollbackQuietly();
             if (retriesRemaining > 0 && isRetryableAttemptRace(exception)) {
                 tx.resetAutoCommit();
-                return recordAttempt(identity, now, denialCooldown, retriesRemaining - 1);
+                return recordAttempt(identity, now, denialCooldown, attemptDelta, retriesRemaining - 1);
             }
             return AttemptOutcome.of(AttemptState.DEGRADED, null);
         } finally {
@@ -96,6 +105,44 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
             return Optional.ofNullable(requests.findActiveByName(normalizedUsername));
         } catch (SQLException exception) {
             throw storageFailure("find_active_request", exception);
+        }
+    }
+
+    @Override
+    public synchronized int countActiveRequests() {
+        try {
+            return requests.countActiveRequests();
+        } catch (SQLException exception) {
+            throw storageFailure("count_active_requests", exception);
+        }
+    }
+
+    @Override
+    public synchronized Optional<WhitelistRequest> findLatestByName(String normalizedUsername) {
+        try {
+            return Optional.ofNullable(requests.latestByName(normalizedUsername));
+        } catch (SQLException exception) {
+            throw storageFailure("find_latest_by_name", exception);
+        }
+    }
+
+    @Override
+    public synchronized List<WhitelistRequest> findLatestByNameAndStatuses(String normalizedUsername,
+                                                                            Set<RequestStatus> statuses,
+                                                                            int limit) {
+        try {
+            return requests.latestByNameAndStatuses(normalizedUsername, statuses, limit);
+        } catch (SQLException exception) {
+            throw storageFailure("find_latest_by_name_and_statuses", exception);
+        }
+    }
+
+    @Override
+    public synchronized List<WhitelistRequest> findByIdPrefix(String prefix) {
+        try {
+            return requests.findByIdPrefix(prefix);
+        } catch (SQLException exception) {
+            throw storageFailure("find_request_by_prefix", exception);
         }
     }
 
@@ -279,6 +326,14 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
                 tx.rollbackQuietly();
                 return new DecisionResultSnapshot(DecisionOutcome.RESOLVING, Optional.of(request), "Request is currently resolving");
             }
+            WhitelistRequest active = requests.findActiveByName(request.identity().normalizedUsername());
+            if (active != null && !active.id().equals(requestId)) {
+                tx.rollbackQuietly();
+                return new DecisionResultSnapshot(DecisionOutcome.CONFLICT, Optional.of(request),
+                        "Cannot reopen " + requestId.toString().substring(0, 8) + " for "
+                                + request.identity().exactUsername() + ": active request "
+                                + active.id().toString().substring(0, 8) + " already exists. Resolve the active request first.");
+            }
             boolean wasBlocked = request.status() == RequestStatus.BLOCKED;
             if (!requests.reopen(requestId, actor, reason, now)) {
                 tx.rollbackQuietly();
@@ -447,6 +502,11 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
     @Override
     public synchronized void retryOutbox(UUID outboxId, Instant nextAttempt, String error, Instant now) {
         outbox.retry(outboxId, nextAttempt, error, now);
+    }
+
+    @Override
+    public synchronized void deferOutbox(UUID outboxId, Instant nextAttempt, Instant now) {
+        outbox.defer(outboxId, nextAttempt, now);
     }
 
     @Override

@@ -4,6 +4,62 @@ This document is the implementation reference so Codex should not need to redisc
 
 **Research snapshot:** 2026-09-08.
 
+## 0. Official source verification — 2026-09-19
+
+This release correction restores the GatehouseMC artifact version to `1.2.0`;
+it does not change the Minecraft or loader targets. The following primary
+sources were checked before rebuilding the artifacts:
+
+### R-OFFICIAL-01 — Minecraft 1.21.1 release status
+
+<https://www.minecraft.net/en-us/article/minecraft-java-edition-1-21-1>
+
+Minecraft describes 1.21.1 as a hotfix, recommends server owners upgrade to
+it, and lists fixes for critical exploits that could crash servers. The
+project therefore keeps 1.21.1 as the Fabric and NeoForge proof target.
+
+### R-OFFICIAL-02 — Java dedicated-server prerequisite
+
+<https://www.minecraft.net/en-us/download/server>
+
+Mojang's server download page states that Java Edition servers require a
+compatible JRE. The local proof uses Java 21 for the 1.21.1 targets and Java
+17 for the Forge 1.20.1 target, matching the pinned loader toolchains.
+
+### R-OFFICIAL-03 — Fabric Loom server/tooling behavior
+
+<https://docs.fabricmc.net/develop/loom/>
+
+Fabric's official documentation states that Loom resolves the configured
+Minecraft client/server jars, mappings, and remapped dependencies. This
+supports keeping the exact pinned Loom/Minecraft coordinates in the build and
+proving the produced jar on a dedicated server rather than treating a compile
+as sufficient evidence.
+
+### R-OFFICIAL-04 — Forge version semantics
+
+<https://docs.minecraftforge.net/en/1.20.1/gettingstarted/versioning/>
+
+Forge documents that its version comparison uses Maven ranges and is not fully
+compatible with Semantic Versioning. `1.2.0` is therefore applied only to the
+mod metadata and release artifact names; the Minecraft coordinate remains
+`1.20.1` and the Forge coordinate remains `47.4.23`.
+
+### R-OFFICIAL-05 — NeoForge dedicated-server procedure
+
+<https://docs.neoforged.net/user/docs/server/>
+
+NeoForge's official server guide requires the versioned installer, a compatible
+Java runtime, the generated server launch script, and a `mods` directory. It
+also warns that modpack server installs may require removing client-only mods.
+The release test consequently uses a clean disposable server and treats
+third-party modpack compatibility as a separate gate.
+
+**Decision:** no loader/toolchain upgrade was inferred from this research. The
+existing pinned coordinates remain the ones rebuilt and tested; the GatehouseMC
+artifact line is `1.2.0`, matching the approved M9 requirements and the prior
+`1.1.0` release line.
+
 ---
 
 ## 1. HeapHammer quality baseline

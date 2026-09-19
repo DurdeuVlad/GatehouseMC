@@ -142,6 +142,49 @@ class UndoDecisionServiceTest {
         }
     }
 
+    @Test
+    void reopenPreservesDatabaseFailureInsteadOfReportingSuccess(@TempDir Path temp) throws Exception {
+        SqliteDatabase database = new SqliteDatabase(temp.resolve("reopen-failure.sqlite"), 5000);
+        SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database);
+        RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
+        WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ZERO, cache);
+        requests.recordAttempt(PlayerIdentity.of("ReopenFailure"));
+        UUID requestId = repository.findActiveByName("reopenfailure").orElseThrow().id();
+        DecisionService decisions = new DecisionService(repository, new CountingWhitelist(), () -> NOW, cache);
+        decisions.decide(requestId, DecisionAction.DENY, AdminPrincipal.console(), Optional.empty())
+                .toCompletableFuture().join();
+        repository.close();
+
+        var result = decisions.decide(requestId, DecisionAction.UNDO, AdminPrincipal.console(), Optional.empty())
+                .toCompletableFuture().join();
+
+        assertEquals(DecisionOutcome.FAILED, result.outcome());
+    }
+
+    @Test
+    void reopenReportsActiveConflictAndLeavesBothDurableStatesUntouched(@TempDir Path temp) throws Exception {
+        try (SqliteDatabase database = new SqliteDatabase(temp.resolve("reopen-conflict.sqlite"), 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
+            WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ZERO, cache);
+            requests.recordAttempt(PlayerIdentity.of("ReopenConflict"));
+            UUID terminalId = repository.findActiveByName("reopenconflict").orElseThrow().id();
+            DecisionService decisions = new DecisionService(repository, new CountingWhitelist(), () -> NOW, cache);
+            decisions.decide(terminalId, DecisionAction.DENY, AdminPrincipal.console(), Optional.empty())
+                    .toCompletableFuture().join();
+            requests.recordAttempt(PlayerIdentity.of("ReopenConflict"));
+            UUID activeId = repository.findActiveByName("reopenconflict").orElseThrow().id();
+
+            var result = decisions.decide(terminalId, DecisionAction.UNDO, AdminPrincipal.console(), Optional.empty())
+                    .toCompletableFuture().join();
+
+            assertEquals(DecisionOutcome.CONFLICT, result.outcome());
+            assertEquals(RequestStatus.DENIED, repository.findById(terminalId).orElseThrow().status());
+            assertEquals(RequestStatus.PENDING, repository.findById(activeId).orElseThrow().status());
+            assertTrue(result.message().contains(activeId.toString().substring(0, 8)));
+        }
+    }
+
     private static class CountingWhitelist implements VanillaWhitelistPort {
         final AtomicInteger addCalls = new AtomicInteger();
         final AtomicInteger removeCalls = new AtomicInteger();

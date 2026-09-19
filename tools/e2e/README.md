@@ -63,6 +63,25 @@ For a complete clean-server smoke, use the wrapper from the repository root:
 bash tools/e2e/run-clean-server-smoke.sh fabric <server-dir> <port> <artifact> <minecraft-version>
 ```
 
+For the full M9 recovery and abuse matrix, enable the matrix driver and RCON
+on a disposable server. The wrapper provisions a clean directory, and the
+driver runs the same sequence against Fabric, Forge, and NeoForge; all traffic
+stays on `127.0.0.1`.
+
+```bash
+E2E_DRIVER=m9-matrix \
+E2E_RCON_PORT=25675 \
+E2E_RCON_PASSWORD='<disposable test password>' \
+EVIDENCE_FILE=build/e2e/artifacts/fabric-1.21.1/m9-matrix.json \
+bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565 \
+  build/libs/gatehousemc-1.2.0.jar 1.21.1
+```
+
+The matrix records command acceptance separately from durable workflow effects;
+SQLite and `whitelist.json` are inspected only after shutdown so WAL state is
+authoritative. It intentionally performs bounded repeated login attempts for
+defensive validation and must never target a real production server.
+
 The wrapper accepts `FABRIC_LOADER_VERSION`, `FABRIC_API_VERSION`, or a local
 `FABRIC_API_JAR` override so each supported Minecraft version can be tested
 against its matching Fabric dependencies. On Windows, Forge and NeoForge use

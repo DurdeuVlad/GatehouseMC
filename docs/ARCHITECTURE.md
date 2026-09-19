@@ -2,7 +2,7 @@
 
 This document defines the implementation blueprint for the loader-neutral GatehouseMC runtime and its Fabric, Forge, and NeoForge adapters. Product semantics live in `../WHITELIST_REQUEST_SPEC.md`; accepted rationale lives in `DECISION.md`.
 
-The 1.1.x implementation proof targets are Fabric 1.21.1 (Java 21), Forge 1.20.1 (Java 17), and NeoForge 1.21.1 (Java 21). The exact release state is tracked in [`.github/support-matrix.yml`](../.github/support-matrix.yml); historical 1.0.1 artifacts are not treated as freshly verified 1.1.x builds.
+The 1.2.0 implementation proof targets are Fabric 1.21.1 (Java 21), Forge 1.20.1 (Java 17), and NeoForge 1.21.1 (Java 21). The exact release state is tracked in [`.github/support-matrix.yml`](../.github/support-matrix.yml); historical 1.0.1 artifacts are not treated as freshly verified 1.2.0 builds.
 
 ---
 
@@ -613,7 +613,7 @@ The interface must not expose JDA/Telegram types.
 
 The current source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge
 1.21.1. Historical Fabric compatibility artifacts from 1.14.4 through 1.21.4
-remain documented in the support matrix, but a row is not a 1.1.x release
+remain documented in the support matrix, but a row is not a 1.2.0 release
 target until its own source build and dedicated-server proof are rerun.
 
 ### Version-coupled components
@@ -776,7 +776,7 @@ Telegram callback data has a small size limit; the action + canonical request UU
 
 Provider config validation errors disable that provider and surface status, rather than crashing Minecraft unless a core-required config (e.g. database path) is unusable.
 
-`/gatehouse reload` (or `/wlreq reload`) should restart affected providers safely. Do not change database path on live reload.
+`/gatehouse reload` should restart affected providers safely. Do not change database path on live reload.
 
 ---
 
@@ -838,7 +838,7 @@ storage.degraded
 
 Never log provider tokens. Avoid logging full callback payloads if they may include sensitive metadata.
 
-`/wlreq status` should report:
+`/gatehouse status` should report:
 
 - service health;
 - DB health/path (not credentials; SQLite only);
@@ -852,7 +852,7 @@ Never log provider tokens. Avoid logging full callback payloads if they may incl
 
 ## 17. Build/dependency packaging
 
-Current 1.1.x build lanes:
+Current 1.2.0 build lanes:
 
 ```text
 minecraft_version=1.21.1

@@ -9,7 +9,7 @@ version together.
 | Branch | Purpose |
 |---|---|
 | `main` | Integration branch for the next compatible change. |
-| `release/1.1.x` | Optional release-line coordination and changelog work. |
+| `release/1.2.x` | Optional release-line coordination and changelog work. |
 | `support/fabric/1.21.1` | Fabric 1.21.1 maintenance branch. |
 | `support/forge/1.20.1` | Forge 1.20.1 maintenance branch. |
 | `support/neoforge/1.21.1` | NeoForge 1.21.1 maintenance branch. |
@@ -38,12 +38,12 @@ v<mod-version>-<loader>-mc<minecraft-version>
 Examples:
 
 ```text
-v1.1.0-fabric-mc1.21.1
-v1.1.0-forge-mc1.20.1
-v1.1.0-neoforge-mc1.21.1
+v1.2.0-fabric-mc1.21.1
+v1.2.0-forge-mc1.20.1
+v1.2.0-neoforge-mc1.21.1
 ```
 
-Bare tags such as `v1.1.0` and tags that omit the loader are invalid. The tag
+Bare tags such as `v1.2.0` and tags that omit the loader are invalid. The tag
 must point at the matching `support/<loader>/<minecraft>` branch and the
 workflow verifies that the tag version equals `gradle.properties`.
 
