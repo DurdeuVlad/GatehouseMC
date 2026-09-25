@@ -271,6 +271,19 @@ public final class GatehouseRuntime implements AutoCloseable {
     }
 
     /**
+     * Closes this runtime the same way {@link #close()} does, but waits for teardown to actually
+     * finish instead of abandoning it after {@link #CLOSE_TIMEOUT}. For callers like a config
+     * reload that already run off the Minecraft server thread (so blocking here is harmless) and
+     * that open a replacement runtime against the same database file before this one is closed:
+     * letting the old teardown run unbounded in the background would leave two open connections
+     * to that file for an unpredictable extra stretch, instead of the brief, bounded overlap this
+     * gives you.
+     */
+    public void closeAndAwait() {
+        closeNow();
+    }
+
+    /**
      * Runs {@code work} on a daemon thread and waits up to {@code timeout} for it to finish.
      * Returns {@code false} (leaving the thread running in the background) instead of blocking the
      * caller past the bound; a hung provider is abandoned, never allowed to hang the caller. Package
