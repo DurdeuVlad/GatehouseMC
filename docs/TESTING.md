@@ -389,6 +389,50 @@ Case B:
 
 Do not add a dangerous production command solely for this test.
 
+### E2E-11 — Discord-armed shutdown gate
+
+Real dedicated-server release gate. It exists because JDA (the bundled
+Discord library) only starts its gateway/REST thread pools, and only
+registers its own JVM shutdown hook, once the Discord provider is actually
+armed with a token. E2E-01 through E2E-10 run with providers disabled or
+fake and cannot exercise this path, so they cannot catch a shutdown hang
+caused by JDA's threads or a shutdown-hook race with `GatehouseRuntime.close()`.
+
+Setup:
+
+- clean server directory;
+- `config/gatehousemc/config.json` seeded from
+  `tools/e2e/fixtures/discord-armed-config.json` **before first boot**, which
+  enables the Discord provider with a syntactically-valid but fake token (it
+  never authenticates against real Discord — this test never needs network
+  access to Discord, only to prove JDA's local thread pools start and stop
+  cleanly).
+
+Action:
+
+- boot the server and wait for `Done (...)!`;
+- send `stop` over RCON;
+- watch the **actual OS process** this script launched (not just RCON
+  reachability — a hung non-daemon thread can keep the JVM alive well after
+  RCON's own socket has closed) until it exits, bounded by
+  `E2E_SHUTDOWN_TIMEOUT_SECONDS` (default 30s).
+
+Assert:
+
+- the process exits within the bound;
+- fail with the elapsed time and pid if it does not.
+
+Driver: `E2E_DRIVER=shutdown-gate` in
+[`tools/e2e/run-clean-server-smoke.sh`](../tools/e2e/run-clean-server-smoke.sh).
+Evidence is written to `build/e2e/artifacts/<loader>/shutdown-gate.json`
+(`elapsedSeconds`, `timeoutSeconds`, `passed`).
+
+Currently scoped to NeoForge 1.21.1 only: it is the loader named in the
+production incident this gate was added for
+(`gatehousemc-neoforge-mc1.21.1-*.jar` bundles JDA and is the artifact
+armed with a real key in that report). Extend to Fabric/Forge if either
+loader's own shutdown-hook wiring is ever suspected.
+
 ---
 
 ## 7. Provider/router component scenarios

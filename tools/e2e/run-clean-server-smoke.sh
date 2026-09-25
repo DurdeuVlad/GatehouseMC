@@ -112,6 +112,18 @@ rcon.password=$rcon_password
 EOF
 fi
 
+if [[ "$driver" == "shutdown-gate" ]]; then
+  [[ -n "$rcon_port" && -n "$rcon_password" ]] || {
+    echo "shutdown-gate driver requires E2E_RCON_PORT and E2E_RCON_PASSWORD" >&2
+    exit 2
+  }
+  # Arms the Discord provider with a fake token before first boot so JDA
+  # actually starts (mirrors a production server with a real key), which is
+  # the precondition for the shutdown hang this gate proves is fixed.
+  mkdir -p "$server_dir/config/gatehousemc"
+  cp "$e2e_dir/fixtures/discord-armed-config.json" "$server_dir/config/gatehousemc/config.json"
+fi
+
 server_log="$server_dir/server.log"
 server_pid=''
 cleanup() {
@@ -170,6 +182,36 @@ if [[ "$driver" == "smoke" ]]; then
   MC_USERNAME="E2E_${loader}" \
   MC_EXPECTED_STATUS=rejected \
   npm --prefix "$e2e_dir" run smoke
+elif [[ "$driver" == "shutdown-gate" ]]; then
+  # Real dedicated-server proof for the JDA/close() shutdown fix: with Discord
+  # armed (see the config seeded above), send 'stop' over RCON and measure how
+  # long the *actual OS process* this script launched (server_pid) takes to
+  # exit. Watching the process, not just RCON reachability, is what catches a
+  # hung non-daemon thread keeping the JVM alive after everything else has
+  # shut down -- exactly the "stuck while trying to close" failure mode.
+  shutdown_timeout="${E2E_SHUTDOWN_TIMEOUT_SECONDS:-30}"
+  evidence_dir="$repo_root/build/e2e/artifacts/$loader"
+  evidence_path="$evidence_dir/shutdown-gate.json"
+  mkdir -p "$evidence_dir"
+
+  MC_HOST=127.0.0.1 RCON_PORT="$rcon_port" RCON_PASSWORD="$rcon_password" \
+    node "$e2e_dir/src/rcon-fire.mjs" stop
+
+  SECONDS=0
+  while kill -0 "$server_pid" 2>/dev/null; do
+    if (( SECONDS >= shutdown_timeout )); then
+      printf '{"loader":"%s","elapsedSeconds":%d,"timeoutSeconds":%d,"passed":false,"reason":"process still running after stop"}\n' \
+        "$loader" "$SECONDS" "$shutdown_timeout" > "$evidence_path"
+      echo "FAIL: ${loader} server did not exit within ${shutdown_timeout}s of RCON 'stop' (pid $server_pid still running)" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+  elapsed=$SECONDS
+  printf '{"loader":"%s","elapsedSeconds":%d,"timeoutSeconds":%d,"passed":true}\n' \
+    "$loader" "$elapsed" "$shutdown_timeout" > "$evidence_path"
+  echo "PASS: ${loader} server exited ${elapsed}s after RCON 'stop' (bound ${shutdown_timeout}s)"
+  server_pid=''
 else
   MC_HOST=127.0.0.1 \
   MC_PORT="$port" \
