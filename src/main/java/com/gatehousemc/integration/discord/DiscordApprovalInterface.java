@@ -149,7 +149,10 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         }
         try {
             health = ProviderHealth.STARTING;
-            JDA jda = JDABuilder.createDefault(config.token()).addEventListeners(this).build();
+            // GatehouseRuntime.close() is the canonical shutdown owner (invoked from each platform's
+            // server-stopping hook); JDA's own JVM shutdown hook must stay disabled so it can never
+            // race that call and shut down the same JDA instance's thread pools from a second thread.
+            JDA jda = JDABuilder.createDefault(config.token()).setEnableShutdownHook(false).addEventListeners(this).build();
             transport = new JdaDiscordTransport(jda, config.guildId(), config.dmUserId());
         } catch (RuntimeException error) {
             LOGGER.error("discord.start_failed: failed to initialize JDA", error);

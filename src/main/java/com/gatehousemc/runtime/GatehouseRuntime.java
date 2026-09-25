@@ -30,6 +30,8 @@ import com.gatehousemc.port.ApprovalInterface;
 import com.gatehousemc.port.ClockPort;
 import com.gatehousemc.port.VanillaWhitelistPort;
 import com.gatehousemc.port.WorkflowRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -47,6 +49,9 @@ import java.util.function.Supplier;
 
 /** Shared application wiring used by every Minecraft loader adapter. */
 public final class GatehouseRuntime implements AutoCloseable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GatehouseRuntime.class);
+    private static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(10);
+
     public record AdmissionResponse(AdmissionState.Kind state, String message) {}
 
     private final ModConfig config;
@@ -250,8 +255,29 @@ public final class GatehouseRuntime implements AutoCloseable {
         return repository == null ? Optional.empty() : repository.findActiveByName(username.toLowerCase(Locale.ROOT));
     }
 
+    /**
+     * Called synchronously from each platform's server-stopping hook, on the Minecraft server
+     * thread. Provider shutdown (JDA/Telegram) does network I/O and must never be allowed to hang
+     * that thread, so the real work runs on a daemon thread with a bounded wait; a provider that
+     * doesn't finish in time is abandoned rather than blocking vanilla server shutdown.
+     */
     @Override
     public void close() {
+        Thread closer = new Thread(this::closeNow, "gatehousemc-shutdown");
+        closer.setDaemon(true);
+        closer.start();
+        try {
+            closer.join(CLOSE_TIMEOUT.toMillis());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        if (closer.isAlive()) {
+            LOGGER.warn("gatehousemc.shutdown_timeout: providers did not finish shutting down within {}s; " +
+                    "letting the server continue stopping.", CLOSE_TIMEOUT.getSeconds());
+        }
+    }
+
+    private void closeNow() {
         providers.forEach(ApprovalInterface::stop);
         if (outbox != null) outbox.close();
         if (worker != null) worker.close();
