@@ -391,22 +391,43 @@ Do not add a dangerous production command solely for this test.
 
 ### E2E-11 — Discord-armed shutdown gate
 
-Real dedicated-server release gate. It exists because JDA (the bundled
-Discord library) only starts its gateway/REST thread pools, and only
-registers its own JVM shutdown hook, once the Discord provider is actually
-armed with a token. E2E-01 through E2E-10 run with providers disabled or
-fake and cannot exercise this path, so they cannot catch a shutdown hang
-caused by JDA's threads or a shutdown-hook race with `GatehouseRuntime.close()`.
+Real dedicated-server release gate. It exists because a production incident
+showed `stop`/restart hanging with the Discord provider armed, and E2E-01
+through E2E-10 all run with providers disabled or fake, so none of them ever
+start the Discord provider at all.
+
+**Known scope limit, confirmed by decompiling the bundled `JDA-6.5.0.jar`:**
+`JDAImpl.verifyToken()` makes a synchronous REST call to Discord
+(`GET /users/@me`) inside `JDABuilder.build()` and calls `shutdownNow()` on
+itself immediately if that call fails, before `build()` even returns. This
+means an invalid/fake token — the only kind usable in CI without a live
+Discord bot credential — never reaches the "connected, gateway threads
+running" state the production incident actually involved; JDA tears itself
+down synchronously on its own before there is anything left that could hang.
+This gate therefore proves a real but narrower thing: booting with the
+provider armed and failing to authenticate does not hang server shutdown. It
+does **not** reproduce, and cannot currently reproduce without a disposable
+real bot token, a shutdown hang in a successfully-connected JDA instance.
+That harder case is covered instead by a fast, deterministic Tier 1 test —
+`GatehouseRuntimeShutdownBoundTest` (`src/test/java/com/gatehousemc/runtime/`)
+— which drives `GatehouseRuntime.runBounded(...)` (the exact mechanism
+`close()` uses) with a task that deliberately never finishes, and asserts it
+is abandoned within the timeout rather than blocking the caller. That test
+needs no network and no Minecraft server, and is the real regression guard
+for the `close()` timeout fix; this E2E gate is a complementary, narrower
+check run against a real dedicated server.
 
 Setup:
 
 - clean server directory;
 - `config/gatehousemc/config.json` seeded from
   `tools/e2e/fixtures/discord-armed-config.json` **before first boot**, which
-  enables the Discord provider with a syntactically-valid but fake token (it
-  never authenticates against real Discord — this test never needs network
-  access to Discord, only to prove JDA's local thread pools start and stop
-  cleanly).
+  enables the Discord provider with a placeholder token
+  (`__E2E_FAKE_DISCORD_TOKEN__`) that the harness replaces at runtime with a
+  freshly random, disposable value — never a fixed committed string, both
+  because it must be unique to avoid coincidentally matching a real
+  credential and because GitHub push protection correctly rejects a
+  plausible-looking fixed token even when it is fake.
 
 Action:
 

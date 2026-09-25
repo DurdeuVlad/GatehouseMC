@@ -263,18 +263,30 @@ public final class GatehouseRuntime implements AutoCloseable {
      */
     @Override
     public void close() {
-        Thread closer = new Thread(this::closeNow, "gatehousemc-shutdown");
-        closer.setDaemon(true);
-        closer.start();
-        try {
-            closer.join(CLOSE_TIMEOUT.toMillis());
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
-        if (closer.isAlive()) {
+        boolean finished = runBounded(this::closeNow, CLOSE_TIMEOUT, "gatehousemc-shutdown");
+        if (!finished) {
             LOGGER.warn("gatehousemc.shutdown_timeout: providers did not finish shutting down within {}s; " +
                     "letting the server continue stopping.", CLOSE_TIMEOUT.getSeconds());
         }
+    }
+
+    /**
+     * Runs {@code work} on a daemon thread and waits up to {@code timeout} for it to finish.
+     * Returns {@code false} (leaving the thread running in the background) instead of blocking the
+     * caller past the bound; a hung provider is abandoned, never allowed to hang the caller. Package
+     * -private so the timeout behavior itself can be tested directly with a deliberately hanging
+     * task, without needing a live JDA connection to reproduce a stuck shutdown.
+     */
+    static boolean runBounded(Runnable work, Duration timeout, String threadName) {
+        Thread worker = new Thread(work, threadName);
+        worker.setDaemon(true);
+        worker.start();
+        try {
+            worker.join(timeout.toMillis());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        return !worker.isAlive();
     }
 
     private void closeNow() {

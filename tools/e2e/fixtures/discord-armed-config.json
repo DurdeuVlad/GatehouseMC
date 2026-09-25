@@ -2,7 +2,7 @@
   "routing": { "mode": "PRIMARY_FALLBACK", "providers": ["discord"] },
   "discord": {
     "enabled": true,
-    "token": "FAKE.E2E.SHUTDOWN_GATE_TOKEN_NEVER_CONNECTS_TO_REAL_DISCORD",
+    "token": "__E2E_FAKE_DISCORD_TOKEN__",
     "guildId": "",
     "channelId": "",
     "dmUserId": "100000000000000001",

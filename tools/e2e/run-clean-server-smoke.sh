@@ -117,11 +117,17 @@ if [[ "$driver" == "shutdown-gate" ]]; then
     echo "shutdown-gate driver requires E2E_RCON_PORT and E2E_RCON_PASSWORD" >&2
     exit 2
   }
-  # Arms the Discord provider with a fake token before first boot so JDA
-  # actually starts (mirrors a production server with a real key), which is
-  # the precondition for the shutdown hang this gate proves is fixed.
+  # Arms the Discord provider with a fake token before first boot so
+  # DiscordApprovalInterface.start() actually calls JDABuilder.build()
+  # instead of staying SETUP_REQUIRED, mirroring a production server with a
+  # real key configured. The value is generated fresh here, never committed
+  # -- the fixture only holds a placeholder -- both so it can't collide with
+  # a real credential and because a fixed, plausible-looking token trips
+  # GitHub push protection even when it is fake.
+  fake_token="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=\n').$(openssl rand -hex 4).$(openssl rand -base64 20 | tr '+/' '-_' | tr -d '=\n')"
   mkdir -p "$server_dir/config/gatehousemc"
-  cp "$e2e_dir/fixtures/discord-armed-config.json" "$server_dir/config/gatehousemc/config.json"
+  sed "s/__E2E_FAKE_DISCORD_TOKEN__/$fake_token/" \
+    "$e2e_dir/fixtures/discord-armed-config.json" > "$server_dir/config/gatehousemc/config.json"
 fi
 
 server_log="$server_dir/server.log"
