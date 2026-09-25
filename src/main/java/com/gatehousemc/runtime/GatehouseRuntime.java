@@ -30,6 +30,8 @@ import com.gatehousemc.port.ApprovalInterface;
 import com.gatehousemc.port.ClockPort;
 import com.gatehousemc.port.VanillaWhitelistPort;
 import com.gatehousemc.port.WorkflowRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -47,6 +49,9 @@ import java.util.function.Supplier;
 
 /** Shared application wiring used by every Minecraft loader adapter. */
 public final class GatehouseRuntime implements AutoCloseable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GatehouseRuntime.class);
+    private static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(10);
+
     public record AdmissionResponse(AdmissionState.Kind state, String message) {}
 
     private final ModConfig config;
@@ -250,8 +255,54 @@ public final class GatehouseRuntime implements AutoCloseable {
         return repository == null ? Optional.empty() : repository.findActiveByName(username.toLowerCase(Locale.ROOT));
     }
 
+    /**
+     * Called synchronously from each platform's server-stopping hook, on the Minecraft server
+     * thread. Provider shutdown (JDA/Telegram) does network I/O and must never be allowed to hang
+     * that thread, so the real work runs on a daemon thread with a bounded wait; a provider that
+     * doesn't finish in time is abandoned rather than blocking vanilla server shutdown.
+     */
     @Override
     public void close() {
+        boolean finished = runBounded(this::closeNow, CLOSE_TIMEOUT, "gatehousemc-shutdown");
+        if (!finished) {
+            LOGGER.warn("gatehousemc.shutdown_timeout: providers did not finish shutting down within {}s; " +
+                    "letting the server continue stopping.", CLOSE_TIMEOUT.getSeconds());
+        }
+    }
+
+    /**
+     * Closes this runtime the same way {@link #close()} does, but waits for teardown to actually
+     * finish instead of abandoning it after {@link #CLOSE_TIMEOUT}. For callers like a config
+     * reload that already run off the Minecraft server thread (so blocking here is harmless) and
+     * that open a replacement runtime against the same database file before this one is closed:
+     * letting the old teardown run unbounded in the background would leave two open connections
+     * to that file for an unpredictable extra stretch, instead of the brief, bounded overlap this
+     * gives you.
+     */
+    public void closeAndAwait() {
+        closeNow();
+    }
+
+    /**
+     * Runs {@code work} on a daemon thread and waits up to {@code timeout} for it to finish.
+     * Returns {@code false} (leaving the thread running in the background) instead of blocking the
+     * caller past the bound; a hung provider is abandoned, never allowed to hang the caller. Package
+     * -private so the timeout behavior itself can be tested directly with a deliberately hanging
+     * task, without needing a live JDA connection to reproduce a stuck shutdown.
+     */
+    static boolean runBounded(Runnable work, Duration timeout, String threadName) {
+        Thread worker = new Thread(work, threadName);
+        worker.setDaemon(true);
+        worker.start();
+        try {
+            worker.join(timeout.toMillis());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        return !worker.isAlive();
+    }
+
+    private void closeNow() {
         providers.forEach(ApprovalInterface::stop);
         if (outbox != null) outbox.close();
         if (worker != null) worker.close();

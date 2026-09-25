@@ -88,3 +88,22 @@ against its matching Fabric dependencies. On Windows, Forge and NeoForge use
 their generated `win_args.txt` launch configuration directly; this avoids the
 installer-generated `run.bat` pause prompt while preserving the same server
 arguments.
+
+For the shutdown gate (see `docs/TESTING.md` E2E-11), seed the Discord
+provider with a fake token before boot and time the actual OS process's exit
+after `stop`, not just RCON reachability:
+
+```bash
+E2E_DRIVER=shutdown-gate \
+E2E_RCON_PORT=25577 \
+E2E_RCON_PASSWORD='<disposable test password>' \
+E2E_SHUTDOWN_TIMEOUT_SECONDS=30 \
+bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-shutdown 25568 \
+  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0.jar 1.21.1
+```
+
+The fake token in `tools/e2e/fixtures/discord-armed-config.json` never
+authenticates against real Discord; the gate only needs JDA's local thread
+pools and its (now-disabled) shutdown hook to actually exist, which requires
+the provider to be armed, not connected. Evidence lands in
+`build/e2e/artifacts/<loader>/shutdown-gate.json`.

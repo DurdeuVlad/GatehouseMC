@@ -58,6 +58,8 @@ public final class NeoForgeRuntime implements AutoCloseable {
     @Override
     public void close() { delegate.close(); }
 
+    public void closeAndAwait() { delegate.closeAndAwait(); }
+
     public record GameProfileIdentity(UUID uuid, String exactUsername) {
         public PlayerIdentity toDomain() { return PlayerIdentity.of(exactUsername); }
     }

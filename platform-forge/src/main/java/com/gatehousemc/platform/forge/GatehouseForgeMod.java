@@ -144,7 +144,12 @@ public final class GatehouseForgeMod {
                         installed = true;
                     }
                     Messages.load(next.language());
-                    current.close();
+                    // closeAndAwait(), not close(): this runs on STARTUP_EXECUTOR, off the Minecraft
+                    // main thread, so blocking here is fine -- and it matters, because `started`
+                    // already opened a new connection to the same database file above. close()'s
+                    // bounded abandon-on-timeout (needed for the server-stop path) would let that
+                    // overlap run unbounded in the background instead of ending here.
+                    current.closeAndAwait();
                     LOGGER.info("GatehouseMC configuration reloaded: {}", next.redactedSummary());
                     result.complete(AdminCommandResult.success("Gatehouse configuration reloaded."));
                 } catch (Exception error) {
