@@ -154,9 +154,10 @@ When a new Minecraft version becomes a target:
 3. Verify the Mixin target (`PlayerManager#checkCanJoin`) exists in the new mapping set.
 4. Run `./gradlew clean test build` and boot a real dedicated server.
 5. Record verified version pins in `docs/RESEARCH.md`.
-6. Add the branch and tag pattern to `.github/support-matrix.json`, then mirror the human-readable summary in `.github/support-matrix.yml`.
-7. Verify the loader-qualified tag format
-   `v<mod-version>-<loader>-mc<minecraft-version>`.
+6. Add the branch and release metadata to `.github/support-matrix.json`, then
+   mirror the human-readable summary in `.github/support-matrix.yml`.
+7. Verify the canonical GitHub release tag format `v<mod-version>` and retain
+   loader-qualified artifact names for each target.
 
 ### 5.5 Branch deprecation
 
@@ -164,9 +165,9 @@ A version branch is deprecated when the corresponding Minecraft release is no lo
 
 ### 5.6 Release branches
 
-Releases are tagged directly on the relevant support branch, for example
-`git tag v1.1.0-fabric-mc1.21.1` on `support/fabric/1.21.1`. Bare version tags
-are invalid. The release workflow creates one loader/version artifact per tag.
+Releases are tagged on the reviewed `main` commit, for example
+`git tag v1.2.1`. The release workflow creates one page for that version with
+one loader-qualified artifact per ready target and a combined checksum file.
 
 ---
 
@@ -196,9 +197,8 @@ Every release should record:
 Expected public distribution:
 
 - GitHub repository — public source and issue tracker; GitHub Releases is the
-  authoritative tagged source/checksum channel. The earlier combined
-  `v1.1.0-mc1.21.1` release is retained for history; new files use
-  loader-qualified tags.
+  authoritative tagged source/checksum channel. Each version has one page with
+  all ready loader assets, while the assets retain loader-qualified filenames.
 - Modrinth — submitted mod distribution; currently pending moderation.
 - CurseForge — submitted secondary distribution; currently pending moderation.
 

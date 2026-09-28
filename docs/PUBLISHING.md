@@ -9,10 +9,12 @@ gates are green.
 ## Current publication state
 
 - GitHub repository: public — <https://github.com/DurdeuVlad/GatehouseMC>
-- GitHub Release: the earlier combined `v1.1.0-mc1.21.1` release is retained
-  for history. New installations should use a loader-qualified release.
+- GitHub Releases: one page exists per mod version. The page contains the
+  Fabric, Forge, and NeoForge JARs that passed the release gates, plus one
+  checksum file covering all of them.
 - Modrinth and CurseForge: the release workflow builds, validates, smoke-tests,
-  and publishes exactly one loader/version artifact per loader-qualified tag.
+  and publishes one loader/version artifact for each ready target. Their
+  storefront versions remain loader-qualified even though GitHub is unified.
   CurseForge publication is required. Modrinth publication is explicitly
   opt-in through the `PUBLISH_MODRINTH=true` repository variable, a valid
   `MODRINTH_PROJECT_ID` repository variable, and the `MODRINTH_TOKEN` secret.
@@ -56,11 +58,11 @@ Do not call a release production-ready when only the Gradle build or the
 
 ## GitHub Release
 
-Use the reviewed loader-qualified release process described in
+Use the reviewed single-page release process described in
 [`docs/RELEASE_BRANCHING.md`](RELEASE_BRANCHING.md). A release must contain:
 
-- exactly one JAR for the loader/version in the tag;
-- a checksum file covering that JAR;
+- exactly one JAR for every ready loader/version target;
+- a checksum file covering every JAR;
 - release notes naming the Minecraft version and Java runtime for each asset;
 - the offline-mode trust warning and any unresolved compatibility limits.
 
@@ -103,14 +105,14 @@ Optional repository variables for Modrinth publication:
 
 `GITHUB_TOKEN` is provided by GitHub Actions. Never print, commit, or write
 expanded secret values to disk. The workflow contains the non-secret
-CurseForge project ID for the existing `gatehousemc` listing; a loader-qualified tag is the
-CI/CD publish trigger. Do not create the tag until the target is ready for
-public publication.
+CurseForge project ID for the existing `gatehousemc` listing; a bare version tag
+is the CI/CD publish trigger. Do not create the tag until every ready target is
+prepared for public publication.
 
 The workflow fails closed if the required CurseForge token is missing, if the
-release version does not match `gradle.properties`, or if the JAR's internal
-loader metadata does not match its target. Each GitHub Release contains exactly
-one proof-target JAR and its checksum. Storefront publication runs
+release version does not match `gradle.properties`, or if a JAR's internal
+loader metadata does not match its target. Each GitHub Release contains one
+proof-target JAR per ready loader and a combined checksum file. Storefront publication runs
 automatically for a valid pushed tag, or through the guarded manual dispatch;
 the Gradle sources JAR is never sent to a storefront. Modrinth publication is
 skipped unless its opt-in variable, project ID variable, and token are all
@@ -122,26 +124,22 @@ notifications.
 
 ## Manual release commands
 
-The support branches must already point at the reviewed 1.1.0 commit. Create
-the tags locally from those branches, inspect them, and then push each tag:
+The active support branches must already point at the reviewed release commit.
+Create one version tag from the reviewed `main` commit, inspect it, and then
+push it:
 
 ```powershell
-git switch support/fabric/1.21.1
-git tag v1.2.1-fabric-mc1.21.1
-git push origin v1.2.1-fabric-mc1.21.1
-git switch support/forge/1.20.1
-git tag v1.2.1-forge-mc1.20.1
-git push origin v1.2.1-forge-mc1.20.1
-git switch support/neoforge/1.21.1
-git tag v1.2.1-neoforge-mc1.21.1
-git push origin v1.2.1-neoforge-mc1.21.1
+git switch main
+git pull --ff-only origin main
+git tag v1.2.1
+git push origin v1.2.1
 ```
 
-The storefront version is loader-qualified as
+The GitHub page is `v1.2.1`. Each storefront version is still loader-qualified as
 `<version>-<loader>-mc<minecraft-version>` so Fabric and NeoForge 1.21.1 do
 not collide in the same project.
 
 The release workflow must be inspected before tagging to confirm that it builds
-the intended target branch and uploads the exact loader-qualified artifact. A
-tag push is the CI/CD trigger, but the GitHub Actions result and storefront
-status still need to be checked before announcing availability.
+all ready targets and uploads the exact three artifacts. A tag push is the
+CI/CD trigger, but the GitHub Actions result, combined GitHub page, and
+storefront status still need to be checked before announcing availability.

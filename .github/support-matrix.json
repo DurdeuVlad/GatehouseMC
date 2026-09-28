@@ -3,7 +3,7 @@
   "project": "GatehouseMC",
   "release_line": "1.2.x",
   "release_version": "1.2.1",
-  "tag_pattern": "v<mod-version>-<loader>-mc<minecraft-version>",
+  "tag_pattern": "v<mod-version>",
   "release_gates": {
     "require_clean_server": true,
     "require_artifact_validation": true,

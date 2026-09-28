@@ -3,13 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*-fabric-mc*'
-      - 'v*-forge-mc*'
-      - 'v*-neoforge-mc*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing loader-qualified tag to rebuild and republish'
+        description: 'Existing bare version tag to rebuild and republish'
         required: true
         type: string
 
@@ -26,7 +24,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Resolve and verify release target
+      - name: Resolve and verify combined release
         id: target
         shell: bash
         env:
@@ -49,127 +47,171 @@ jobs:
           }
 
           mod_version=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
-          python tools/release/resolve_target.py \
+          python tools/release/resolve_release.py \
             --tag "$tag" \
-            --mod-version "$mod_version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            --mod-version "$mod_version" \
+            --output release-manifest.json
 
-      - name: Set up Java
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r '.version' release-manifest.json)" >> "$GITHUB_OUTPUT"
+          for loader in fabric forge neoforge; do
+            prefix="${loader}_"
+            echo "${prefix}minecraft=$(jq -r --arg loader "$loader" '.targets[] | select(.loader == $loader) | .minecraft' release-manifest.json)" >> "$GITHUB_OUTPUT"
+            echo "${prefix}java=$(jq -r --arg loader "$loader" '.targets[] | select(.loader == $loader) | .java' release-manifest.json)" >> "$GITHUB_OUTPUT"
+            echo "${prefix}artifact=$(jq -r --arg loader "$loader" '.targets[] | select(.loader == $loader) | .artifact' release-manifest.json)" >> "$GITHUB_OUTPUT"
+            echo "${prefix}artifact_name=$(jq -r --arg loader "$loader" '.targets[] | select(.loader == $loader) | .artifact_name' release-manifest.json)" >> "$GITHUB_OUTPUT"
+            echo "${prefix}dependencies=$(jq -r --arg loader "$loader" '.targets[] | select(.loader == $loader) | .dependencies' release-manifest.json)" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Set up Java 21 for Fabric and NeoForge
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ steps.target.outputs.java }}
+          java-version: '21'
 
       - name: Set up Gradle wrapper lane
-        if: steps.target.outputs.gradle == 'wrapper'
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Build Fabric and NeoForge artifacts
+        run: bash ./gradlew clean test build :platform-neoforge:build --stacktrace
+
+      - name: Set up Java 17 for Forge
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Set up Forge Gradle 8.8 lane
-        if: steps.target.outputs.gradle == '8.8'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.8'
+
+      - name: Build Forge artifact
+        run: gradle -PenableForge :core:test :platform-forge:build --stacktrace
 
       - name: Set up Node.js for dedicated-server smoke
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Build selected loader artifact
+      - name: Validate and stage all release artifacts
         shell: bash
-        env:
-          LOADER: ${{ steps.target.outputs.loader }}
         run: |
           set -euo pipefail
-          case "$LOADER" in
-            fabric)
-              bash ./gradlew clean test build --stacktrace
-              ;;
-            forge)
-              gradle -PenableForge :platform-forge:build --stacktrace
-              ;;
-            neoforge)
-              bash ./gradlew clean test build :platform-neoforge:build --stacktrace
-              ;;
-            *)
-              echo "Unsupported release loader: $LOADER" >&2
-              exit 2
-              ;;
-          esac
-
-      - name: Validate and checksum selected artifact
-        shell: bash
-        env:
-          ARTIFACT: ${{ steps.target.outputs.artifact }}
-          ARTIFACT_NAME: ${{ steps.target.outputs.artifact_name }}
-          LOADER: ${{ steps.target.outputs.loader }}
-          MINECRAFT: ${{ steps.target.outputs.minecraft }}
-          VERSION: ${{ steps.target.outputs.version }}
-        run: |
-          set -euo pipefail
-          test -f "$ARTIFACT"
-          python tools/release/validate_artifact.py \
-            --artifact "$ARTIFACT" \
-            --loader "$LOADER" \
-            --minecraft "$MINECRAFT" \
-            --version "$VERSION"
+          rm -rf release-assets
           mkdir -p release-assets
-          cp "$ARTIFACT" "release-assets/$ARTIFACT_NAME"
-          sha256sum "release-assets/$ARTIFACT_NAME" > release-assets/checksums.txt
+          : > release-assets/checksums.txt
+
+          while IFS= read -r target; do
+            loader=$(jq -r '.loader' <<< "$target")
+            minecraft=$(jq -r '.minecraft' <<< "$target")
+            artifact=$(jq -r '.artifact' <<< "$target")
+            artifact_name=$(jq -r '.artifact_name' <<< "$target")
+            test -f "$artifact"
+            python tools/release/validate_artifact.py \
+              --artifact "$artifact" \
+              --loader "$loader" \
+              --minecraft "$minecraft" \
+              --version "${{ steps.target.outputs.version }}"
+            cp "$artifact" "release-assets/$artifact_name"
+            sha256sum "release-assets/$artifact_name" >> release-assets/checksums.txt
+          done < <(jq -c '.targets[]' release-manifest.json)
+
           cat release-assets/checksums.txt
 
       - name: Install E2E dependencies
         run: npm ci
         working-directory: tools/e2e
 
-      - name: Run clean dedicated-server smoke gate
+      - name: Run clean dedicated-server smoke gates
         shell: bash
-        env:
-          LOADER: ${{ steps.target.outputs.loader }}
-          MINECRAFT: ${{ steps.target.outputs.minecraft }}
-          ARTIFACT: ${{ steps.target.outputs.artifact }}
         run: |
           set -euo pipefail
-          bash tools/e2e/run-clean-server-smoke.sh \
-            "$LOADER" \
-            ".e2e-release-$LOADER" \
-            25565 \
-            "$ARTIFACT" \
-            "$MINECRAFT"
+          port=25565
+          while IFS= read -r target; do
+            loader=$(jq -r '.loader' <<< "$target")
+            minecraft=$(jq -r '.minecraft' <<< "$target")
+            artifact=$(jq -r '.artifact' <<< "$target")
+            bash tools/e2e/run-clean-server-smoke.sh \
+              "$loader" \
+              ".e2e-release-$loader" \
+              "$port" \
+              "$artifact" \
+              "$minecraft"
+            port=$((port + 1))
+          done < <(jq -c '.targets[]' release-manifest.json)
 
       - name: Upload dedicated-server evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gatehousemc-${{ steps.target.outputs.loader }}-e2e-${{ github.run_id }}
-          path: .e2e-release-${{ steps.target.outputs.loader }}/server.log
+          name: gatehousemc-${{ steps.target.outputs.version }}-e2e-${{ github.run_id }}
+          path: .e2e-release-*/server.log
           if-no-files-found: warn
 
-      - name: Create GitHub Release
+      - name: Create combined GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
+          name: GatehouseMC ${{ steps.target.outputs.version }}
           tag_name: ${{ steps.target.outputs.tag }}
           body_path: CHANGELOG.md
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to CurseForge
+      - name: Publish Fabric to CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1689020
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: release-assets/${{ steps.target.outputs.artifact_name }}
-          name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
-          version: ${{ steps.target.outputs.version }}-${{ steps.target.outputs.loader }}-mc${{ steps.target.outputs.minecraft }}
+          files: release-assets/${{ steps.target.outputs.fabric_artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (Fabric, Minecraft ${{ steps.target.outputs.fabric_minecraft }})
+          version: ${{ steps.target.outputs.version }}-fabric-mc${{ steps.target.outputs.fabric_minecraft }}
           version-type: release
           changelog-file: CHANGELOG.md
-          loaders: ${{ steps.target.outputs.loader }}
+          loaders: fabric
           environment: dedicated-server
-          game-versions: ${{ steps.target.outputs.minecraft }}
-          java: ${{ steps.target.outputs.java }}
-          dependencies: ${{ steps.target.outputs.dependencies }}
+          game-versions: ${{ steps.target.outputs.fabric_minecraft }}
+          java: ${{ steps.target.outputs.fabric_java }}
+          dependencies: ${{ steps.target.outputs.fabric_dependencies }}
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000
+
+      - name: Publish Forge to CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1689020
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: release-assets/${{ steps.target.outputs.forge_artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (Forge, Minecraft ${{ steps.target.outputs.forge_minecraft }})
+          version: ${{ steps.target.outputs.version }}-forge-mc${{ steps.target.outputs.forge_minecraft }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: forge
+          environment: dedicated-server
+          game-versions: ${{ steps.target.outputs.forge_minecraft }}
+          java: ${{ steps.target.outputs.forge_java }}
+          dependencies: ${{ steps.target.outputs.forge_dependencies }}
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000
+
+      - name: Publish NeoForge to CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1689020
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: release-assets/${{ steps.target.outputs.neoforge_artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (NeoForge, Minecraft ${{ steps.target.outputs.neoforge_minecraft }})
+          version: ${{ steps.target.outputs.version }}-neoforge-mc${{ steps.target.outputs.neoforge_minecraft }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: neoforge
+          environment: dedicated-server
+          game-versions: ${{ steps.target.outputs.neoforge_minecraft }}
+          java: ${{ steps.target.outputs.neoforge_java }}
+          dependencies: ${{ steps.target.outputs.neoforge_dependencies }}
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
@@ -189,22 +231,62 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to Modrinth
+      - name: Publish Fabric to Modrinth
         if: steps.modrinth.outputs.available == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: release-assets/${{ steps.target.outputs.artifact_name }}
-          name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
-          version: ${{ steps.target.outputs.version }}-${{ steps.target.outputs.loader }}-mc${{ steps.target.outputs.minecraft }}
+          files: release-assets/${{ steps.target.outputs.fabric_artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (Fabric, Minecraft ${{ steps.target.outputs.fabric_minecraft }})
+          version: ${{ steps.target.outputs.version }}-fabric-mc${{ steps.target.outputs.fabric_minecraft }}
           version-type: release
           changelog-file: CHANGELOG.md
-          loaders: ${{ steps.target.outputs.loader }}
+          loaders: fabric
           environment: dedicated-server
-          game-versions: ${{ steps.target.outputs.minecraft }}
-          java: ${{ steps.target.outputs.java }}
-          dependencies: ${{ steps.target.outputs.dependencies }}
+          game-versions: ${{ steps.target.outputs.fabric_minecraft }}
+          java: ${{ steps.target.outputs.fabric_java }}
+          dependencies: ${{ steps.target.outputs.fabric_dependencies }}
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000
+
+      - name: Publish Forge to Modrinth
+        if: steps.modrinth.outputs.available == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ steps.modrinth.outputs.project_id }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-assets/${{ steps.target.outputs.forge_artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (Forge, Minecraft ${{ steps.target.outputs.forge_minecraft }})
+          version: ${{ steps.target.outputs.version }}-forge-mc${{ steps.target.outputs.forge_minecraft }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: forge
+          environment: dedicated-server
+          game-versions: ${{ steps.target.outputs.forge_minecraft }}
+          java: ${{ steps.target.outputs.forge_java }}
+          dependencies: ${{ steps.target.outputs.forge_dependencies }}
+          fail-mode: fail
+          retry-attempts: 3
+          retry-delay: 10000
+
+      - name: Publish NeoForge to Modrinth
+        if: steps.modrinth.outputs.available == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ steps.modrinth.outputs.project_id }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-assets/${{ steps.target.outputs.neoforge_artifact_name }}
+          name: GatehouseMC ${{ steps.target.outputs.version }} (NeoForge, Minecraft ${{ steps.target.outputs.neoforge_minecraft }})
+          version: ${{ steps.target.outputs.version }}-neoforge-mc${{ steps.target.outputs.neoforge_minecraft }}
+          version-type: release
+          changelog-file: CHANGELOG.md
+          loaders: neoforge
+          environment: dedicated-server
+          game-versions: ${{ steps.target.outputs.neoforge_minecraft }}
+          java: ${{ steps.target.outputs.neoforge_java }}
+          dependencies: ${{ steps.target.outputs.neoforge_dependencies }}
           fail-mode: fail
           retry-attempts: 3
           retry-delay: 10000
