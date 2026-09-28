@@ -179,9 +179,12 @@ jobs:
         shell: bash
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+          PUBLISH_MODRINTH: ${{ vars.PUBLISH_MODRINTH }}
         run: |
-          if [ -n "$MODRINTH_TOKEN" ]; then
+          if [ "${PUBLISH_MODRINTH,,}" = "true" ] && [ -n "$MODRINTH_TOKEN" ] && [ -n "$MODRINTH_PROJECT_ID" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "project_id=$MODRINTH_PROJECT_ID" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
@@ -190,7 +193,7 @@ jobs:
         if: steps.modrinth.outputs.available == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          modrinth-id: gatehousemc
+          modrinth-id: ${{ steps.modrinth.outputs.project_id }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: release-assets/${{ steps.target.outputs.artifact_name }}
           name: GatehouseMC ${{ steps.target.outputs.version }} (${{ steps.target.outputs.loader }}, Minecraft ${{ steps.target.outputs.minecraft }})
