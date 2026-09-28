@@ -114,9 +114,11 @@ release version does not match `gradle.properties`, or if a JAR's internal
 loader metadata does not match its target. Each GitHub Release contains one
 proof-target JAR per ready loader and a combined checksum file. Storefront publication runs
 automatically for a valid pushed tag, or through the guarded manual dispatch;
-the Gradle sources JAR is never sent to a storefront. Modrinth publication is
-skipped unless its opt-in variable, project ID variable, and token are all
-configured.
+the Gradle sources JAR is never sent to a storefront. A manual dispatch can
+set `publish_storefronts=false` when rebuilding a version whose storefront
+files already exist; this avoids duplicate storefront uploads during a GitHub
+release-page migration. Modrinth publication is skipped unless its opt-in
+variable, project ID variable, and token are all configured.
 
 Every successful release is visible in the GitHub Actions run and GitHub
 Release. This release lane does not send external Discord or Telegram

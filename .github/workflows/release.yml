@@ -10,6 +10,11 @@ on:
         description: 'Existing bare version tag to rebuild and republish'
         required: true
         type: string
+      publish_storefronts:
+        description: 'Publish this version to CurseForge and optional Modrinth'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -160,6 +165,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish Fabric to CurseForge
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_storefronts
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1689020
@@ -179,6 +185,7 @@ jobs:
           retry-delay: 10000
 
       - name: Publish Forge to CurseForge
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_storefronts
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1689020
@@ -198,6 +205,7 @@ jobs:
           retry-delay: 10000
 
       - name: Publish NeoForge to CurseForge
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_storefronts
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1689020
@@ -232,7 +240,7 @@ jobs:
           fi
 
       - name: Publish Fabric to Modrinth
-        if: steps.modrinth.outputs.available == 'true'
+        if: (github.event_name != 'workflow_dispatch' || inputs.publish_storefronts) && steps.modrinth.outputs.available == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
@@ -252,7 +260,7 @@ jobs:
           retry-delay: 10000
 
       - name: Publish Forge to Modrinth
-        if: steps.modrinth.outputs.available == 'true'
+        if: (github.event_name != 'workflow_dispatch' || inputs.publish_storefronts) && steps.modrinth.outputs.available == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
@@ -272,7 +280,7 @@ jobs:
           retry-delay: 10000
 
       - name: Publish NeoForge to Modrinth
-        if: steps.modrinth.outputs.available == 'true'
+        if: (github.event_name != 'workflow_dispatch' || inputs.publish_storefronts) && steps.modrinth.outputs.available == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
