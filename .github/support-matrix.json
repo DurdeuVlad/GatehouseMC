@@ -261,7 +261,7 @@
       "java": 17,
       "gradle": "8.8.0",
       "build": { "command": "gradle -PenableForge :core:test :platform-forge:build", "artifact": "platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.1-all.jar", "release_name": "gatehousemc-forge-mc1.20.1-1.2.1.jar" },
-      "dependencies": { "forge": "47.4.23", "forge_gradle": "6.0" },
+      "dependencies": { "forge": "47.4.23", "forge_gradle": "6.0.54" },
       "e2e": { "profile": "forge", "installer": "47.4.23" },
       "gates": { "build": true, "artifact_validation": true, "server_e2e": true, "publishable": true }
     },
