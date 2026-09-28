@@ -128,7 +128,13 @@ jobs:
         run: npm ci
         working-directory: tools/e2e
 
-      - name: Run clean dedicated-server smoke gates
+      - name: Set up Java 21 for Fabric and NeoForge smoke
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run Fabric and NeoForge clean dedicated-server smoke gates
         shell: bash
         run: |
           set -euo pipefail
@@ -144,7 +150,27 @@ jobs:
               "$artifact" \
               "$minecraft"
             port=$((port + 1))
-          done < <(jq -c '.targets[]' release-manifest.json)
+          done < <(jq -c '.targets[] | select(.loader == "fabric" or .loader == "neoforge")' release-manifest.json)
+
+      - name: Set up Java 17 for Forge smoke
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Run Forge clean dedicated-server smoke gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=$(jq -c '.targets[] | select(.loader == "forge")' release-manifest.json)
+          minecraft=$(jq -r '.minecraft' <<< "$target")
+          artifact=$(jq -r '.artifact' <<< "$target")
+          bash tools/e2e/run-clean-server-smoke.sh \
+            forge \
+            .e2e-release-forge \
+            25567 \
+            "$artifact" \
+            "$minecraft"
 
       - name: Upload dedicated-server evidence
         if: always()
