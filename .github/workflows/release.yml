@@ -177,7 +177,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gatehousemc-${{ steps.target.outputs.version }}-e2e-${{ github.run_id }}
-          path: .e2e-release-*/server.log
+          path: |
+            .e2e-release-fabric/server.log
+            .e2e-release-neoforge/server.log
+            .e2e-release-forge/server.log
           if-no-files-found: warn
 
       - name: Create combined GitHub Release
