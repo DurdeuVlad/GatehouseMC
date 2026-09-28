@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import resolve_target
+import resolve_release
 import validate_support_matrix
 import validate_branch_metadata
 
@@ -19,6 +20,7 @@ class MatrixContractTest(unittest.TestCase):
         cls.matrix = json.loads((ROOT / ".github" / "support-matrix.json").read_text(encoding="utf-8"))
 
     def test_inventory_has_expected_targets(self):
+        self.assertEqual(self.matrix["tag_pattern"], "v<mod-version>")
         self.assertEqual(len(self.matrix["targets"]), 27)
         self.assertEqual(sum(target["loader"] == "fabric" for target in self.matrix["targets"]), 12)
         self.assertEqual(sum(target["loader"] == "forge" for target in self.matrix["targets"]), 8)
@@ -26,7 +28,24 @@ class MatrixContractTest(unittest.TestCase):
         for target in self.matrix["targets"]:
             validate_support_matrix.validate_target(target, self.matrix["release_version"])
 
-    def test_resolver_requires_qualified_ready_target(self):
+    def test_release_resolves_one_page_with_all_loader_assets(self):
+        manifest = resolve_release.resolve(self.matrix, "v1.2.1", "1.2.1")
+        self.assertEqual(manifest["tag"], "v1.2.1")
+        self.assertEqual([target["loader"] for target in manifest["targets"]], ["fabric", "forge", "neoforge"])
+        self.assertEqual(
+            [target["artifact_name"] for target in manifest["targets"]],
+            [
+                "gatehousemc-fabric-mc1.21.1-1.2.1.jar",
+                "gatehousemc-forge-mc1.20.1-1.2.1.jar",
+                "gatehousemc-neoforge-mc1.21.1-1.2.1.jar",
+            ],
+        )
+
+    def test_release_rejects_loader_qualified_tag(self):
+        with self.assertRaises(ValueError):
+            resolve_release.resolve(self.matrix, "v1.2.1-fabric-mc1.21.1", "1.2.1")
+
+    def test_resolver_requires_ready_target(self):
         target = resolve_target.resolve_matrix(self.matrix, "1.2.1", "fabric", "1.21.1", True)
         self.assertEqual(target["id"], "fabric-1.21.1")
         with self.assertRaises(SystemExit):

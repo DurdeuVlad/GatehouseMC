@@ -13,7 +13,7 @@ from pathlib import Path
 VERSION = re.compile(r"^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$")
 MC_VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 BRANCH = re.compile(r"^support/(fabric|forge|neoforge)/\d+\.\d+(?:\.\d+)?$")
-TAG = re.compile(r"^v<mod-version>-(fabric|forge|neoforge)-mc<minecraft-version>$")
+TAG = re.compile(r"^v<mod-version>$")
 LOADERS = {"fabric", "forge", "neoforge"}
 READY_STATES = {"verified-local", "verified-ci", "published"}
 DYNAMIC_PIN = re.compile(r"(?:latest|SNAPSHOT|\*|\[|\]|\(|\)|,)", re.IGNORECASE)
@@ -80,18 +80,10 @@ def validate_target(target: dict, release_version: str) -> None:
         fail(f"{target['id']}: ready target has no server installer pin")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--matrix", type=Path, default=Path(".github/support-matrix.json"))
-    parser.add_argument("--require-all-ready", action="store_true")
-    args = parser.parse_args()
-    try:
-        data = json.loads(args.matrix.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        fail(f"cannot read matrix: {error}")
+def validate_data(data: dict) -> None:
     if data.get("schema") != 2:
         fail("schema must be 2")
-    if data.get("tag_pattern") != "v<mod-version>-<loader>-mc<minecraft-version>":
+    if data.get("tag_pattern") != "v<mod-version>":
         fail("tag_pattern is invalid")
     release_version = data.get("release_version")
     if not isinstance(release_version, str) or not VERSION.fullmatch(release_version):
@@ -112,6 +104,21 @@ def main() -> None:
             fail(f"duplicate target {target['id']}")
         ids.add(target["id"])
         pairs.add(pair)
+    return None
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--matrix", type=Path, default=Path(".github/support-matrix.json"))
+    parser.add_argument("--require-all-ready", action="store_true")
+    args = parser.parse_args()
+    try:
+        data = json.loads(args.matrix.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read matrix: {error}")
+    validate_data(data)
+    release_version = data["release_version"]
+    targets = data["targets"]
     if args.require_all_ready and not all(target.get("ready") for target in targets):
         pending = ", ".join(target["id"] for target in targets if not target.get("ready"))
         fail(f"targets are not ready: {pending}")

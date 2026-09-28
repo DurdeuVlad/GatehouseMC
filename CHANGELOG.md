@@ -16,6 +16,13 @@ All notable changes to **GatehouseMC** will be documented in this file.
   long-poll cancellation, and cancellation of raw `HttpClient.sendAsync`
   requests.
 
+### Downloads
+
+- [Fabric 1.21.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/gatehousemc-fabric-mc1.21.1-1.2.1.jar)
+- [Forge 1.20.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/gatehousemc-forge-mc1.20.1-1.2.1.jar)
+- [NeoForge 1.21.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/gatehousemc-neoforge-mc1.21.1-1.2.1.jar)
+- [SHA-256 checksums](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/checksums.txt)
+
 ## 1.2.0 — Canonical administration, setup durability, and abuse resistance
 
 - Standardized Minecraft, Discord, and Telegram administration on the canonical

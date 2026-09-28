@@ -30,19 +30,19 @@ Node E2E client.
 - No IP persistence and no claim that offline usernames are authenticated.
 - Active maintenance branches are `support/fabric/1.21.1`,
   `support/forge/1.20.1`, and `support/neoforge/1.21.1`.
-- Canonical release tags are `v<mod-version>-<loader>-mc<minecraft-version>`;
-  each tag releases one loader/version artifact.
+- Canonical GitHub release tags are `v<mod-version>`; each page contains one
+  validated artifact for every ready loader target and a combined checksum
+  file. Storefront versions remain loader-qualified.
 
 ## Publication status
 
 - GitHub is public and contains the source repository.
 - Modrinth and CurseForge submissions contain the earlier files. The 1.2.1
-  workflow now builds, tests, and stages one loader/version file per qualified
-  tag; a qualified tag publishes automatically once the configured storefront
-  secrets and release gates succeed.
-- GitHub Release `v1.1.0-mc1.21.1` is retained as the earlier combined release.
-  New loader-specific files use the qualified tags documented in
-  `docs/RELEASE_BRANCHING.md`.
+  workflow builds, tests, and stages all three ready loader files on one
+  version tag; that page publishes automatically once the configured
+  storefront secrets and release gates succeed.
+- GitHub Release `v1.1.0-mc1.21.1` is retained as historical data. The 1.2.1
+  page uses the canonical `v1.2.1` tag documented in `docs/RELEASE_BRANCHING.md`.
 - GitHub Release `v1.0.0` is retained for history but is not production-ready;
   its non-1.21.1 labelled assets declare Minecraft 1.21.1 internally.
 

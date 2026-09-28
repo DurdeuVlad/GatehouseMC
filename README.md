@@ -29,7 +29,7 @@ GatehouseMC is an operational workflow layer around Minecraft's native whitelist
 
 - **Modrinth:** [modrinth.com/mod/gatehousemc](https://modrinth.com/mod/gatehousemc) *(submitted; pending moderation)*
 - **CurseForge:** [curseforge.com/minecraft/mc-mods/gatehousemc](https://www.curseforge.com/minecraft/mc-mods/gatehousemc) *(submitted; pending moderation)*
-- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(1.2.1 loader-qualified releases)*
+- **GitHub Releases:** [latest release](https://github.com/DurdeuVlad/GatehouseMC/releases/latest) *(one page per mod version with Fabric, Forge, and NeoForge downloads)*
 - **Source and issues:** [github.com/DurdeuVlad/GatehouseMC](https://github.com/DurdeuVlad/GatehouseMC) · [issue tracker](https://github.com/DurdeuVlad/GatehouseMC/issues)
 - **Publishing copy:** [Modrinth](docs/publishing/MODRINTH.md) · [CurseForge](docs/publishing/CURSEFORGE.md)
 - **Operator Publishing Guide:** [`docs/PUBLISHING.md`](docs/PUBLISHING.md)

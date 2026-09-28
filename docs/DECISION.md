@@ -178,9 +178,18 @@ This document records the accepted foundational decisions for Whitelist Request 
 
 ## ADR-018 — Loader-qualified support branches and release tags
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-019 for GitHub release-page identity; the
+  support-branch portion remains accepted.
 - **Context:** A Minecraft version alone does not identify a distributable artifact. Fabric, Forge, and NeoForge have different APIs, toolchains, metadata, and server proofs, so a version-only branch or tag can publish the wrong binary.
-- **Decision:** Maintain active targets on `support/<loader>/<minecraft>` branches and identify releases as `v<mod-version>-<loader>-mc<minecraft-version>`. Keep `main` as the integration branch and use `release/<major>.<minor>.x` for release-line coordination. The release workflow resolves the tag to an allow-listed support branch and publishes exactly one validated loader/version artifact.
-- **Rejected:** Bare `v<version>` tags, version-only maintenance branches, or one multi-loader release tag that hides which artifact was tested and published.
-- **Consequences:** Each new loader/version target needs its own branch, support-matrix row, build lane, clean-server proof, and resolver entry before release. This creates a small amount of release bookkeeping but makes maintenance, rollback, and artifact provenance explicit.
+- **Decision:** Maintain active targets on `support/<loader>/<minecraft>` branches. The former loader-qualified GitHub tags remain historical provenance only.
+- **Rejected:** Merging support branches into one loader-specific implementation or using a tag to publish a target that has not passed its own gates.
+- **Consequences:** The support-branch, build-lane, clean-server-proof, and artifact-provenance requirements remain per target.
+
+## ADR-019 — One GitHub release page per mod version
+
+- **Status:** Accepted
+- **Context:** A loader-qualified GitHub page made users choose among three pages for one mod version, even though each page was already a separately validated asset. GitHub Releases supports multiple downloadable assets on one release page.
+- **Decision:** Use one canonical GitHub tag `v<mod-version>` on the reviewed `main` commit. The release workflow resolves the ready targets from `.github/support-matrix.json`, builds and smoke-tests Fabric, Forge, and NeoForge independently, then uploads one loader-qualified JAR per target and one combined `checksums.txt` to that single page. Modrinth versions and CurseForge files retain loader-qualified names and metadata.
+- **Rejected:** A single ambiguous JAR, silently replacing loader-qualified filenames, or continuing to create one GitHub page per loader.
+- **Consequences:** Release-page discovery is version-wide, while target provenance and storefront compatibility remain explicit in asset names, support branches, matrix rows, and per-loader validation evidence. Existing loader-qualified 1.2.1 pages are migration history and are removed only after the combined `v1.2.1` page is verified.
 

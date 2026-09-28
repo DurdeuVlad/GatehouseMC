@@ -1,8 +1,8 @@
 # Release and maintenance branching
 
 GatehouseMC treats a Minecraft loader/version pair as a separately maintained
-binary target. A release tag identifies the mod version, loader, and Minecraft
-version together.
+binary target. A GitHub release page identifies one mod version and contains
+one validated asset for each ready loader target.
 
 ## Branches
 
@@ -29,48 +29,49 @@ Retired branches remain archived for reproducibility.
 
 ## Tags
 
-The canonical tag format is:
+The canonical GitHub release tag format is:
 
 ```text
-v<mod-version>-<loader>-mc<minecraft-version>
+v<mod-version>
 ```
 
-Examples:
+Example:
 
 ```text
-v1.2.1-fabric-mc1.21.1
-v1.2.1-forge-mc1.20.1
-v1.2.1-neoforge-mc1.21.1
+v1.2.1
 ```
 
-Bare tags such as `v1.2.1` and tags that omit the loader are invalid. The tag
-must point at the matching `support/<loader>/<minecraft>` branch and the
-workflow verifies that the tag version equals `gradle.properties`.
+The tag must point at a commit reachable from `main`, and the workflow verifies
+that its version equals `gradle.properties`. Loader-specific support branches
+remain the source of the target metadata and proof, but they do not receive
+separate GitHub release pages.
 
-Each tag produces exactly one loader-qualified JAR:
+The single page contains one asset for every ready target:
 
 ```text
 gatehousemc-<loader>-mc<minecraft-version>-<mod-version>.jar
 ```
 
-The GitHub release, Modrinth version, and CurseForge file all use the same
-loader/version identity. A pushed loader-qualified tag publishes automatically
-after the tagged build and clean-server E2E gate pass when the required
-storefront secrets are configured. A guarded manual dispatch is available for
-controlled republishing.
+The release also contains `checksums.txt` with the SHA-256 digest of every JAR.
+The GitHub page is version-wide; Modrinth versions and CurseForge files retain
+their loader-qualified identities so their storefront metadata remains exact.
+A pushed bare version tag publishes the combined page after all build,
+artifact-validation, and clean-server E2E gates pass. A guarded manual
+dispatch is available for controlled republishing.
 
-The earlier combined tag `v1.1.0-mc1.21.1` is retained for history. It is not a
-loader-qualified release target and must not be reused for additional files.
+The old loader-qualified 1.2.1 tags are retained as source/provenance history
+during the migration. They are not valid tags for future GitHub releases.
 
 ## Maintenance flow
 
 1. Open feature work from `main`.
 2. Merge the feature into `main` after the full applicable verification.
 3. Backport approved fixes to active support branches with a separate PR.
-4. Tag the exact support branch using the canonical loader-qualified format.
-5. Let the release workflow build, validate, clean-server test, and stage the
-   single matching artifact.
-6. Push the loader-qualified tag only after moderation, credentials, release
-   notes, and the production publication decision are ready. The workflow
-   publishes automatically after the build and clean-server gate. Use the
-   manual `tag` input only to rebuild and republish an existing tag.
+4. Confirm every ready target in the support matrix has passed its required
+   build, artifact-validation, and dedicated-server gates.
+5. Tag the reviewed `main` commit with the canonical version tag.
+6. Let the release workflow build, validate, clean-server test, and stage all
+   ready loader artifacts into one GitHub release page.
+7. Push the version tag only after moderation, credentials, release notes, and
+   the production publication decision are ready. Use the manual `tag` input
+   only to rebuild and republish an existing version page.
