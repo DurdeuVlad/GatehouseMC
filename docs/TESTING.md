@@ -6,7 +6,7 @@ This project uses the HeapHammer-style rule:
 
 Unit tests are necessary but cannot prove Fabric loader behavior, Mixins, offline-mode protocol login, packaged dependencies, or vanilla whitelist persistence.
 
-The release matrix is maintained in [`.github/support-matrix.yml`](../.github/support-matrix.yml). For 1.2.0 the source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. A historical 1.0.1 download is compatibility evidence, not 1.2.0 release proof.
+The machine-validated release manifest is [`.github/support-matrix.json`](../.github/support-matrix.json); the YAML file is its human-readable target summary. For 1.2.1 the source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. A historical 1.0.1 download is compatibility evidence, not 1.2.1 release proof.
 
 ## 0. Loader build and artifact gates
 
@@ -15,11 +15,11 @@ Run the modern lanes with Java 21 and the repository wrapper:
 ```bash
 ./gradlew clean test build :platform-neoforge:build
 python tools/release/validate_artifact.py \
-  --artifact build/libs/gatehousemc-1.2.0.jar \
-  --loader fabric --minecraft 1.21.1 --version 1.2.0
+  --artifact build/libs/gatehousemc-1.2.1.jar \
+  --loader fabric --minecraft 1.21.1 --version 1.2.1
 python tools/release/validate_artifact.py \
-  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0.jar \
-  --loader neoforge --minecraft 1.21.1 --version 1.2.0
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1.jar \
+  --loader neoforge --minecraft 1.21.1 --version 1.2.1
 ```
 
 Run the Forge lane with Java 17 and Gradle 8.8:
@@ -27,8 +27,8 @@ Run the Forge lane with Java 17 and Gradle 8.8:
 ```bash
 gradle -PenableForge :platform-forge:build
 python tools/release/validate_artifact.py \
-  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.0-all.jar \
-  --loader forge --minecraft 1.20.1 --version 1.2.0
+  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.1-all.jar \
+  --loader forge --minecraft 1.20.1 --version 1.2.1
 ```
 
 The validator checks the exact loader metadata, Minecraft dependency, entrypoint, icon, core classes, and nested SQLite runtime. It is intentionally fail-closed: no loader/version pair is publishable until its build, artifact validation, and clean dedicated-server E2E columns are all green.
@@ -119,7 +119,7 @@ GameTest is **not sufficient** for the pre-join whitelist admission acceptance t
 This is the release gate for login/whitelist behavior.
 
 Boot an actual clean dedicated server using the final built mod artifact. The
-1.2.0 proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1; the
+1.2.1 proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1; the
 same rejection assertion is run against each loader with its required Java
 runtime.
 
@@ -146,11 +146,11 @@ server process:
 ```bash
 npm --prefix tools/e2e ci
 bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565 \
-  build/libs/gatehousemc-1.2.0.jar 1.21.1
+  build/libs/gatehousemc-1.2.1.jar 1.21.1
 bash tools/e2e/run-clean-server-smoke.sh forge .e2e-forge 25566 \
-  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.0-all.jar 1.20.1
+  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.1-all.jar 1.20.1
 bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-neoforge 25567 \
-  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0.jar 1.21.1
+  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1.jar 1.21.1
 ```
 
 ---

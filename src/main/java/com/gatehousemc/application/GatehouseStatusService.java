@@ -70,7 +70,7 @@ public final class GatehouseStatusService {
                         provider.lastSuccessfulOperation(), provider.lastActionableError()))
                 .toList();
         boolean healthy = sqliteHealthy && !degraded;
-        return new Snapshot("1.2.0", healthy ? OverallHealth.HEALTHY : OverallHealth.DEGRADED,
+        return new Snapshot("1.2.1", healthy ? OverallHealth.HEALTHY : OverallHealth.DEGRADED,
                 healthy ? RuntimeState.RUNNING : RuntimeState.DEGRADED, Map.copyOf(counts), active,
                 worker == null ? 0 : worker.pendingWorkUnits(), config.requests().queueCapacity(),
                 worker == null ? 0 : worker.availableNewRequestTokens(),

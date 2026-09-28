@@ -121,7 +121,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         return current.sendMessage(destination, "GatehouseMC provider test — delivery is working.", UUID.randomUUID(), RequestStatus.RESOLVING)
                 .thenRun(() -> { lastSuccessfulOperation = "provider test"; lastActionableError = ""; })
                 .whenComplete((ignored, error) -> {
-                    if (error != null) {
+                    if (error != null && health != ProviderHealth.STOPPED) {
                         lastActionableError = safeError(error);
                         health = ProviderHealth.DEGRADED;
                     }
@@ -171,6 +171,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
 
     @Override
     public void onReady(ReadyEvent event) {
+        if (health == ProviderHealth.STOPPED) return;
         health = ProviderHealth.HEALTHY;
         JDA readyJda = event == null ? null : event.getJDA();
         if (readyJda != null) registerSlashCommands(readyJda);
@@ -221,7 +222,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
                 .exceptionallyCompose(error -> {
                     Throwable cause = error.getCause() != null ? error.getCause() : error;
                     lastActionableError = safeError(cause);
-                    health = ProviderHealth.DEGRADED;
+                    if (health != ProviderHealth.STOPPED) health = ProviderHealth.DEGRADED;
                     LOGGER.error("discord.publish_failed destination={}: {}", destination, cause.getMessage());
                     return CompletableFuture.failedFuture(cause);
                 });
@@ -247,7 +248,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
                 })
                 .exceptionallyCompose(error -> {
                     lastActionableError = safeError(error);
-                    health = ProviderHealth.DEGRADED;
+                    if (health != ProviderHealth.STOPPED) health = ProviderHealth.DEGRADED;
                     return CompletableFuture.failedFuture(error);
                 });
     }

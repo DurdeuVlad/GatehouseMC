@@ -6,10 +6,14 @@ import com.gatehousemc.port.ProviderHealth;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -60,6 +64,44 @@ class TelegramApprovalInterfaceTest {
         ModConfig.Telegram config = new ModConfig.Telegram(true, "token", "chat1", List.of("user1"));
         TelegramApprovalInterface telegram = new TelegramApprovalInterface(config, null, transport);
         assertEquals(ProviderHealth.HEALTHY, telegram.health());
+    }
+
+    @Test
+    void stopClosesTransportAndUnblocksLongPoll() throws Exception {
+        CountDownLatch pollStarted = new CountDownLatch(1);
+        CompletableFuture<JsonObject> pendingUpdates = new CompletableFuture<>();
+        AtomicBoolean closed = new AtomicBoolean();
+        TelegramTransport transport = new TelegramTransport() {
+            @Override
+            public CompletableFuture<JsonObject> post(String method, String payload) {
+                if (method.equals("getUpdates")) {
+                    pollStarted.countDown();
+                    return pendingUpdates;
+                }
+                return CompletableFuture.completedFuture(okResponse());
+            }
+
+            @Override
+            public void close() {
+                closed.set(true);
+                pendingUpdates.cancel(false);
+            }
+        };
+        ModConfig.Telegram config = new ModConfig.Telegram(true, "token", "chat1", List.of("user1"));
+        TelegramApprovalInterface telegram = new TelegramApprovalInterface(config, null, transport);
+
+        telegram.start();
+        assertTrue(pollStarted.await(1, TimeUnit.SECONDS));
+        assertTimeout(Duration.ofSeconds(2), telegram::stop);
+
+        assertTrue(closed.get());
+        assertEquals(ProviderHealth.STOPPED, telegram.health());
+    }
+
+    private static JsonObject okResponse() {
+        JsonObject response = new JsonObject();
+        response.addProperty("ok", true);
+        return response;
     }
 
     private static final class FakeTelegramTransport implements TelegramTransport {

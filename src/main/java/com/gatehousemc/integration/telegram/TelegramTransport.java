@@ -10,4 +10,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface TelegramTransport {
     CompletableFuture<JsonObject> post(String method, String payload);
+
+    /** Cancels transport-owned work during server shutdown. */
+    default void close() {}
 }

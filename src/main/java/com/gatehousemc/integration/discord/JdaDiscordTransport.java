@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /** JDA-backed implementation of DiscordTransport. */
 final class JdaDiscordTransport implements DiscordTransport {
@@ -107,7 +108,28 @@ final class JdaDiscordTransport implements DiscordTransport {
 
     @Override
     public void stop() {
-        jda.shutdownNow();
+        boolean interrupted = false;
+        try {
+            jda.shutdown();
+            try {
+                if (jda.awaitShutdown(5, TimeUnit.SECONDS)) return;
+            } catch (InterruptedException interruption) {
+                interrupted = true;
+            }
+
+            jda.shutdownNow();
+            if (!interrupted) {
+                try {
+                    if (!jda.awaitShutdown(1, TimeUnit.SECONDS)) {
+                        LOGGER.warn("discord.shutdown_timeout: JDA did not reach SHUTDOWN after forced shutdown");
+                    }
+                } catch (InterruptedException interruption) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
     }
 
     /** Proactively validates reachability and permissions for the destination channel. */

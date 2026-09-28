@@ -15,7 +15,7 @@ version together.
 | `support/neoforge/1.21.1` | NeoForge 1.21.1 maintenance branch. |
 
 Create a new `support/<loader>/<minecraft>` branch when a target is promoted
-from `planned` to `verified-local` in [the support matrix](../.github/support-matrix.yml).
+from `planned` to `verified-local` in the machine-validated [support matrix](../.github/support-matrix.json), then mirror the target summary in `../.github/support-matrix.yml`.
 The branch is cut from the nearest compatible implementation baseline and owns
 only that loader/version artifact.
 
@@ -38,12 +38,12 @@ v<mod-version>-<loader>-mc<minecraft-version>
 Examples:
 
 ```text
-v1.2.0-fabric-mc1.21.1
-v1.2.0-forge-mc1.20.1
-v1.2.0-neoforge-mc1.21.1
+v1.2.1-fabric-mc1.21.1
+v1.2.1-forge-mc1.20.1
+v1.2.1-neoforge-mc1.21.1
 ```
 
-Bare tags such as `v1.2.0` and tags that omit the loader are invalid. The tag
+Bare tags such as `v1.2.1` and tags that omit the loader are invalid. The tag
 must point at the matching `support/<loader>/<minecraft>` branch and the
 workflow verifies that the tag version equals `gradle.properties`.
 
