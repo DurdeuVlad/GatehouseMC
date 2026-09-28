@@ -150,7 +150,7 @@ jobs:
               "$artifact" \
               "$minecraft"
             port=$((port + 1))
-          done < <(jq -c '.targets[]' release-manifest.json)
+          done < <(jq -c '.targets[] | select(.loader == "fabric" or .loader == "neoforge")' release-manifest.json)
 
       - name: Set up Java 17 for Forge smoke
         uses: actions/setup-java@v5
