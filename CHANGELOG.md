@@ -2,6 +2,20 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.2.1 — Graceful provider shutdown and server-stop reliability
+
+- Fixed Discord shutdown to request a graceful JDA stop, wait within a bounded
+  timeout, and use forced shutdown only when graceful termination does not
+  complete.
+- Fixed Telegram shutdown to cancel in-flight Bot API requests and await the
+  long-polling worker instead of leaving an HTTP request alive after the
+  Minecraft server stops.
+- Prevented late Discord and Telegram callbacks from changing a stopped
+  provider back to `DEGRADED` or `HEALTHY`.
+- Added regression coverage for graceful/forced JDA shutdown, Telegram
+  long-poll cancellation, and cancellation of raw `HttpClient.sendAsync`
+  requests.
+
 ## 1.2.0 — Canonical administration, setup durability, and abuse resistance
 
 - Standardized Minecraft, Discord, and Telegram administration on the canonical

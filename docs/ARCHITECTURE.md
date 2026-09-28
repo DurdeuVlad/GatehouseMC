@@ -2,7 +2,7 @@
 
 This document defines the implementation blueprint for the loader-neutral GatehouseMC runtime and its Fabric, Forge, and NeoForge adapters. Product semantics live in `../WHITELIST_REQUEST_SPEC.md`; accepted rationale lives in `DECISION.md`.
 
-The 1.2.0 implementation proof targets are Fabric 1.21.1 (Java 21), Forge 1.20.1 (Java 17), and NeoForge 1.21.1 (Java 21). The exact release state is tracked in [`.github/support-matrix.yml`](../.github/support-matrix.yml); historical 1.0.1 artifacts are not treated as freshly verified 1.2.0 builds.
+The 1.2.1 implementation proof targets are Fabric 1.21.1 (Java 21), Forge 1.20.1 (Java 17), and NeoForge 1.21.1 (Java 21). The exact release state is validated in [`.github/support-matrix.json`](../.github/support-matrix.json) and summarized in `.github/support-matrix.yml`; historical 1.0.1 artifacts are not treated as freshly verified 1.2.1 builds.
 
 ---
 
@@ -613,7 +613,7 @@ The interface must not expose JDA/Telegram types.
 
 The current source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge
 1.21.1. Historical Fabric compatibility artifacts from 1.14.4 through 1.21.4
-remain documented in the support matrix, but a row is not a 1.2.0 release
+remain documented in the support matrix, but a row is not a 1.2.1 release
 target until its own source build and dedicated-server proof are rerun.
 
 ### Version-coupled components
@@ -633,7 +633,7 @@ verified by `ArchitectureTest`.
 
 ### Adding a new Minecraft version
 
-1. Add a row to `.github/support-matrix.yml` with the loader, Java runtime,
+1. Add a row to `.github/support-matrix.json` with the loader, Java runtime,
    build lane, and explicit `build`, `artifact_validation`, and `server_e2e`
    gates set to false/pending until proven.
 2. **Verify the Mixin target**: inspect that loader's mappings for the actual
@@ -852,7 +852,7 @@ Never log provider tokens. Avoid logging full callback payloads if they may incl
 
 ## 17. Build/dependency packaging
 
-Current 1.2.0 build lanes:
+Current 1.2.1 build lanes:
 
 ```text
 minecraft_version=1.21.1
@@ -864,7 +864,7 @@ neoforge_version=21.1.201
 forge_version=47.4.23
 ```
 
-Each loader/version target is pinned in `gradle.properties` and `.github/support-matrix.yml`. Loader/API/Gradle versions may be updated only if necessary for resolution, security, or compatibility, with exact versions pinned and the change recorded in `DECISION.md`.
+Each loader/version target is pinned in `gradle.properties` and `.github/support-matrix.json`; mirror the human-readable target summary in `.github/support-matrix.yml`. Loader/API/Gradle versions may be updated only if necessary for resolution, security, or compatibility, with exact versions pinned and the change recorded in `DECISION.md`.
 
 Runtime dependencies expected:
 

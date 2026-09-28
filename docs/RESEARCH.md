@@ -500,7 +500,8 @@ Record discoveries that materially differ from this research in `.scratch/MIXIN_
 This is the researched historical target/branch matrix. The `1.0.1` clean-server
 results are historical evidence for the listed Fabric artifacts; they do not
 automatically transfer to the 1.1.x loader-neutral rebuild. Current release
-eligibility is tracked in `.github/support-matrix.yml`.
+eligibility is validated from `.github/support-matrix.json` and summarized in
+`.github/support-matrix.yml`.
 
 The following matrix documents the verified version pins, toolchain requirements, and passing build status for all historical Minecraft branches:
 

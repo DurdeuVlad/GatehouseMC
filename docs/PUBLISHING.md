@@ -2,7 +2,7 @@
 
 This guide describes the repeatable release process for GatehouseMC across
 GitHub Releases, Modrinth, and CurseForge. The published `1.0.1` line is the
-historical Fabric compatibility release. The `1.2.0` line adds the canonical
+historical Fabric compatibility release. The `1.2.1` line adds the canonical
 administration workflow across the isolated Forge and NeoForge proof targets and is not production-publishable until the matrix
 gates are green.
 
@@ -37,7 +37,7 @@ gates are green.
 
 Before publishing a new release:
 
-1. Run the exact loader build lane from [`.github/support-matrix.yml`](../.github/support-matrix.yml) with its required JDK.
+1. Run the exact loader build lane from the machine-validated [`.github/support-matrix.json`](../.github/support-matrix.json) with its required JDK; use `.github/support-matrix.yml` as the human-readable summary.
 2. Run the applicable real dedicated-server scenarios from
    [`docs/TESTING.md`](TESTING.md).
 3. Verify the clean standalone artifact and representative mod-stack
@@ -119,14 +119,14 @@ the tags locally from those branches, inspect them, and then push each tag:
 
 ```powershell
 git switch support/fabric/1.21.1
-git tag v1.2.0-fabric-mc1.21.1
-git push origin v1.2.0-fabric-mc1.21.1
+git tag v1.2.1-fabric-mc1.21.1
+git push origin v1.2.1-fabric-mc1.21.1
 git switch support/forge/1.20.1
-git tag v1.2.0-forge-mc1.20.1
-git push origin v1.2.0-forge-mc1.20.1
+git tag v1.2.1-forge-mc1.20.1
+git push origin v1.2.1-forge-mc1.20.1
 git switch support/neoforge/1.21.1
-git tag v1.2.0-neoforge-mc1.21.1
-git push origin v1.2.0-neoforge-mc1.21.1
+git tag v1.2.1-neoforge-mc1.21.1
+git push origin v1.2.1-neoforge-mc1.21.1
 ```
 
 The storefront version is loader-qualified as

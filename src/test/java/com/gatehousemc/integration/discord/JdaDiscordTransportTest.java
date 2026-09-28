@@ -22,12 +22,54 @@ import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class JdaDiscordTransportTest {
     private static final String GUILD_ID = "111111111111111111";
     private static final String CHANNEL_ID = "222222222222222222";
+
+    @Test
+    @DisplayName("stop requests graceful JDA shutdown and waits for completion")
+    void stop_gracefullyShutsDownJda() {
+        AtomicInteger gracefulShutdowns = new AtomicInteger();
+        AtomicInteger forcedShutdowns = new AtomicInteger();
+        AtomicInteger awaitCalls = new AtomicInteger();
+        JDA jda = mock(JDA.class, (proxy, method, args) -> {
+            return switch (method.getName()) {
+                case "shutdown" -> { gracefulShutdowns.incrementAndGet(); yield null; }
+                case "shutdownNow" -> { forcedShutdowns.incrementAndGet(); yield null; }
+                case "awaitShutdown" -> { awaitCalls.incrementAndGet(); yield true; }
+                default -> null;
+            };
+        });
+
+        new JdaDiscordTransport(jda, GUILD_ID, null).stop();
+
+        assertEquals(1, gracefulShutdowns.get());
+        assertEquals(0, forcedShutdowns.get());
+        assertEquals(1, awaitCalls.get());
+    }
+
+    @Test
+    @DisplayName("stop forces JDA shutdown when graceful shutdown exceeds the bound")
+    void stopForcesShutdownAfterGracefulTimeout() {
+        AtomicInteger forcedShutdowns = new AtomicInteger();
+        AtomicInteger awaitCalls = new AtomicInteger();
+        JDA jda = mock(JDA.class, (proxy, method, args) -> {
+            return switch (method.getName()) {
+                case "shutdownNow" -> { forcedShutdowns.incrementAndGet(); yield null; }
+                case "awaitShutdown" -> { awaitCalls.incrementAndGet(); yield awaitCalls.get() > 1; }
+                default -> null;
+            };
+        });
+
+        new JdaDiscordTransport(jda, GUILD_ID, null).stop();
+
+        assertEquals(1, forcedShutdowns.get());
+        assertEquals(2, awaitCalls.get());
+    }
 
     @Test
     @DisplayName("Bot not in guild at all returns descriptive error message naming the guild ID")

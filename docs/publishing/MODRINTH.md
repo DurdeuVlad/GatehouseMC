@@ -69,7 +69,7 @@ Players do **not** need a client-side mod, Discord account, or external registra
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-The 1.2.0 source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Use only the exact loader/version entry marked public in the [support matrix](../../.github/support-matrix.yml); build artifacts under review are not production support claims.
+The 1.2.1 source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Use only the exact loader/version entry marked public in the machine-validated [support matrix](../../.github/support-matrix.json); build artifacts under review are not production support claims.
 
 ## 🔒 Offline-Mode Notice
 

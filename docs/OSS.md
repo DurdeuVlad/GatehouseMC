@@ -77,7 +77,7 @@ The mod's distributed jar contains project code and allowed dependencies only.
 The repository tracks integration on `main`. Exact loader/version maintenance
 branches and release identity are defined in
 [`docs/RELEASE_BRANCHING.md`](RELEASE_BRANCHING.md) and
-[`.github/support-matrix.yml`](../.github/support-matrix.yml). Retained
+the machine-validated [`.github/support-matrix.json`](../.github/support-matrix.json), summarized in [`.github/support-matrix.yml`](../.github/support-matrix.yml). Retained
 historical branches and downloads are not a promise of equal future feature
 support; a row becomes a current release target only after its own source
 build, artifact validation, and dedicated-server proof.
@@ -154,7 +154,7 @@ When a new Minecraft version becomes a target:
 3. Verify the Mixin target (`PlayerManager#checkCanJoin`) exists in the new mapping set.
 4. Run `./gradlew clean test build` and boot a real dedicated server.
 5. Record verified version pins in `docs/RESEARCH.md`.
-6. Add the branch and tag pattern to `.github/support-matrix.yml`.
+6. Add the branch and tag pattern to `.github/support-matrix.json`, then mirror the human-readable summary in `.github/support-matrix.yml`.
 7. Verify the loader-qualified tag format
    `v<mod-version>-<loader>-mc<minecraft-version>`.
 

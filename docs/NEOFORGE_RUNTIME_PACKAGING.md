@@ -98,8 +98,8 @@ Run the static gates with:
 ```bash
 python -m unittest discover -s tools/release -p 'test_*.py'
 python tools/release/validate_artifact.py \
-  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0.jar \
-  --loader neoforge --minecraft 1.21.1 --version 1.2.0
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1.jar \
+  --loader neoforge --minecraft 1.21.1 --version 1.2.1
 ```
 
 Then boot the artifact on a clean dedicated server and at least one
@@ -138,8 +138,8 @@ into its outer JAR, build the temporary server artifact with:
 ```powershell
 ./gradlew.ps1 -PgatehouseCompatibility=grieflogger :platform-neoforge:griefloggerCompatJar
 python tools/release/validate_artifact.py `
-  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0-grieflogger-compat.jar `
-  --loader neoforge --minecraft 1.21.1 --version 1.2.0 `
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1-grieflogger-compat.jar `
+  --loader neoforge --minecraft 1.21.1 --version 1.2.1 `
   --compatibility-profile grieflogger
 ```
 
@@ -153,7 +153,7 @@ python tools/release/write_target_evidence.py `
   --loader-version 21.1.201 `
   --grieflogger-version <installed-version> `
   --compatibility-profile grieflogger `
-  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0-grieflogger-compat.jar `
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1-grieflogger-compat.jar `
   --server-log <server-log> --commit <commit> --working-tree-dirty --status PASS `
   --scenario module-layer-coexistence `
   --scenario clean-server-boot `

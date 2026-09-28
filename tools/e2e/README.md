@@ -74,7 +74,7 @@ E2E_RCON_PORT=25675 \
 E2E_RCON_PASSWORD='<disposable test password>' \
 EVIDENCE_FILE=build/e2e/artifacts/fabric-1.21.1/m9-matrix.json \
 bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565 \
-  build/libs/gatehousemc-1.2.0.jar 1.21.1
+  build/libs/gatehousemc-1.2.1.jar 1.21.1
 ```
 
 The matrix records command acceptance separately from durable workflow effects;
@@ -99,7 +99,7 @@ E2E_RCON_PORT=25577 \
 E2E_RCON_PASSWORD='<disposable test password>' \
 E2E_SHUTDOWN_TIMEOUT_SECONDS=30 \
 bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-shutdown 25568 \
-  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.0.jar 1.21.1
+  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1.jar 1.21.1
 ```
 
 The fake token in `tools/e2e/fixtures/discord-armed-config.json` never

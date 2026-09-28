@@ -15,16 +15,17 @@ Node E2E client.
 
 ## Current baseline
 
-- Primary 1.2.0 source-build targets: Fabric 1.21.1 (Java 21), Forge 1.20.1
+- Primary 1.2.1 source-build targets: Fabric 1.21.1 (Java 21), Forge 1.20.1
   (Java 17), and NeoForge 1.21.1 (Java 21).
 - Historical Fabric 1.0.1 artifacts exist for Minecraft 1.14.4 through 1.21.4;
-  current rebuild/publish state is authoritative in `.github/support-matrix.yml`.
+  current rebuild/publish state is authoritative in `.github/support-matrix.json`,
+  with `.github/support-matrix.yml` retained as the human-readable summary.
 - Server-side mod id: `gatehousemc`.
 - Offline-mode deployment: `online-mode=false`, `white-list=true`.
 - Vanilla `whitelist.json` remains authoritative.
 - SQLite workflow store and persistent outbox.
 - `/gatehouse` command interface; `/gh` and `/wlreq` are intentionally not
-  registered in the 1.2.0 contract.
+  registered in the 1.2.1 contract.
 - Discord JDA and Telegram Bot API adapters behind one core decision service.
 - No IP persistence and no claim that offline usernames are authenticated.
 - Active maintenance branches are `support/fabric/1.21.1`,
@@ -35,7 +36,7 @@ Node E2E client.
 ## Publication status
 
 - GitHub is public and contains the source repository.
-- Modrinth and CurseForge submissions contain the earlier files. The 1.2.0
+- Modrinth and CurseForge submissions contain the earlier files. The 1.2.1
   workflow now builds, tests, and stages one loader/version file per qualified
   tag; a qualified tag publishes automatically once the configured storefront
   secrets and release gates succeed.
@@ -47,7 +48,7 @@ Node E2E client.
 
 ## Verification already executed
 
-The 1.2.0 local evidence includes passing root/Fabric and NeoForge tests/builds,
+The 1.2.1 local evidence includes passing root/Fabric and NeoForge tests/builds,
 a passing Forge Gradle 8.8 build/test lane, artifact validation for all three
 jars, and the complete isolated clean-server M9 matrix: 29 checks each on
 Fabric 1.21.1/Java 21, Forge 1.20.1/Java 17, and NeoForge 1.21.1/Java 21.

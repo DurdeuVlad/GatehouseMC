@@ -104,7 +104,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         return current.post("sendMessage", payload)
                 .thenRun(() -> { lastSuccessfulOperation = "provider test"; lastActionableError = ""; })
                 .whenComplete((ignored, error) -> {
-                    if (error != null) {
+                    if (error != null && health != ProviderHealth.STOPPED) {
                         lastActionableError = safeError(error);
                         health = ProviderHealth.DEGRADED;
                     }
@@ -124,10 +124,17 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
             lastActionableError = "configure the Telegram token, chat, and at least one administrator principal";
             return;
         }
-        api = new TelegramApiClient(config.token());
-        api.post("setMyCommands", "{\"commands\":[{\"command\":\"gatehouse\",\"description\":\"Gatehouse administration and whitelist requests\"}]}")
-                .thenRun(() -> lastSuccessfulOperation = "setMyCommands")
-                .exceptionally(error -> { health = ProviderHealth.DEGRADED; lastActionableError = safeError(error); return null; });
+        if (api == null) api = new TelegramApiClient(config.token());
+        TelegramTransport currentApi = api;
+        currentApi.post("setMyCommands", "{\"commands\":[{\"command\":\"gatehouse\",\"description\":\"Gatehouse administration and whitelist requests\"}]}")
+                .thenRun(() -> { if (health != ProviderHealth.STOPPED) lastSuccessfulOperation = "setMyCommands"; })
+                .exceptionally(error -> {
+                    if (health != ProviderHealth.STOPPED) {
+                        health = ProviderHealth.DEGRADED;
+                        lastActionableError = safeError(error);
+                    }
+                    return null;
+                });
         running = true;
         health = ProviderHealth.STARTING;
         poller = Executors.newSingleThreadExecutor(runnable -> {
@@ -142,9 +149,24 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
     public void stop() {
         running = false;
         health = ProviderHealth.STOPPED;
+        TelegramTransport currentApi = api;
+        api = null;
         ExecutorService current = poller;
         poller = null;
-        if (current != null) current.shutdownNow();
+        try {
+            if (currentApi != null) currentApi.close();
+        } finally {
+            if (current != null) {
+                current.shutdownNow();
+                try {
+                    if (!current.awaitTermination(1, TimeUnit.SECONDS)) {
+                        lastActionableError = "Telegram poller did not stop within one second";
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
     }
 
     @Override
@@ -157,7 +179,12 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
             lastSuccessfulOperation = "publish";
             lastActionableError = "";
             return new PublicationRef(id(), config.chatId(), message.get("message_id").getAsString());
-        }).whenComplete((ignored, error) -> { if (error != null) { health = ProviderHealth.DEGRADED; lastActionableError = safeError(error); } });
+        }).whenComplete((ignored, error) -> {
+            if (error != null && health != ProviderHealth.STOPPED) {
+                health = ProviderHealth.DEGRADED;
+                lastActionableError = safeError(error);
+            }
+        });
     }
 
     @Override
@@ -170,7 +197,12 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
             lastActionableError = "";
             return null;
         }).thenApply(ignored -> (Void) null)
-                .whenComplete((ignored, error) -> { if (error != null) { health = ProviderHealth.DEGRADED; lastActionableError = safeError(error); } });
+                .whenComplete((ignored, error) -> {
+                    if (error != null && health != ProviderHealth.STOPPED) {
+                        health = ProviderHealth.DEGRADED;
+                        lastActionableError = safeError(error);
+                    }
+                });
     }
 
     private void pollLoop() {
@@ -178,6 +210,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
             try {
                 String payload = "{\"timeout\":20,\"offset\":" + offset + ",\"allowed_updates\":[\"callback_query\",\"message\"]}";
                 JsonArray updates = api.post("getUpdates", payload).join().getAsJsonArray("result");
+                if (!running) return;
                 health = ProviderHealth.HEALTHY;
                 updates.forEach(update -> {
                     JsonObject value = update.getAsJsonObject();
@@ -186,6 +219,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
                     if (value.has("message")) handleMessage(value.getAsJsonObject("message"));
                 });
             } catch (Exception error) {
+                if (!running) return;
                 health = ProviderHealth.DEGRADED;
                 lastActionableError = safeError(error);
                 try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
