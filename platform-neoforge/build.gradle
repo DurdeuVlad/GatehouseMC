@@ -69,7 +69,7 @@ dependencies {
     // protobuf breaks NeoForge's JPMS module layer when mods like grieflogger
     // export com.google.protobuf packages.
     jarJar "com.neovisionaries:nv-websocket-client:2.14"
-    jarJar "com.squareup.okhttp3:okhttp-jvm:5.4.0"
+    jarJar "com.squareup.okhttp3:okhttp-jvm:5.5.0"
     jarJar "org.jetbrains.kotlin:kotlin-stdlib:2.2.21"
     jarJar "org.jetbrains:annotations:13.0"
     jarJar "com.squareup.okio:okio:3.17.0"
