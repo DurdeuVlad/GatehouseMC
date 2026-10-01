@@ -61,8 +61,8 @@ dependencies {
     // intentionally omitted because Minecraft/NeoForge supplies them.
     jarJar "net.dv8tion:JDA:${jda_version}"
     jarJar "net.sf.trove4j:core:3.1.0"
-    jarJar "com.fasterxml.jackson.core:jackson-core:2.22.0"
-    jarJar "com.fasterxml.jackson.core:jackson-databind:2.22.0"
+    jarJar "com.fasterxml.jackson.core:jackson-core:2.22.3"
+    jarJar "com.fasterxml.jackson.core:jackson-databind:2.22.3"
     jarJar "com.fasterxml.jackson.core:jackson-annotations:2.22"
     // Tink and Protobuf are transitive voice dependencies of JDA. They are not
     // used by GatehouseMC (which only uses text/interactions) and bundling
