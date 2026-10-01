@@ -62,7 +62,7 @@ if (!forgeLane) {
         include "com.fasterxml.jackson.core:jackson-databind:2.22.0"
         include "com.google.crypto.tink:tink:1.18.0"
         include "com.google.code.findbugs:jsr305:3.0.2"
-        include "com.google.errorprone:error_prone_annotations:2.22.0"
+        include "com.google.errorprone:error_prone_annotations:2.50.0"
         include "com.google.protobuf:protobuf-java:4.28.2"
         include "com.neovisionaries:nv-websocket-client:2.14"
         include "com.squareup.okhttp3:okhttp-jvm:5.4.0"
