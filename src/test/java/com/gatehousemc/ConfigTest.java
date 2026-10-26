@@ -26,7 +26,7 @@ class ConfigTest {
     }
 
     @Test
-    void invalidEnabledDiscordProviderIsDisabledWithoutBreakingCore(@TempDir Path configDir) {
+    void incompleteEnabledDiscordProviderRemainsVisibleAsSetupRequired(@TempDir Path configDir) {
         ModConfig config = ConfigLoader.parse(JsonParser.parseString("""
                 {
                   "discord": {
@@ -40,7 +40,7 @@ class ConfigTest {
                 }
                 """).getAsJsonObject(), configDir);
 
-        assertFalse(config.discord().enabled());
+        assertTrue(config.discord().enabled());
         assertFalse(config.telegram().enabled());
     }
 
@@ -206,5 +206,43 @@ class ConfigTest {
                 () -> ConfigLoader.loadOrDefault(configDir));
 
         assertTrue(error.getMessage().contains("JSON object"));
+    }
+
+    @Test
+    void requestDefaultsMatchM9AdmissionControls(@TempDir Path configDir) {
+        ModConfig config = ConfigLoader.parse(JsonParser.parseString("{}").getAsJsonObject(), configDir);
+
+        assertEquals(1440, config.requests().denialCooldownMinutes());
+        assertEquals(2000, config.requests().queueCapacity());
+        assertEquals(5, config.requests().attemptCoalesceSeconds());
+        assertEquals(30, config.requests().providerRefreshSeconds());
+        assertEquals(30, config.requests().newRequestRatePerMinute());
+        assertEquals(10, config.requests().newRequestBurst());
+        assertEquals(500, config.requests().maxPendingRequests());
+        assertEquals(168, config.requests().pendingStaleAfterHours());
+        assertEquals("", config.requests().supportMessage());
+    }
+
+    @Test
+    void generatedConfigUsesCanonicalOnePointTwoFields(@TempDir Path configDir) throws Exception {
+        ModConfig config = ConfigLoader.loadOrDefault(configDir);
+        String json = Files.readString(configDir.resolve("config.json"));
+        assertTrue(json.contains("\"minecraft\""));
+        assertTrue(json.contains("\"principals\""));
+        assertFalse(json.contains("commandPermissionLevel"));
+        assertFalse(json.contains("allowedUserIds"));
+        assertEquals(2, config.minecraft().viewPermissionLevel());
+        assertEquals(3, config.minecraft().decisionPermissionLevel());
+        assertEquals(4, config.minecraft().managePermissionLevel());
+    }
+
+    @Test
+    void invalidAdmissionRangeIsRejected(@TempDir Path configDir) {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> ConfigLoader.parse(JsonParser.parseString("""
+                        { "requests": { "attemptCoalesceSeconds": 61 } }
+                        """).getAsJsonObject(), configDir));
+
+        assertTrue(error.getMessage().contains("Invalid requests configuration"));
     }
 }

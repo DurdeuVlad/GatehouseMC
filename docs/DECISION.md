@@ -158,7 +158,8 @@ This document records the accepted foundational decisions for Whitelist Request 
   - Official mod id is `gatehousemc`.
   - Jar output name is `gatehousemc-<version>.jar`.
   - Java base package is `com.gatehousemc`.
-  - Primary command is `/gatehouse` with aliases `/gh` and `/wlreq`.
+  - Primary and only public textual command root is `/gatehouse`; the 1.2.0
+    command contract intentionally removes `/gh` and `/wlreq` aliases.
   - Default config path is `config/gatehousemc/` with transparent automatic migration from legacy `config/whitelistrequest/`.
   - In-jar assets and translation bundles are housed under `/assets/gatehousemc/`.
 - **Consequences:** Consistent, unified branding across repository, jar metadata, fabric loader, documentation, and operational interfaces while retaining 100% backward compatibility for existing deployments.
@@ -171,15 +172,24 @@ This document records the accepted foundational decisions for Whitelist Request 
 - **Context:** GatehouseMC needs Fabric, Forge, and NeoForge artifacts without copying request, decision, persistence, or provider logic into each loader adapter. ForgeGradle 6 also rejects the Gradle 9 toolchain used by modern Fabric/NeoForge builds.
 - **Decision:** Keep business logic in a loader-neutral `core` module. Each loader owns only its lifecycle, command, whitelist, and Mixin adapter. Fabric and NeoForge use the Gradle 9.5 wrapper; Forge 1.20.1 is an explicitly isolated Gradle 8.8 lane selected with `-PenableForge`. Every distributable jar is checked for its own loader metadata, exact Minecraft dependency, entrypoint, and nested runtime dependencies before release.
 - **Rejected:** One shared loader project with conditional source hacks; publishing a jar for a loader/version that only compiled but did not pass artifact and dedicated-server gates; silently using Gradle 9 for ForgeGradle.
-- **Consequences:** The first 1.1.x proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Older Fabric artifacts remain historical 1.0.1 compatibility entries until their per-version source builds and live-server tests are restored. CI builds the proof targets, while the support matrix prevents planned rows from being published accidentally.
+- **Consequences:** The 1.2.0 proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Older artifacts remain historical compatibility entries until their per-version source builds and live-server tests are restored. CI builds the proof targets, while the support matrix prevents planned rows from being published accidentally.
 
 ---
 
 ## ADR-018 — Loader-qualified support branches and release tags
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-019 for GitHub release-page identity; the
+  support-branch portion remains accepted.
 - **Context:** A Minecraft version alone does not identify a distributable artifact. Fabric, Forge, and NeoForge have different APIs, toolchains, metadata, and server proofs, so a version-only branch or tag can publish the wrong binary.
-- **Decision:** Maintain active targets on `support/<loader>/<minecraft>` branches and identify releases as `v<mod-version>-<loader>-mc<minecraft-version>`. Keep `main` as the integration branch and use `release/<major>.<minor>.x` for release-line coordination. The release workflow resolves the tag to an allow-listed support branch and publishes exactly one validated loader/version artifact.
-- **Rejected:** Bare `v<version>` tags, version-only maintenance branches, or one multi-loader release tag that hides which artifact was tested and published.
-- **Consequences:** Each new loader/version target needs its own branch, support-matrix row, build lane, clean-server proof, and resolver entry before release. This creates a small amount of release bookkeeping but makes maintenance, rollback, and artifact provenance explicit.
+- **Decision:** Maintain active targets on `support/<loader>/<minecraft>` branches. The former loader-qualified GitHub tags remain historical provenance only.
+- **Rejected:** Merging support branches into one loader-specific implementation or using a tag to publish a target that has not passed its own gates.
+- **Consequences:** The support-branch, build-lane, clean-server-proof, and artifact-provenance requirements remain per target.
+
+## ADR-019 — One GitHub release page per mod version
+
+- **Status:** Accepted
+- **Context:** A loader-qualified GitHub page made users choose among three pages for one mod version, even though each page was already a separately validated asset. GitHub Releases supports multiple downloadable assets on one release page.
+- **Decision:** Use one canonical GitHub tag `v<mod-version>` on the reviewed `main` commit. The release workflow resolves the ready targets from `.github/support-matrix.json`, builds and smoke-tests Fabric, Forge, and NeoForge independently, then uploads one loader-qualified JAR per target and one combined `checksums.txt` to that single page. Modrinth versions and CurseForge files retain loader-qualified names and metadata.
+- **Rejected:** A single ambiguous JAR, silently replacing loader-qualified filenames, or continuing to create one GitHub page per loader.
+- **Consequences:** Release-page discovery is version-wide, while target provenance and storefront compatibility remain explicit in asset names, support branches, matrix rows, and per-loader validation evidence. Existing loader-qualified 1.2.1 pages are migration history and are removed only after the combined `v1.2.1` page is verified.
 

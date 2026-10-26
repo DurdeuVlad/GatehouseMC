@@ -25,8 +25,10 @@ public final class OutboxWorker implements AutoCloseable {
     private final WorkflowRepository repository;
     private final ApprovalInterfaceRouter router;
     private final ClockPort clock;
+    private final Duration providerRefreshCadence;
     private final ScheduledExecutorService executor;
     private final ConcurrentMap<UUID, FailureTracker> failureTrackers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Instant> lastAttemptPublication = new ConcurrentHashMap<>();
 
     static final class FailureTracker {
         String signature;
@@ -47,9 +49,15 @@ public final class OutboxWorker implements AutoCloseable {
     }
 
     public OutboxWorker(WorkflowRepository repository, ApprovalInterfaceRouter router, ClockPort clock) {
+        this(repository, router, clock, Duration.ZERO);
+    }
+
+    public OutboxWorker(WorkflowRepository repository, ApprovalInterfaceRouter router, ClockPort clock,
+                        Duration providerRefreshCadence) {
         this.repository = repository;
         this.router = router;
         this.clock = clock;
+        this.providerRefreshCadence = Objects.requireNonNull(providerRefreshCadence, "providerRefreshCadence");
         this.executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "whitelistrequest-outbox");
             thread.setDaemon(true);
@@ -87,7 +95,7 @@ public final class OutboxWorker implements AutoCloseable {
         }
         switch (event.eventType()) {
             case "REQUEST_CREATED" -> processCreated(event, request);
-            case "REQUEST_RESOLVED", "REQUEST_UPDATED" -> processUpdate(event, request);
+            case "REQUEST_RESOLVED", "REQUEST_UPDATED", "REQUEST_ATTEMPT_UPDATED" -> processUpdate(event, request);
             default -> {
                 failureTrackers.remove(event.id());
                 repository.completeOutbox(event.id(), clock.now());
@@ -109,8 +117,21 @@ public final class OutboxWorker implements AutoCloseable {
     }
 
     private void processUpdate(OutboxEvent event, WhitelistRequest request) {
+        boolean attemptOnly = "REQUEST_ATTEMPT_UPDATED".equals(event.eventType());
+        Instant now = clock.now();
+        if (attemptOnly && !providerRefreshCadence.isZero()) {
+            Instant last = lastAttemptPublication.get(request.id());
+            if (last != null && now.isBefore(last.plus(providerRefreshCadence))) {
+                repository.deferOutbox(event.id(), last.plus(providerRefreshCadence), now);
+                return;
+            }
+        }
         router.updateAll(repository.publications(request.id()), RequestView.from(request))
-                .whenComplete((ignored, error) -> finish(event, error));
+                .whenComplete((ignored, error) -> {
+                    if (error == null && attemptOnly) lastAttemptPublication.put(request.id(), clock.now());
+                    if (error == null && !attemptOnly) lastAttemptPublication.remove(request.id());
+                    finish(event, error);
+                });
     }
 
     private void saveSuccessfulPublications(UUID requestId, List<com.gatehousemc.domain.PublicationRef> publications, Throwable error) {
@@ -230,6 +251,7 @@ public final class OutboxWorker implements AutoCloseable {
     @Override
     public void close() {
         failureTrackers.clear();
+        lastAttemptPublication.clear();
         executor.shutdown();
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) executor.shutdownNow();

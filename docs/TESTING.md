@@ -6,7 +6,7 @@ This project uses the HeapHammer-style rule:
 
 Unit tests are necessary but cannot prove Fabric loader behavior, Mixins, offline-mode protocol login, packaged dependencies, or vanilla whitelist persistence.
 
-The release matrix is maintained in [`.github/support-matrix.yml`](../.github/support-matrix.yml). For 1.1.x the source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. A historical 1.0.1 download is compatibility evidence, not proof that a 1.1.x artifact can be rebuilt.
+The machine-validated release manifest is [`.github/support-matrix.json`](../.github/support-matrix.json); the YAML file is its human-readable target summary. For 1.2.1 the source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. A historical 1.0.1 download is compatibility evidence, not 1.2.1 release proof.
 
 ## 0. Loader build and artifact gates
 
@@ -15,11 +15,11 @@ Run the modern lanes with Java 21 and the repository wrapper:
 ```bash
 ./gradlew clean test build :platform-neoforge:build
 python tools/release/validate_artifact.py \
-  --artifact build/libs/gatehousemc-1.1.0.jar \
-  --loader fabric --minecraft 1.21.1 --version 1.1.0
+  --artifact build/libs/gatehousemc-1.2.1.jar \
+  --loader fabric --minecraft 1.21.1 --version 1.2.1
 python tools/release/validate_artifact.py \
-  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.0.jar \
-  --loader neoforge --minecraft 1.21.1 --version 1.1.0
+  --artifact platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1.jar \
+  --loader neoforge --minecraft 1.21.1 --version 1.2.1
 ```
 
 Run the Forge lane with Java 17 and Gradle 8.8:
@@ -27,8 +27,8 @@ Run the Forge lane with Java 17 and Gradle 8.8:
 ```bash
 gradle -PenableForge :platform-forge:build
 python tools/release/validate_artifact.py \
-  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.0-all.jar \
-  --loader forge --minecraft 1.20.1 --version 1.1.0
+  --artifact platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.1-all.jar \
+  --loader forge --minecraft 1.20.1 --version 1.2.1
 ```
 
 The validator checks the exact loader metadata, Minecraft dependency, entrypoint, icon, core classes, and nested SQLite runtime. It is intentionally fail-closed: no loader/version pair is publishable until its build, artifact validation, and clean dedicated-server E2E columns are all green.
@@ -82,6 +82,12 @@ Required tests:
 
 - request creation transaction creates request + outbox atomically;
 - duplicate attempts update one request;
+- adversarial unique reconnects cannot grow the admission cache or coalescing
+  index beyond their explicit bounds;
+- unbounded external actor IDs cannot grow rate-limit buckets or pending
+  confirmation state beyond their explicit bounds;
+- oversized provider command input is rejected before tokenization or business
+  execution;
 - partial unique index prevents active duplicates under concurrency;
 - deny transaction is atomic;
 - block transaction creates `identity_blocks` atomically;
@@ -113,7 +119,7 @@ GameTest is **not sufficient** for the pre-join whitelist admission acceptance t
 This is the release gate for login/whitelist behavior.
 
 Boot an actual clean dedicated server using the final built mod artifact. The
-1.1.x proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1; the
+1.2.1 proof targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1; the
 same rejection assertion is run against each loader with its required Java
 runtime.
 
@@ -140,11 +146,11 @@ server process:
 ```bash
 npm --prefix tools/e2e ci
 bash tools/e2e/run-clean-server-smoke.sh fabric .e2e-fabric 25565 \
-  build/libs/gatehousemc-1.1.0.jar 1.21.1
+  build/libs/gatehousemc-1.2.1.jar 1.21.1
 bash tools/e2e/run-clean-server-smoke.sh forge .e2e-forge 25566 \
-  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.1.0-all.jar 1.20.1
+  platform-forge/build/libs/gatehousemc-forge-mc1.20.1-1.2.1-all.jar 1.20.1
 bash tools/e2e/run-clean-server-smoke.sh neoforge .e2e-neoforge 25567 \
-  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.1.0.jar 1.21.1
+  platform-neoforge/build/libs/gatehousemc-neoforge-mc1.21.1-1.2.1.jar 1.21.1
 ```
 
 ---
@@ -298,7 +304,7 @@ If Minecraft itself rejects that case variant before whitelist evaluation due na
 Write:
 
 ```text
-wlreq approve <request-id>
+/gatehouse approve <request-id> [reason...]
 ```
 
 to server stdin.
@@ -333,7 +339,7 @@ Assert:
 Then:
 
 ```text
-wlreq unblock E2E_Charlie
+/gatehouse unblock E2E_Charlie [reason...]
 ```
 
 and attempt again.
@@ -382,6 +388,71 @@ Case B:
 - assert `PENDING`.
 
 Do not add a dangerous production command solely for this test.
+
+### E2E-11 — Discord-armed shutdown gate
+
+Real dedicated-server release gate. It exists because a production incident
+showed `stop`/restart hanging with the Discord provider armed, and E2E-01
+through E2E-10 all run with providers disabled or fake, so none of them ever
+start the Discord provider at all.
+
+**Known scope limit, confirmed by decompiling the bundled `JDA-6.5.0.jar`:**
+`JDAImpl.verifyToken()` makes a synchronous REST call to Discord
+(`GET /users/@me`) inside `JDABuilder.build()` and calls `shutdownNow()` on
+itself immediately if that call fails, before `build()` even returns. This
+means an invalid/fake token — the only kind usable in CI without a live
+Discord bot credential — never reaches the "connected, gateway threads
+running" state the production incident actually involved; JDA tears itself
+down synchronously on its own before there is anything left that could hang.
+This gate therefore proves a real but narrower thing: booting with the
+provider armed and failing to authenticate does not hang server shutdown. It
+does **not** reproduce, and cannot currently reproduce without a disposable
+real bot token, a shutdown hang in a successfully-connected JDA instance.
+That harder case is covered instead by a fast, deterministic Tier 1 test —
+`GatehouseRuntimeShutdownBoundTest` (`src/test/java/com/gatehousemc/runtime/`)
+— which drives `GatehouseRuntime.runBounded(...)` (the exact mechanism
+`close()` uses) with a task that deliberately never finishes, and asserts it
+is abandoned within the timeout rather than blocking the caller. That test
+needs no network and no Minecraft server, and is the real regression guard
+for the `close()` timeout fix; this E2E gate is a complementary, narrower
+check run against a real dedicated server.
+
+Setup:
+
+- clean server directory;
+- `config/gatehousemc/config.json` seeded from
+  `tools/e2e/fixtures/discord-armed-config.json` **before first boot**, which
+  enables the Discord provider with a placeholder token
+  (`__E2E_FAKE_DISCORD_TOKEN__`) that the harness replaces at runtime with a
+  freshly random, disposable value — never a fixed committed string, both
+  because it must be unique to avoid coincidentally matching a real
+  credential and because GitHub push protection correctly rejects a
+  plausible-looking fixed token even when it is fake.
+
+Action:
+
+- boot the server and wait for `Done (...)!`;
+- send `stop` over RCON;
+- watch the **actual OS process** this script launched (not just RCON
+  reachability — a hung non-daemon thread can keep the JVM alive well after
+  RCON's own socket has closed) until it exits, bounded by
+  `E2E_SHUTDOWN_TIMEOUT_SECONDS` (default 30s).
+
+Assert:
+
+- the process exits within the bound;
+- fail with the elapsed time and pid if it does not.
+
+Driver: `E2E_DRIVER=shutdown-gate` in
+[`tools/e2e/run-clean-server-smoke.sh`](../tools/e2e/run-clean-server-smoke.sh).
+Evidence is written to `build/e2e/artifacts/<loader>/shutdown-gate.json`
+(`elapsedSeconds`, `timeoutSeconds`, `passed`).
+
+Currently scoped to NeoForge 1.21.1 only: it is the loader named in the
+production incident this gate was added for
+(`gatehousemc-neoforge-mc1.21.1-*.jar` bundles JDA and is the artifact
+armed with a real key in that report). Extend to Fabric/Forge if either
+loader's own shutdown-hook wiring is ever suspected.
 
 ---
 

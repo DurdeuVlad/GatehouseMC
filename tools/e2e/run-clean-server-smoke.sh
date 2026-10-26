@@ -16,6 +16,9 @@ e2e_dir="$repo_root/tools/e2e"
 fabric_loader_version="${FABRIC_LOADER_VERSION:-0.19.5}"
 fabric_api_version="${FABRIC_API_VERSION:-0.116.17+1.21.1}"
 fabric_api_jar="${FABRIC_API_JAR:-}"
+rcon_port="${E2E_RCON_PORT:-}"
+rcon_password="${E2E_RCON_PASSWORD:-}"
+driver="${E2E_DRIVER:-smoke}"
 
 [[ -f "$artifact" ]] || { echo "Artifact does not exist: $artifact" >&2; exit 1; }
 if [[ "$loader" == "fabric" && "$minecraft_version" != "1.21.1" \
@@ -45,6 +48,11 @@ case "$loader" in
         --output "$server_dir/mods/fabric-api.jar"
     fi
     launch=(java -jar fabric-server-launch.jar nogui)
+    if command -v cmd.exe >/dev/null 2>&1; then
+      restart_command_json='["java","-jar","fabric-server-launch.jar","nogui"]'
+    else
+      restart_command_json='["java","-jar","fabric-server-launch.jar","nogui"]'
+    fi
     ;;
   forge)
     curl --fail --silent --show-error --location \
@@ -56,8 +64,10 @@ case "$loader" in
     )
     if command -v cmd.exe >/dev/null 2>&1 && [[ -f "$server_dir/run.bat" ]]; then
       launch=(cmd.exe //c java @user_jvm_args.txt @libraries/net/minecraftforge/forge/1.20.1-47.4.23/win_args.txt nogui)
+      restart_command_json='["java","@user_jvm_args.txt","@libraries/net/minecraftforge/forge/1.20.1-47.4.23/win_args.txt","nogui"]'
     else
       launch=(bash run.sh nogui)
+      restart_command_json='["bash","run.sh","nogui"]'
     fi
     ;;
   neoforge)
@@ -70,8 +80,10 @@ case "$loader" in
     )
     if command -v cmd.exe >/dev/null 2>&1 && [[ -f "$server_dir/run.bat" ]]; then
       launch=(cmd.exe //c java @user_jvm_args.txt @libraries/net/neoforged/neoforge/21.1.201/win_args.txt nogui)
+      restart_command_json='["java","@user_jvm_args.txt","@libraries/net/neoforged/neoforge/21.1.201/win_args.txt","nogui"]'
     else
       launch=(bash run.sh nogui)
+      restart_command_json='["bash","run.sh","nogui"]'
     fi
     ;;
   *)
@@ -88,17 +100,54 @@ white-list=true
 enforce-secure-profile=false
 server-port=$port
 EOF
+if [[ -n "$rcon_port" || -n "$rcon_password" ]]; then
+  [[ -n "$rcon_port" && -n "$rcon_password" ]] || {
+    echo "E2E_RCON_PORT and E2E_RCON_PASSWORD must be provided together" >&2
+    exit 2
+  }
+  cat >> "$server_dir/server.properties" <<EOF
+enable-rcon=true
+rcon.port=$rcon_port
+rcon.password=$rcon_password
+EOF
+fi
+
+if [[ "$driver" == "shutdown-gate" ]]; then
+  [[ -n "$rcon_port" && -n "$rcon_password" ]] || {
+    echo "shutdown-gate driver requires E2E_RCON_PORT and E2E_RCON_PASSWORD" >&2
+    exit 2
+  }
+  # Arms the Discord provider with a fake token before first boot so
+  # DiscordApprovalInterface.start() actually calls JDABuilder.build()
+  # instead of staying SETUP_REQUIRED, mirroring a production server with a
+  # real key configured. The value is generated fresh here, never committed
+  # -- the fixture only holds a placeholder -- both so it can't collide with
+  # a real credential and because a fixed, plausible-looking token trips
+  # GitHub push protection even when it is fake.
+  fake_token="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=\n').$(openssl rand -hex 4).$(openssl rand -base64 20 | tr '+/' '-_' | tr -d '=\n')"
+  mkdir -p "$server_dir/config/gatehousemc"
+  sed "s/__E2E_FAKE_DISCORD_TOKEN__/$fake_token/" \
+    "$e2e_dir/fixtures/discord-armed-config.json" > "$server_dir/config/gatehousemc/config.json"
+fi
 
 server_log="$server_dir/server.log"
 server_pid=''
 cleanup() {
   if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
-    kill -- "-$server_pid" 2>/dev/null || kill "$server_pid" 2>/dev/null || true
+    if command -v taskkill.exe >/dev/null 2>&1; then
+      taskkill.exe /PID "$server_pid" /T /F >/dev/null 2>&1 || true
+    else
+      kill -- "-$server_pid" 2>/dev/null || kill "$server_pid" 2>/dev/null || true
+    fi
     for _ in {1..15}; do
       kill -0 "$server_pid" 2>/dev/null || return 0
       sleep 1
-    done
-    kill -KILL -- "-$server_pid" 2>/dev/null || kill -KILL "$server_pid" 2>/dev/null || true
+      done
+    if command -v taskkill.exe >/dev/null 2>&1; then
+      taskkill.exe /PID "$server_pid" /T /F >/dev/null 2>&1 || true
+    else
+      kill -KILL -- "-$server_pid" 2>/dev/null || kill -KILL "$server_pid" 2>/dev/null || true
+    fi
   fi
 }
 trap cleanup EXIT
@@ -132,11 +181,55 @@ if ! grep -qE 'Done \([0-9.]+s\)!' "$server_log"; then
   exit 1
 fi
 
-MC_HOST=127.0.0.1 \
-MC_PORT="$port" \
-MC_VERSION="$minecraft_version" \
-MC_USERNAME="E2E_${loader}" \
-MC_EXPECTED_STATUS=rejected \
-npm --prefix "$e2e_dir" run smoke
+if [[ "$driver" == "smoke" ]]; then
+  MC_HOST=127.0.0.1 \
+  MC_PORT="$port" \
+  MC_VERSION="$minecraft_version" \
+  MC_USERNAME="E2E_${loader}" \
+  MC_EXPECTED_STATUS=rejected \
+  npm --prefix "$e2e_dir" run smoke
+elif [[ "$driver" == "shutdown-gate" ]]; then
+  # Real dedicated-server proof for the JDA/close() shutdown fix: with Discord
+  # armed (see the config seeded above), send 'stop' over RCON and measure how
+  # long the *actual OS process* this script launched (server_pid) takes to
+  # exit. Watching the process, not just RCON reachability, is what catches a
+  # hung non-daemon thread keeping the JVM alive after everything else has
+  # shut down -- exactly the "stuck while trying to close" failure mode.
+  shutdown_timeout="${E2E_SHUTDOWN_TIMEOUT_SECONDS:-30}"
+  evidence_dir="$repo_root/build/e2e/artifacts/$loader"
+  evidence_path="$evidence_dir/shutdown-gate.json"
+  mkdir -p "$evidence_dir"
+
+  MC_HOST=127.0.0.1 RCON_PORT="$rcon_port" RCON_PASSWORD="$rcon_password" \
+    node "$e2e_dir/src/rcon-fire.mjs" stop
+
+  SECONDS=0
+  while kill -0 "$server_pid" 2>/dev/null; do
+    if (( SECONDS >= shutdown_timeout )); then
+      printf '{"loader":"%s","elapsedSeconds":%d,"timeoutSeconds":%d,"passed":false,"reason":"process still running after stop"}\n' \
+        "$loader" "$SECONDS" "$shutdown_timeout" > "$evidence_path"
+      echo "FAIL: ${loader} server did not exit within ${shutdown_timeout}s of RCON 'stop' (pid $server_pid still running)" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+  elapsed=$SECONDS
+  printf '{"loader":"%s","elapsedSeconds":%d,"timeoutSeconds":%d,"passed":true}\n' \
+    "$loader" "$elapsed" "$shutdown_timeout" > "$evidence_path"
+  echo "PASS: ${loader} server exited ${elapsed}s after RCON 'stop' (bound ${shutdown_timeout}s)"
+  server_pid=''
+else
+  MC_HOST=127.0.0.1 \
+  MC_PORT="$port" \
+  MC_VERSION="$minecraft_version" \
+  MC_USERNAME="E2E_Bob" \
+  RCON_PORT="$rcon_port" \
+  RCON_PASSWORD="$rcon_password" \
+  M9_SERVER_DIR="$server_dir" \
+  M9_SERVER_COMMAND_JSON="$restart_command_json" \
+  M9_LOADER="$loader" \
+  M9_MINECRAFT_VERSION="$minecraft_version" \
+  npm --prefix "$e2e_dir" run "$driver"
+fi
 
 echo "clean ${loader} ${minecraft_version} server smoke passed"

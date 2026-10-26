@@ -2,6 +2,42 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.2.1 — Graceful provider shutdown and server-stop reliability
+
+- Fixed Discord shutdown to request a graceful JDA stop, wait within a bounded
+  timeout, and use forced shutdown only when graceful termination does not
+  complete.
+- Fixed Telegram shutdown to cancel in-flight Bot API requests and await the
+  long-polling worker instead of leaving an HTTP request alive after the
+  Minecraft server stops.
+- Prevented late Discord and Telegram callbacks from changing a stopped
+  provider back to `DEGRADED` or `HEALTHY`.
+- Added regression coverage for graceful/forced JDA shutdown, Telegram
+  long-poll cancellation, and cancellation of raw `HttpClient.sendAsync`
+  requests.
+
+### Downloads
+
+- [Fabric 1.21.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/gatehousemc-fabric-mc1.21.1-1.2.1.jar)
+- [Forge 1.20.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/gatehousemc-forge-mc1.20.1-1.2.1.jar)
+- [NeoForge 1.21.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/gatehousemc-neoforge-mc1.21.1-1.2.1.jar)
+- [SHA-256 checksums](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.1/checksums.txt)
+
+## 1.2.0 — Canonical administration, setup durability, and abuse resistance
+
+- Standardized Minecraft, Discord, and Telegram administration on the canonical
+  `/gatehouse` command model; legacy textual aliases are no longer registered.
+- Added shared request resolution, authorization capabilities, provider status,
+  setup-session handling, principal management, and provider test boundaries.
+- Added bounded admission coalescing/rate limiting, durable setup-session
+  migration, opaque confirmation tokens, and state-aware provider actions.
+- Added atomic non-secret configuration writes that preserve `${ENV_VAR}` token
+  placeholders.
+- Passed the required isolated Fabric, Forge, and NeoForge dedicated-server
+  matrix: 29 checks per loader, including restart recovery and provider-outbox
+  retention under disabled providers.
+- Publication still requires maintainer authorization and storefront credentials.
+
 ## 1.1.0 — Native NeoForge and Forge support, multi-loader foundation, and cross-platform hardening
 
 - Added native NeoForge (1.21.1) and Forge (1.20.1) support without requiring Sinytra Connector.

@@ -365,23 +365,23 @@ Unblock removes that record. The historical request remains `BLOCKED` for audit.
 
 ### 9.1 Minecraft command interface
 
-Recommended root command:
+The 0.2.0 root command is:
 
 ```text
-/wlreq
+/gatehouse
 ```
 
 Required subcommands:
 
 ```text
-/wlreq list [pending|approved|denied|blocked]
-/wlreq show <request-id|username>
-/wlreq approve <request-id|username> [reason...]
-/wlreq deny <request-id|username> [reason...]
-/wlreq block <request-id|username> [reason...]
-/wlreq unblock <username> [reason...]
-/wlreq status
-/wlreq reload
+/gatehouse requests [pending|resolving|approved|denied|blocked|all] [page]
+/gatehouse show <request-id|username>
+/gatehouse approve <request-id|username> [reason...]
+/gatehouse deny <request-id|username> [reason...]
+/gatehouse block <request-id|username> [reason...]
+/gatehouse unblock <username> [reason...]
+/gatehouse status
+/gatehouse reload
 ```
 
 Requirements:
@@ -541,7 +541,7 @@ Fail safe:
 - do not pretend requests are durable;
 - keep vanilla whitelist enforcement untouched;
 - show degraded kick message;
-- expose failure through `/wlreq status` where possible.
+- expose failure through `/gatehouse status` where possible.
 
 ---
 
@@ -593,7 +593,7 @@ Requirements:
 - unknown enum values fail validation with actionable errors;
 - unresolved `${ENV_VAR}` secrets fail provider startup, not the whole Minecraft server;
 - expanded secret values are never written back to disk;
-- `/wlreq reload` may reload non-structural provider/config values; database path changes may require restart;
+- `/gatehouse reload` may reload non-structural provider/config values; database path changes may require restart;
 - config status logs redact secrets.
 
 Discord may use either a guild text channel (`guildId` + `channelId`) or a

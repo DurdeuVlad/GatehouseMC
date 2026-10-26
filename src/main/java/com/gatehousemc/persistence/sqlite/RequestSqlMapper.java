@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -38,8 +39,50 @@ final class RequestSqlMapper {
         }
     }
 
+    WhitelistRequest latestByName(String normalizedUsername) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "SELECT * FROM whitelist_requests WHERE normalized_name=? ORDER BY created_at DESC LIMIT 1")) {
+            statement.setString(1, normalizedUsername);
+            try (ResultSet result = statement.executeQuery()) { return result.next() ? readRequest(result) : null; }
+        }
+    }
+
+    List<WhitelistRequest> latestByNameAndStatuses(String normalizedUsername, Set<RequestStatus> statuses, int limit)
+            throws SQLException {
+        if (statuses.isEmpty()) return List.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(statuses.size(), "?"));
+        String sql = "SELECT * FROM whitelist_requests WHERE normalized_name=? AND status IN (" + placeholders
+                + ") ORDER BY created_at DESC LIMIT ?";
+        try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
+            int index = 1;
+            statement.setString(index++, normalizedUsername);
+            for (RequestStatus status : statuses) statement.setString(index++, status.name());
+            statement.setInt(index, Math.max(1, Math.min(limit, 500)));
+            try (ResultSet result = statement.executeQuery()) {
+                List<WhitelistRequest> requests = new java.util.ArrayList<>();
+                while (result.next()) requests.add(readRequest(result));
+                return requests;
+            }
+        }
+    }
+
+    List<WhitelistRequest> findByIdPrefix(String prefix) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "SELECT * FROM whitelist_requests WHERE lower(id) LIKE ? ORDER BY created_at DESC")) {
+            statement.setString(1, prefix.toLowerCase(java.util.Locale.ROOT) + "%");
+            try (ResultSet result = statement.executeQuery()) {
+                List<WhitelistRequest> requests = new java.util.ArrayList<>();
+                while (result.next()) requests.add(readRequest(result));
+                return requests;
+            }
+        }
+    }
+
     List<WhitelistRequest> findByStatus(Optional<RequestStatus> status, int limit) throws SQLException {
-        String sql = "SELECT * FROM whitelist_requests" + (status.isPresent() ? " WHERE status=?" : "") + " ORDER BY updated_at DESC LIMIT ?";
+        String ordering = status.filter(value -> value == RequestStatus.PENDING).isPresent()
+                ? "created_at ASC" : "updated_at DESC";
+        String sql = "SELECT * FROM whitelist_requests" + (status.isPresent() ? " WHERE status=?" : "")
+                + " ORDER BY " + ordering + " LIMIT ?";
         try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
             int index = 1;
             if (status.isPresent()) statement.setString(index++, status.get().name());
@@ -48,6 +91,15 @@ final class RequestSqlMapper {
                 List<WhitelistRequest> requests = new java.util.ArrayList<>();
                 while (result.next()) requests.add(readRequest(result));
                 return requests;
+            }
+        }
+    }
+
+    int countActiveRequests() throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement(
+                "SELECT COUNT(*) FROM whitelist_requests WHERE status IN ('PENDING','RESOLVING')")) {
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? result.getInt(1) : 0;
             }
         }
     }
@@ -98,10 +150,15 @@ final class RequestSqlMapper {
     }
 
     void updateAttemptTimestamps(UUID requestId, Instant now) throws SQLException {
-        try (PreparedStatement statement = tx.connection().prepareStatement("UPDATE whitelist_requests SET last_attempt_at=?, updated_at=?, attempt_count=attempt_count+1 WHERE id=?")) {
+        updateAttemptTimestamps(requestId, now, 1);
+    }
+
+    void updateAttemptTimestamps(UUID requestId, Instant now, long attemptDelta) throws SQLException {
+        try (PreparedStatement statement = tx.connection().prepareStatement("UPDATE whitelist_requests SET last_attempt_at=?, updated_at=?, attempt_count=attempt_count+? WHERE id=?")) {
             statement.setLong(1, SqliteWorkflowRepository.millis(now));
             statement.setLong(2, SqliteWorkflowRepository.millis(now));
-            statement.setString(3, requestId.toString());
+            statement.setLong(3, attemptDelta);
+            statement.setString(4, requestId.toString());
             statement.executeUpdate();
         }
     }

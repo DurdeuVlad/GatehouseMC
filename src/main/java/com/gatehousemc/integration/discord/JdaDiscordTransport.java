@@ -1,5 +1,6 @@
 package com.gatehousemc.integration.discord;
 
+import com.gatehousemc.domain.RequestStatus;
 import com.gatehousemc.i18n.Messages;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /** JDA-backed implementation of DiscordTransport. */
 final class JdaDiscordTransport implements DiscordTransport {
@@ -66,19 +68,39 @@ final class JdaDiscordTransport implements DiscordTransport {
     }
 
     @Override
-    public CompletableFuture<String> sendMessage(String destination, String text, UUID requestId, boolean disabled) {
-        return resolveChannel(destination).thenCompose(channel -> channel.sendMessage(text)
-                .addComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, disabled))))
-                .submit())
-                .thenApply(message -> message.getId());
+    public CompletableFuture<String> sendMessage(String destination, String text, UUID requestId, RequestStatus status) {
+        return resolveChannel(destination).thenCompose(channel -> {
+            var action = channel.sendMessage(text);
+            Button[] buttons = actionButtons(requestId, status);
+            if (buttons.length > 0) action = action.addComponents(ActionRow.of(Arrays.asList(buttons)));
+            return action.submit();
+        }).thenApply(message -> message.getId());
     }
 
     @Override
-    public CompletableFuture<Void> editMessage(String destination, String messageId, String text, UUID requestId, boolean disabled) {
-        return resolveChannel(destination).thenCompose(channel -> channel.editMessageById(messageId, text)
-                .setComponents(ActionRow.of(Arrays.asList(actionButtons(requestId, disabled))))
-                .submit())
-                .thenApply(message -> null);
+    public CompletableFuture<Void> editMessage(String destination, String messageId, String text, UUID requestId, RequestStatus status) {
+        return resolveChannel(destination).thenCompose(channel -> {
+            var action = channel.editMessageById(messageId, text);
+            Button[] buttons = DiscordApprovalInterface.cardButtons(requestId, status);
+            action = buttons.length > 0
+                    ? action.setComponents(ActionRow.of(Arrays.asList(buttons)))
+                    : action.setComponents();
+            return action.submit();
+        }).thenApply(message -> null);
+    }
+
+    @Override
+    public CompletableFuture<String> sendActionFollowUp(String destination, String referenceMessageId, String text,
+                                                        UUID requestId, RequestStatus status) {
+        return resolveChannel(destination).thenCompose(channel -> {
+            var action = channel.sendMessage(text);
+            if (referenceMessageId != null && !referenceMessageId.isBlank()) {
+                action = action.setMessageReference(Long.parseLong(referenceMessageId));
+            }
+            Button[] buttons = actionButtons(requestId, status);
+            if (buttons.length > 0) action = action.addComponents(ActionRow.of(Arrays.asList(buttons)));
+            return action.submit();
+        }).thenApply(message -> message.getId());
     }
 
     @Override
@@ -86,7 +108,28 @@ final class JdaDiscordTransport implements DiscordTransport {
 
     @Override
     public void stop() {
-        jda.shutdownNow();
+        boolean interrupted = false;
+        try {
+            jda.shutdown();
+            try {
+                if (jda.awaitShutdown(5, TimeUnit.SECONDS)) return;
+            } catch (InterruptedException interruption) {
+                interrupted = true;
+            }
+
+            jda.shutdownNow();
+            if (!interrupted) {
+                try {
+                    if (!jda.awaitShutdown(1, TimeUnit.SECONDS)) {
+                        LOGGER.warn("discord.shutdown_timeout: JDA did not reach SHUTDOWN after forced shutdown");
+                    }
+                } catch (InterruptedException interruption) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
     }
 
     /** Proactively validates reachability and permissions for the destination channel. */
@@ -230,8 +273,8 @@ final class JdaDiscordTransport implements DiscordTransport {
         return null;
     }
 
-    private static Button[] actionButtons(UUID requestId, boolean disabled) {
-        return DiscordApprovalInterface.actionButtons(requestId, disabled);
+    private static Button[] actionButtons(UUID requestId, RequestStatus status) {
+        return DiscordApprovalInterface.actionButtons(requestId, status);
     }
 
     private static Throwable rootCause(Throwable error) {

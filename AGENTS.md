@@ -9,6 +9,16 @@ This file is the canonical operating contract for AI coding agents and human dev
 
 ---
 
+## 0. Standing directive (always in effect)
+
+**Precision, no vagueness, completeness.** Talk in facts and direct names —
+exact file paths, exact command syntax, exact config keys. Whoever
+implements owns every detail underneath the given direction, and those
+details must be complete and internally consistent — no contradicting an
+earlier-stated detail later.
+
+---
+
 ## 1. Authority order
 
 When documents disagree, use this precedence unless a human maintainer explicitly overrides it:

@@ -1,8 +1,9 @@
 schema: 1
 project: GatehouseMC
-release_line: 1.1.x
+release_line: 1.2.x
 
-# This file is the release source of truth. A row is not publishable merely
+# This is the human-readable release-target summary. The machine-validated
+# source of truth is support-matrix.json. A row is not publishable merely
 # because it is listed: publish requires build=true, artifact_validation=true,
 # and server_e2e=true for the exact loader/version pair.
 release_gates:
@@ -12,7 +13,7 @@ release_gates:
 
 targets:
   # These artifacts existed in the 1.0.1 Fabric release. They remain part of
-  # the compatibility inventory, but are not 1.1.x source-build targets until
+  # the compatibility inventory, but are not 1.2.1 source-build targets until
   # their old per-version Gradle projects are restored and rerun.
   - id: fabric-1.14.4
     loader: fabric
@@ -109,7 +110,7 @@ targets:
     minecraft: 1.21.1
     java: 21
     branch: support/fabric/1.21.1
-    tag_pattern: v<mod-version>-fabric-mc1.21.1
+    tag_pattern: v<mod-version>
     status: ready-to-publish
     build: true
     artifact_validation: true
@@ -131,7 +132,7 @@ targets:
     minecraft: 1.20.1
     java: 17
     branch: support/forge/1.20.1
-    tag_pattern: v<mod-version>-forge-mc1.20.1
+    tag_pattern: v<mod-version>
     status: ready-to-publish
     build: true
     artifact_validation: true
@@ -142,7 +143,7 @@ targets:
     minecraft: 1.21.1
     java: 21
     branch: support/neoforge/1.21.1
-    tag_pattern: v<mod-version>-neoforge-mc1.21.1
+    tag_pattern: v<mod-version>
     status: ready-to-publish
     build: true
     artifact_validation: true

@@ -17,6 +17,18 @@ public final class ApprovalMessageRenderer {
                 Messages.get("request.identity") + "\n" +
                 Messages.get("request.attempts") + ": " + request.attemptCount() + "\n" +
                 Messages.get("request.id") + ": " + request.id() + "\n" +
-                Messages.get("request.status") + ": " + request.status();
+                Messages.get("request.status") + ": " + request.status() + terminalMetadata(request);
+    }
+
+    private static String terminalMetadata(RequestView request) {
+        if (!request.status().isTerminal()) return "";
+        StringBuilder result = new StringBuilder();
+        if (request.resolvedBy() != null) {
+            result.append("\nResolved by: ").append(request.resolvedBy().displayName());
+        }
+        if (request.resolutionReason() != null && !request.resolutionReason().isBlank()) {
+            result.append("\nReason: ").append(request.resolutionReason());
+        }
+        return result.toString();
     }
 }

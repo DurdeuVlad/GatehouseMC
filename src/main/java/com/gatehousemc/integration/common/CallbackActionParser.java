@@ -39,6 +39,8 @@ public final class CallbackActionParser {
                     yield new ParsedCallback(CallbackKind.CONFIRM, action, UUID.fromString(parts[3]));
                 }
                 case "x" -> new ParsedCallback(CallbackKind.CANCEL, null, UUID.fromString(parts[2]));
+                case "k" -> new ParsedCallback(CallbackKind.CONFIRM, null, null, parts[2]);
+                case "z" -> new ParsedCallback(CallbackKind.CANCEL, null, null, parts[2]);
                 default -> null;
             };
         } catch (IllegalArgumentException ignored) {
@@ -81,6 +83,14 @@ public final class CallbackActionParser {
         return "wr:x:" + requestId;
     }
 
+    public static String formatConfirmToken(String token) {
+        return "wr:k:" + token;
+    }
+
+    public static String formatCancelToken(String token) {
+        return "wr:z:" + token;
+    }
+
     private static String code(DecisionAction action) {
         return switch (action) {
             case APPROVE -> "a";
@@ -98,16 +108,23 @@ public final class CallbackActionParser {
         private final CallbackKind kind;
         private final DecisionAction action;
         private final UUID requestId;
+        private final String token;
 
         public ParsedCallback(CallbackKind kind, DecisionAction action, UUID requestId) {
+            this(kind, action, requestId, null);
+        }
+
+        public ParsedCallback(CallbackKind kind, DecisionAction action, UUID requestId, String token) {
             this.kind = kind;
             this.action = action;
             this.requestId = requestId;
+            this.token = token;
         }
 
         public CallbackKind kind() { return kind; }
         public DecisionAction action() { return action; }
         public UUID requestId() { return requestId; }
+        public String token() { return token; }
     }
 
     /** Legacy parsed action for backward compatibility. */

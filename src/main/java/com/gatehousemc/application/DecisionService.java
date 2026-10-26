@@ -24,6 +24,7 @@ public final class DecisionService {
     private final RequestAdmissionCache cache;
     private final Duration denialCooldown;
     private final Executor decisionExecutor;
+    private final ActiveRequestCounter activeRequestCounter;
 
     public DecisionService(WorkflowRepository repository, VanillaWhitelistPort vanillaWhitelist,
                            ClockPort clock, RequestAdmissionCache cache) {
@@ -38,12 +39,19 @@ public final class DecisionService {
     public DecisionService(WorkflowRepository repository, VanillaWhitelistPort vanillaWhitelist,
                            ClockPort clock, RequestAdmissionCache cache, Duration denialCooldown,
                            Executor decisionExecutor) {
+        this(repository, vanillaWhitelist, clock, cache, denialCooldown, decisionExecutor, null);
+    }
+
+    public DecisionService(WorkflowRepository repository, VanillaWhitelistPort vanillaWhitelist,
+                           ClockPort clock, RequestAdmissionCache cache, Duration denialCooldown,
+                           Executor decisionExecutor, ActiveRequestCounter activeRequestCounter) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.vanillaWhitelist = Objects.requireNonNull(vanillaWhitelist, "vanillaWhitelist");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.cache = Objects.requireNonNull(cache, "cache");
         this.denialCooldown = Objects.requireNonNull(denialCooldown, "denialCooldown");
         this.decisionExecutor = Objects.requireNonNull(decisionExecutor, "decisionExecutor");
+        this.activeRequestCounter = activeRequestCounter;
     }
 
     public CompletionStage<DecisionResult> decide(UUID requestId, DecisionAction action, AdminPrincipal actor,
@@ -90,6 +98,25 @@ public final class DecisionService {
         return removed;
     }
 
+    /** Reopens only DENIED/BLOCKED requests; approved requests must use undo. */
+    public CompletionStage<DecisionResult> reopen(UUID requestId, AdminPrincipal actor, Optional<String> reason) {
+        Objects.requireNonNull(requestId, "requestId");
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(reason, "reason");
+        String cleanReason = reason.orElse("").trim();
+        return CompletableFuture.supplyAsync(() -> repository.reopen(requestId, actor, cleanReason, clock.now()), decisionExecutor)
+                .handle((snapshot, error) -> {
+                    if (error != null) return DecisionResult.of(DecisionOutcome.FAILED, null, Messages.get("decision.db_error"));
+                    snapshot.request().ifPresent(this::refreshCache);
+                    if (snapshot.outcome() == DecisionOutcome.UNDONE && activeRequestCounter != null) {
+                        activeRequestCounter.increment();
+                    }
+                    String message = snapshot.outcome() == DecisionOutcome.UNDONE
+                            ? Messages.get("decision.undone", actor.displayName()) : snapshot.message();
+                    return new DecisionResult(snapshot.outcome(), snapshot.request(), message);
+                });
+    }
+
     /** Returns a snapshot of the current request state for rendering by approval interfaces. */
     public Optional<RequestView> findRequest(UUID requestId) {
         Objects.requireNonNull(requestId, "requestId");
@@ -125,6 +152,10 @@ public final class DecisionService {
         WorkflowRepository.DecisionResultSnapshot result = repository.resolveTerminal(
                 requestId, action, actor, reason, clock.now());
         result.request().ifPresent(this::refreshCache);
+        if ((result.outcome() == DecisionOutcome.DENIED || result.outcome() == DecisionOutcome.BLOCKED)
+                && activeRequestCounter != null) {
+            activeRequestCounter.decrement();
+        }
         String message = switch (result.outcome()) {
             case DENIED -> Messages.get("decision.denied", actor.displayName());
             case BLOCKED -> Messages.get("decision.blocked", actor.displayName());
@@ -148,21 +179,30 @@ public final class DecisionService {
      */
     private CompletionStage<DecisionResult> undoAsync(UUID requestId, AdminPrincipal actor, String reason) {
         return CompletableFuture.supplyAsync(() -> {
-            Optional<WhitelistRequest> existing = repository.findById(requestId);
-            if (existing.isEmpty()) return DecisionResult.of(DecisionOutcome.NOT_FOUND, null, Messages.get("decision.not_found"));
-            WhitelistRequest request = existing.get();
-            if (request.status() == RequestStatus.PENDING) {
-                return DecisionResult.of(DecisionOutcome.ALREADY_PENDING, request, Messages.get("decision.already_pending"));
+            try {
+                Optional<WhitelistRequest> existing = repository.findById(requestId);
+                if (existing.isEmpty()) return DecisionResult.of(DecisionOutcome.NOT_FOUND, null, Messages.get("decision.not_found"));
+                WhitelistRequest request = existing.get();
+                if (request.status() == RequestStatus.PENDING) {
+                    return DecisionResult.of(DecisionOutcome.ALREADY_PENDING, request, Messages.get("decision.already_pending"));
+                }
+                if (request.status() == RequestStatus.RESOLVING) {
+                    return DecisionResult.of(DecisionOutcome.RESOLVING, request, Messages.get("decision.already_resolving"));
+                }
+                // APPROVED needs the crash-aware two-phase flow (claim -> whitelist removal -> finalize).
+                // DENIED and BLOCKED are pure database state changes handled by repository.reopen().
+                if (request.status() == RequestStatus.APPROVED) return null;
+                WorkflowRepository.DecisionResultSnapshot result = repository.reopen(requestId, actor, reason, clock.now());
+                result.request().ifPresent(this::refreshCache);
+                if (result.outcome() == DecisionOutcome.UNDONE && activeRequestCounter != null) {
+                    activeRequestCounter.increment();
+                }
+                String message = result.outcome() == DecisionOutcome.UNDONE
+                        ? Messages.get("decision.undone", actor.displayName()) : result.message();
+                return new DecisionResult(result.outcome(), result.request(), message);
+            } catch (RuntimeException error) {
+                return DecisionResult.of(DecisionOutcome.FAILED, null, Messages.get("decision.db_error"));
             }
-            if (request.status() == RequestStatus.RESOLVING) {
-                return DecisionResult.of(DecisionOutcome.RESOLVING, request, Messages.get("decision.already_resolving"));
-            }
-            // APPROVED needs the crash-aware two-phase flow (claim -> whitelist removal -> finalize).
-            // DENIED and BLOCKED are pure database state changes handled by repository.reopen().
-            if (request.status() == RequestStatus.APPROVED) return null;
-            WorkflowRepository.DecisionResultSnapshot result = repository.reopen(requestId, actor, reason, clock.now());
-            result.request().ifPresent(this::refreshCache);
-            return new DecisionResult(DecisionOutcome.UNDONE, result.request(), result.message());
         }, decisionExecutor).thenCompose(preflight -> {
             if (preflight != null) return CompletableFuture.completedFuture(preflight);
             return undoClaimAndFinalize(requestId, actor, reason);
@@ -202,6 +242,7 @@ public final class DecisionService {
         if (result.outcome() != DecisionOutcome.UNDONE) {
             return new DecisionResult(result.outcome(), Optional.of(current), result.message());
         }
+        if (activeRequestCounter != null) activeRequestCounter.increment();
         return DecisionResult.of(DecisionOutcome.UNDONE, current, Messages.get("decision.undone", actor.displayName()));
     }
 
@@ -223,6 +264,7 @@ public final class DecisionService {
                     Messages.get("decision.approval_state_error"));
         }
         refreshCache(current);
+        if (activeRequestCounter != null) activeRequestCounter.decrement();
         return DecisionResult.of(DecisionOutcome.APPROVED, current, Messages.get("decision.approved", actor.displayName()));
     }
 
@@ -234,7 +276,8 @@ public final class DecisionService {
             repository.resetApproval(request.id(), token, actor,
                     "Whitelist recovery check failed: " + safeMessage(error), clock.now());
         } else if (Boolean.TRUE.equals(allowed)) {
-            repository.finalizeApproval(request.id(), token, actor, request.resolutionReason(), clock.now());
+            if (repository.finalizeApproval(request.id(), token, actor, request.resolutionReason(), clock.now())
+                    && activeRequestCounter != null) activeRequestCounter.decrement();
         } else {
             repository.resetApproval(request.id(), token, actor, "Recovered unresolved approval", clock.now());
         }
@@ -252,9 +295,11 @@ public final class DecisionService {
         } else if (Boolean.FALSE.equals(stillWhitelisted)) {
             // Whitelist removal succeeded; finalize the undo.
             repository.finalizeUndo(request.id(), token, actor, request.resolutionReason(), clock.now());
+            // RESOLVING is already counted; finalizing back to PENDING preserves that count.
         } else {
             // Player is still whitelisted; the removal did not complete. Roll back to APPROVED.
-            repository.resetUndo(request.id(), token, actor, "Recovered unresolved undo", clock.now());
+            if (repository.resetUndo(request.id(), token, actor, "Recovered unresolved undo", clock.now())
+                    && activeRequestCounter != null) activeRequestCounter.decrement();
         }
         repository.findById(request.id()).ifPresent(this::refreshCache);
         return null;

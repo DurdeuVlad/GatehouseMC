@@ -18,6 +18,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -35,7 +36,7 @@ class SqliteWorkflowRepositoryTest {
     void freshDatabaseMigratesToCurrentSchema(@TempDir Path temp) throws Exception {
         Path path = temp.resolve("requests.sqlite");
         try (SqliteDatabase database = new SqliteDatabase(path, 5000)) {
-            assertEquals(1, scalarLong(database.connection(), "SELECT MAX(version) FROM schema_migrations"));
+            assertEquals(2, scalarLong(database.connection(), "SELECT MAX(version) FROM schema_migrations"));
             assertEquals(1, scalarLong(database.connection(),
                     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='whitelist_requests'"));
             assertEquals(1, scalarLong(database.connection(), "PRAGMA foreign_keys"));
@@ -115,6 +116,30 @@ class SqliteWorkflowRepositoryTest {
         }
     }
 
+    @Test
+    void historicalLookupReturnsNewestRequestAndUniquePrefixMatches(@TempDir Path temp) throws Exception {
+        Path path = temp.resolve("history.sqlite");
+        try (SqliteDatabase database = new SqliteDatabase(path, 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            WhitelistRequestService service = service(repository);
+            service.recordAttempt(PlayerIdentity.of("HistoryPlayer"));
+            UUID first = repository.findActiveByName("historyplayer").orElseThrow().id();
+            repository.resolveTerminal(first, com.gatehousemc.domain.DecisionAction.DENY,
+                    AdminPrincipal.console(), "old", NOW);
+            WhitelistRequestService laterService = new WhitelistRequestService(repository,
+                    () -> NOW.plusSeconds(1), Duration.ZERO, new RequestAdmissionCache(() -> NOW.plusSeconds(1)));
+            laterService.recordAttempt(PlayerIdentity.of("HistoryPlayer"));
+            UUID second = repository.findActiveByName("historyplayer").orElseThrow().id();
+
+            assertEquals(second, repository.findLatestByName("historyplayer").orElseThrow().id());
+            var prefixMatches = repository.findByIdPrefix(second.toString().substring(0, 8));
+            assertEquals(1, prefixMatches.size());
+            assertEquals(second, prefixMatches.get(0).id());
+            assertEquals(1, repository.findLatestByNameAndStatuses("historyplayer",
+                    Set.of(com.gatehousemc.domain.RequestStatus.PENDING), 10).size());
+        }
+    }
+
     private static void recordAfterStart(SqliteWorkflowRepository repository, PlayerIdentity identity,
                                          CountDownLatch ready, CountDownLatch start) {
         ready.countDown();
@@ -128,7 +153,7 @@ class SqliteWorkflowRepositoryTest {
     }
 
     private static WhitelistRequestService service(SqliteWorkflowRepository repository) {
-        return new WhitelistRequestService(repository, CLOCK, Duration.ofDays(1), new RequestAdmissionCache(CLOCK));
+        return new WhitelistRequestService(repository, CLOCK, Duration.ZERO, new RequestAdmissionCache(CLOCK));
     }
 
     private static String scalarString(Connection connection, String sql) throws SQLException {

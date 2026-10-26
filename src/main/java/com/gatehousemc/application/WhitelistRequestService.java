@@ -32,8 +32,13 @@ public final class WhitelistRequestService {
     }
 
     public AttemptOutcome recordAttempt(PlayerIdentity identity) {
+        return recordAttempt(identity, 1, clock.now());
+    }
+
+    public AttemptOutcome recordAttempt(PlayerIdentity identity, long attemptDelta, Instant observedAt) {
+        if (attemptDelta < 1) throw new IllegalArgumentException("attemptDelta must be positive");
         if (cache.isDegraded()) return AttemptOutcome.of(AttemptState.DEGRADED, null);
-        AttemptOutcome outcome = repository.recordAttempt(identity, clock.now(), denialCooldown);
+        AttemptOutcome outcome = repository.recordAttempt(identity, observedAt, denialCooldown, attemptDelta);
         switch (outcome.state()) {
             case CREATED, PENDING -> cache.put(identity.normalizedUsername(), AdmissionState.pending());
             case DENIED_COOLDOWN -> cache.put(identity.normalizedUsername(), AdmissionState.deniedUntil(outcome.cooldownUntil()));
@@ -51,9 +56,9 @@ public final class WhitelistRequestService {
     }
 
     public void hydrateCache() {
-        repository.findByStatus(Optional.of(RequestStatus.PENDING), 500)
+        repository.findByStatus(Optional.of(RequestStatus.PENDING), Integer.MAX_VALUE)
                 .forEach(request -> cache.put(request.identity().normalizedUsername(), AdmissionState.pending()));
-        List<WhitelistRequest> blockedRequests = repository.findByStatus(Optional.of(RequestStatus.BLOCKED), 500);
+        List<WhitelistRequest> blockedRequests = repository.findByStatus(Optional.of(RequestStatus.BLOCKED), Integer.MAX_VALUE);
         for (WhitelistRequest request : blockedRequests) {
             try {
                 if (repository.isBlocked(request.identity().normalizedUsername())) {
@@ -63,7 +68,7 @@ public final class WhitelistRequestService {
                 LOGGER.warn("Failed to check block status for {} during cache hydration", request.identity().normalizedUsername(), error);
             }
         }
-        repository.findByStatus(Optional.of(RequestStatus.DENIED), 500)
+        repository.findByStatus(Optional.of(RequestStatus.DENIED), Integer.MAX_VALUE)
                 .forEach(request -> {
                     Instant deniedUntil = request.resolvedAt().plus(denialCooldown);
                     if (deniedUntil.isAfter(clock.now())) {

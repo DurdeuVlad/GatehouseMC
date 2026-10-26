@@ -15,8 +15,8 @@ approval.
 - Source code: GitHub — <https://github.com/DurdeuVlad/GatehouseMC>.
 - Comments: enabled; issue tracking remains the public GitHub issue tracker.
 - Files: only artefacts whose internal loader and Minecraft metadata match
-  their labels may be published. The earlier combined `v1.1.0-mc1.21.1`
-  submission remains history-only; new files use loader-qualified tags.
+  their labels may be published. The GitHub release page is version-wide, but
+  each CurseForge file remains loader-qualified in its filename and metadata.
 - Media: the project has a neutral multi-version banner. Keep the square
   project logo available as the canonical icon.
 
@@ -44,7 +44,7 @@ FEATURES
 
 - Automatic whitelist request creation
 - Optional Discord and Telegram approval workflows
-- In-game commands: `/gatehouse`, `/gh`, and `/wlreq`
+- In-game commands: `/gatehouse`
 - Approve, deny, block, unblock, undo, status, and reload actions
 - SQLite persistence and restart/outage recovery
 - Minecraft's native whitelist remains authoritative
@@ -57,7 +57,7 @@ INSTALLATION
 3. Start the server once to generate `config/gatehousemc/config.json` and the request database.
 4. Optionally configure Discord or Telegram integrations. Provider secrets support environment variables such as `${DISCORD_TOKEN}` and `${TELEGRAM_BOT_TOKEN}`.
 
-The 1.1.x source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Choose only the exact loader/version file marked public in the [support matrix](../../.github/support-matrix.yml).
+The 1.2.1 source-build targets are Fabric 1.21.1, Forge 1.20.1, and NeoForge 1.21.1. Historical Fabric 1.0.1 files cover 1.14.4–1.21.4. Choose only the exact loader/version file marked public in the machine-validated [support matrix](../../.github/support-matrix.json).
 
 OFFLINE-MODE NOTICE
 
