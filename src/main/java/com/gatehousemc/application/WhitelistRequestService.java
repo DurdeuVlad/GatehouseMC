@@ -37,7 +37,9 @@ public final class WhitelistRequestService {
 
     public AttemptOutcome recordAttempt(PlayerIdentity identity, long attemptDelta, Instant observedAt) {
         if (attemptDelta < 1) throw new IllegalArgumentException("attemptDelta must be positive");
-        if (cache.isDegraded()) return AttemptOutcome.of(AttemptState.DEGRADED, null);
+        // The degraded latch must not short-circuit here: AdmissionWorker only lets
+        // a bounded probe reach this method while degraded, and a successful probe
+        // is the only way the latch can clear without a reload/restart.
         AttemptOutcome outcome = repository.recordAttempt(identity, observedAt, denialCooldown, attemptDelta);
         switch (outcome.state()) {
             case CREATED, PENDING -> cache.put(identity.normalizedUsername(), AdmissionState.pending());
@@ -48,6 +50,7 @@ public final class WhitelistRequestService {
                 cache.markDegraded(true);
             }
         }
+        if (outcome.state() != AttemptState.DEGRADED) cache.markDegraded(false);
         return outcome;
     }
 

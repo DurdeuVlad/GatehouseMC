@@ -3,6 +3,7 @@ package com.gatehousemc.platform.neoforge;
 import com.gatehousemc.application.admin.AdminCommand;
 import com.gatehousemc.application.admin.AdminCommandResult;
 import com.gatehousemc.application.admin.AdminCommandParser;
+import com.gatehousemc.application.admin.AdminResultRenderer;
 import com.gatehousemc.application.admin.RequestReference;
 import com.gatehousemc.domain.AdminPrincipal;
 import com.gatehousemc.domain.DecisionAction;
@@ -214,25 +215,10 @@ public final class GatehouseNeoForgeCommands {
         runtime.commandExecutor().execute(() -> runtime.adminCommands().execute(command, principalOf(source))
                 .whenComplete((result, error) -> source.getServer().execute(() -> {
                     if (error != null) source.sendFailure(Component.literal(Messages.get("command.decision_failed", safeMessage(error))));
-                    else if (result.succeeded()) source.sendSuccess(() -> Component.literal(render(result)), false);
+                    else if (result.succeeded()) source.sendSuccess(() -> Component.literal(AdminResultRenderer.render(result)), false);
                     else source.sendFailure(Component.literal(result.message()));
                 })));
         return 1;
-    }
-
-    private static String render(AdminCommandResult result) {
-        if (result.value().isEmpty()) return result.message();
-        Object value = result.value().orElseThrow();
-        if (value instanceof WhitelistRequest request) {
-            return result.message() + ": " + request.id() + " " + request.status() + " player="
-                    + request.identity().exactUsername() + " uuid=" + request.identity().offlineUuid()
-                    + " attempts=" + request.attemptCount();
-        }
-        if (value instanceof java.util.List<?> values) {
-            if (values.isEmpty()) return result.message() + ": " + Messages.get("command.no_requests");
-            return result.message() + " (" + values.size() + " results)";
-        }
-        return result.message();
     }
 
     private static Optional<WhitelistRequest> resolve(NeoForgeRuntime runtime, String value) {

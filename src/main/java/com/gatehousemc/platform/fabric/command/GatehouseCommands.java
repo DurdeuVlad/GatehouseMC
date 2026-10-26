@@ -3,10 +3,10 @@ package com.gatehousemc.platform.fabric.command;
 import com.gatehousemc.application.admin.AdminCommand;
 import com.gatehousemc.application.admin.AdminCommandParser;
 import com.gatehousemc.application.admin.AdminCommandResult;
+import com.gatehousemc.application.admin.AdminResultRenderer;
 import com.gatehousemc.application.admin.RequestReference;
 import com.gatehousemc.domain.AdminPrincipal;
 import com.gatehousemc.domain.RequestStatus;
-import com.gatehousemc.domain.WhitelistRequest;
 import com.gatehousemc.i18n.Messages;
 import com.gatehousemc.platform.fabric.FabricRuntime;
 import com.mojang.brigadier.CommandDispatcher;
@@ -18,7 +18,6 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
@@ -161,7 +160,7 @@ public final class GatehouseCommands {
         runtime.commandExecutor().execute(() -> runtime.adminCommands().execute(command, principalOf(source))
                 .whenComplete((result, error) -> source.getServer().execute(() -> {
                     if (error != null) source.sendError(Text.literal(Messages.get("command.decision_failed", safeMessage(error))));
-                    else if (result.succeeded()) source.sendFeedback(() -> Text.literal(render(result)), false);
+                    else if (result.succeeded()) source.sendFeedback(() -> Text.literal(AdminResultRenderer.render(result)), false);
                     else source.sendError(Text.literal(result.message()));
                 })));
         return 1;
@@ -186,25 +185,6 @@ public final class GatehouseCommands {
         int level = source.hasPermissionLevel(4) ? 4 : source.hasPermissionLevel(3) ? 3 :
                 source.hasPermissionLevel(2) ? 2 : source.hasPermissionLevel(1) ? 1 : 0;
         return new AdminPrincipal("minecraft", "perm:" + level, source.getName());
-    }
-
-    private static String render(AdminCommandResult result) {
-        if (result.value().isEmpty()) return result.message();
-        Object value = result.value().orElseThrow();
-        if (value instanceof WhitelistRequest request) {
-            return result.message() + ": " + request.id() + " " + request.status() + " player="
-                    + request.identity().exactUsername() + " uuid=" + request.identity().offlineUuid()
-                    + " attempts=" + request.attemptCount();
-        }
-        if (value instanceof List<?> values) {
-            if (values.isEmpty()) return result.message() + ": " + Messages.get("command.no_requests");
-            return result.message() + "\n" + values.stream().map(item -> {
-                WhitelistRequest request = (WhitelistRequest) item;
-                return request.id().toString().substring(0, 8) + " " + request.status() + " "
-                        + request.identity().exactUsername() + " attempts=" + request.attemptCount();
-            }).reduce((left, right) -> left + "\n" + right).orElse("");
-        }
-        return result.message();
     }
 
     private static int help(CommandContext<ServerCommandSource> context) {

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -90,6 +91,76 @@ class AdminCommandServiceTest {
             assertEquals(AdminCommandResultCode.INVALID_STATE, result.code());
             assertTrue(result.message().contains("reopen"));
             assertEquals(RequestStatus.DENIED, repository.findById(requestId).orElseThrow().status());
+        }
+    }
+
+    /**
+     * Regression for the reported operator-facing defect: a request created at
+     * runtime after a vanilla whitelist rejection must appear in
+     * {@code /gatehouse requests} immediately — no reload or restart may be
+     * required — and the canonical rendering must contain the row, not just a
+     * bare header or count.
+     */
+    @Test
+    void runtimeCreatedRequestAppearsInRequestsListImmediately(@TempDir Path temp) throws Exception {
+        try (SqliteDatabase database = new SqliteDatabase(temp.resolve("admin-list.sqlite"), 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
+            WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ZERO, cache);
+            AdminCommandService commands = service(repository, cache, new CountingWhitelist(),
+                    new AdminAuthorizationService(actor -> Optional.of(AdminCapability.VIEW)));
+
+            assertEquals(com.gatehousemc.domain.AttemptState.CREATED,
+                    requests.recordAttempt(PlayerIdentity.of("RuntimeNewcomer")).state());
+
+            AdminCommandResult result = commands.execute(command("requests"), AdminPrincipal.console())
+                    .toCompletableFuture().join();
+
+            assertEquals(AdminCommandResultCode.SUCCESS, result.code(), result.message());
+            Object value = result.value().orElseThrow();
+            assertTrue(value instanceof List<?>);
+            List<?> listed = (List<?>) value;
+            assertEquals(1, listed.size());
+            WhitelistRequest listedRequest = (WhitelistRequest) listed.get(0);
+            assertEquals("RuntimeNewcomer", listedRequest.identity().exactUsername());
+            assertEquals(RequestStatus.PENDING, listedRequest.status());
+
+            String rendered = AdminResultRenderer.render(result);
+            assertTrue(rendered.contains("RuntimeNewcomer"), rendered);
+            assertTrue(rendered.contains(listedRequest.id().toString().substring(0, 8)), rendered);
+        }
+    }
+
+    @Test
+    void requestsListReflectsDecisionChangesImmediately(@TempDir Path temp) throws Exception {
+        try (SqliteDatabase database = new SqliteDatabase(temp.resolve("admin-list-fresh.sqlite"), 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            RequestAdmissionCache cache = new RequestAdmissionCache(() -> NOW);
+            WhitelistRequestService requests = new WhitelistRequestService(repository, () -> NOW, Duration.ZERO, cache);
+            requests.recordAttempt(PlayerIdentity.of("StayPending"));
+            requests.recordAttempt(PlayerIdentity.of("GetsDenied"));
+            DecisionService decisions = new DecisionService(repository, new CountingWhitelist(), () -> NOW, cache);
+            AdminCommandService commands = new AdminCommandService(repository, decisions,
+                    new DefaultRequestResolver(repository),
+                    new AdminAuthorizationService(actor -> Optional.of(AdminCapability.MANAGE)));
+
+            commands.execute(command("deny GetsDenied"), AdminPrincipal.console()).toCompletableFuture().join();
+
+            AdminCommandResult pending = commands.execute(command("requests"), AdminPrincipal.console())
+                    .toCompletableFuture().join();
+            List<?> pendingRows = (List<?>) pending.value().orElseThrow();
+            assertEquals(1, pendingRows.size());
+            assertEquals("StayPending", ((WhitelistRequest) pendingRows.get(0)).identity().exactUsername());
+
+            AdminCommandResult denied = commands.execute(command("requests denied"), AdminPrincipal.console())
+                    .toCompletableFuture().join();
+            List<?> deniedRows = (List<?>) denied.value().orElseThrow();
+            assertEquals(1, deniedRows.size());
+            assertEquals("GetsDenied", ((WhitelistRequest) deniedRows.get(0)).identity().exactUsername());
+
+            AdminCommandResult all = commands.execute(command("requests all"), AdminPrincipal.console())
+                    .toCompletableFuture().join();
+            assertEquals(2, ((List<?>) all.value().orElseThrow()).size());
         }
     }
 

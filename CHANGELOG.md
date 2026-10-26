@@ -2,6 +2,36 @@
 
 All notable changes to **GatehouseMC** will be documented in this file.
 
+## 1.2.2 — Live request visibility and uniform command output
+
+- Fixed `/gatehouse requests` on Forge and NeoForge collapsing the list to a
+  count-only message ("(N results)") instead of showing request rows; all
+  loaders now delegate to one canonical `AdminResultRenderer` in the shared
+  core, so list, show, and action output is identical on Fabric, Forge,
+  NeoForge, Discord, and Telegram.
+- Fixed Discord and Telegram operator commands replying with only the result
+  headline and silently dropping the request rows attached to list results.
+- Fixed request intake staying degraded after a transient persistence failure:
+  the admission worker now keeps a bounded probe alive (one attempt per probe
+  interval) and a successful write clears the degraded latch, so new whitelist
+  requests are recorded again without a reload or restart.
+- Fixed outbox events stuck in `PROCESSING` being reclaimed only on restart:
+  a claim older than the five-minute processing timeout is re-queued by the
+  next drain pass, and failed completion/retry/defer writes now surface as
+  storage errors instead of leaving a stuck event.
+- Added explicit localized empty-list feedback
+  (`command.no_entries` in English and Romanian).
+- Added regression coverage for live list contents after admission, rendered
+  row formatting with usable request IDs, cross-surface renderer parity,
+  degraded-intake recovery, and outbox claim reclaim.
+
+### Downloads
+
+- [Fabric 1.21.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.2/gatehousemc-fabric-mc1.21.1-1.2.2.jar)
+- [Forge 1.20.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.2/gatehousemc-forge-mc1.20.1-1.2.2.jar)
+- [NeoForge 1.21.1](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.2/gatehousemc-neoforge-mc1.21.1-1.2.2.jar)
+- [SHA-256 checksums](https://github.com/DurdeuVlad/GatehouseMC/releases/download/v1.2.2/checksums.txt)
+
 ## 1.2.1 — Graceful provider shutdown and server-stop reliability
 
 - Fixed Discord shutdown to request a graceful JDA stop, wait within a bounded

@@ -10,6 +10,7 @@ import com.gatehousemc.application.admin.AdminCommandService;
 import com.gatehousemc.application.admin.RequestReference;
 import com.gatehousemc.application.admin.AdminCommandParser;
 import com.gatehousemc.application.admin.AdminCommandResult;
+import com.gatehousemc.application.admin.AdminResultRenderer;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.domain.*;
 import com.gatehousemc.i18n.Messages;
@@ -351,7 +352,7 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
         AdminPrincipal principal = new AdminPrincipal("telegram", userId,
                 from.has("username") ? from.get("username").getAsString() : userId);
         adminCommands.execute(command, principal)
-                .thenAccept(result -> sendText(chatId, result.message()));
+                .thenAccept(result -> sendText(chatId, AdminResultRenderer.render(result)));
     }
 
     private static boolean isMutating(AdminCommand command) {
@@ -424,7 +425,8 @@ public final class TelegramApprovalInterface implements ApprovalInterface {
             case UNDO -> AdminCommand.Kind.UNDO;
         };
         AdminCommand command = AdminCommand.base(kind).withRequest(RequestReference.parse(confirmation.requestId().toString()), null);
-        return adminCommands.execute(command, principal).thenApply(result -> new AdminCommandResultView(result.message()));
+        return adminCommands.execute(command, principal)
+                .thenApply(result -> new AdminCommandResultView(AdminResultRenderer.render(result)));
     }
 
     private record AdminCommandResultView(String message) {}

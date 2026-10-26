@@ -93,23 +93,25 @@ public final class AdminCommandService {
     }
 
     private AdminCommandResult requests(AdminCommand command) {
-        int limit = Math.multiplyExact(command.page(), PAGE_SIZE);
+        int page = Math.max(1, command.page());
+        int limit = Math.multiplyExact(page, PAGE_SIZE);
         List<WhitelistRequest> all = repository.findByStatus(command.status(), limit);
-        int from = Math.min((command.page() - 1) * PAGE_SIZE, all.size());
+        int from = Math.min((page - 1) * PAGE_SIZE, all.size());
         int to = Math.min(from + PAGE_SIZE, all.size());
-        return AdminCommandResult.success(List.copyOf(all.subList(from, to)), "Requests page " + command.page());
+        return AdminCommandResult.success(AdminCommand.Kind.REQUESTS,
+                List.copyOf(all.subList(from, to)), "Requests page " + page);
     }
 
     private AdminCommandResult show(AdminCommand command) {
         RequestResolution resolution = resolver.resolve(command.request().orElseThrow(), RequestResolver.ResolutionPurpose.SHOW);
-        return resultForResolution(resolution, true);
+        return resultForResolution(resolution, command.kind());
     }
 
     private CompletionStage<AdminCommandResult> decide(AdminCommand command, AdminPrincipal actor) {
         RequestResolver.ResolutionPurpose purpose = RequestResolver.ResolutionPurpose.valueOf(command.kind().name());
         RequestResolution resolution = resolver.resolve(command.request().orElseThrow(), purpose);
         if (resolution.outcome() != RequestResolution.Outcome.FOUND) {
-            return complete(resultForResolution(resolution, false));
+            return complete(resultForResolution(resolution, command.kind()));
         }
         WhitelistRequest request = resolution.request().orElseThrow();
         Optional<String> reason = command.reason();
@@ -123,7 +125,7 @@ public final class AdminCommandService {
         }
         return result.handle((decision, error) -> {
             if (error != null) return AdminCommandResult.error(AdminCommandResultCode.FAILED, "Gatehouse decision failed");
-            return decisionResult(decision);
+            return decisionResult(decision, command.kind());
         });
     }
 
@@ -147,7 +149,8 @@ public final class AdminCommandService {
 
     private AdminCommandResult adminList(AdminCommand command) {
         if (principals == null) return unavailable();
-        return AdminCommandResult.success(principals.list(command.provider().orElseThrow()),
+        return AdminCommandResult.success(AdminCommand.Kind.ADMIN_LIST,
+                principals.list(command.provider().orElseThrow()),
                 "Configured principals for " + command.provider().orElseThrow());
     }
 
@@ -168,9 +171,9 @@ public final class AdminCommandService {
                 "This Gatehouse command is not available in the current runtime.");
     }
 
-    private AdminCommandResult resultForResolution(RequestResolution resolution, boolean show) {
+    private AdminCommandResult resultForResolution(RequestResolution resolution, AdminCommand.Kind kind) {
         return switch (resolution.outcome()) {
-            case FOUND -> AdminCommandResult.success(resolution.request().orElseThrow(), resolution.message());
+            case FOUND -> AdminCommandResult.success(kind, resolution.request().orElseThrow(), resolution.message());
             case NOT_FOUND -> AdminCommandResult.error(AdminCommandResultCode.NOT_FOUND, resolution.message());
             case AMBIGUOUS -> AdminCommandResult.error(AdminCommandResultCode.INVALID_ARGUMENT, resolution.message());
             case ACTIVE_CONFLICT -> AdminCommandResult.error(AdminCommandResultCode.CONFLICT, resolution.message());
@@ -178,7 +181,7 @@ public final class AdminCommandService {
         };
     }
 
-    private AdminCommandResult decisionResult(com.gatehousemc.domain.DecisionResult result) {
+    private AdminCommandResult decisionResult(com.gatehousemc.domain.DecisionResult result, AdminCommand.Kind kind) {
         AdminCommandResultCode code = switch (result.outcome()) {
             case APPROVED, DENIED, BLOCKED, UNDONE -> AdminCommandResultCode.SUCCESS;
             case ALREADY_PENDING, ALREADY_RESOLVED, RESOLVING -> AdminCommandResultCode.INVALID_STATE;
@@ -186,7 +189,7 @@ public final class AdminCommandService {
             case NOT_FOUND -> AdminCommandResultCode.NOT_FOUND;
             case FAILED -> AdminCommandResultCode.FAILED;
         };
-        return new AdminCommandResult(code, result.request(), result.message());
+        return new AdminCommandResult(code, java.util.Optional.ofNullable(kind), result.request(), result.message());
     }
 
     private static CompletionStage<AdminCommandResult> complete(AdminCommandResult result) {
