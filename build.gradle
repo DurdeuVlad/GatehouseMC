@@ -68,7 +68,7 @@ if (!forgeLane) {
         include "com.squareup.okhttp3:okhttp-jvm:5.4.0"
         include "com.squareup.okio:okio-jvm:3.17.0"
         include "org.jetbrains.kotlin:kotlin-stdlib:2.2.21"
-        include "org.jetbrains:annotations:13.0"
+        include "org.jetbrains:annotations:26.1.0"
         include "club.minnced:opus-java:1.1.1"
         include "club.minnced:opus-java-api:1.1.1"
         include "club.minnced:opus-java-natives:1.1.1"
