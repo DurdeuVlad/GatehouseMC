@@ -72,6 +72,48 @@ class OutboxRepositoryTest {
         }
     }
 
+    /**
+     * An outbox event stuck in PROCESSING (dead publish callback, crashed worker
+     * pass, or a completion update that could not be written) must be reclaimed
+     * at runtime after the claim timeout — not only by the startup migration
+     * reset. Otherwise providers stay silent until the next restart, which is the
+     * reported "requests only arrive on reload/restart" defect for Discord and
+     * Telegram delivery.
+     */
+    @Test
+    void staleProcessingClaimIsReclaimedWithoutRestart(@TempDir Path temp) throws Exception {
+        Path path = temp.resolve("stale-claim.sqlite");
+        try (SqliteDatabase database = new SqliteDatabase(path, 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            repository.recordAttempt(PlayerIdentity.of("StuckPlayer"), NOW, Duration.ofDays(1));
+            OutboxEvent claimed = repository.readyOutbox(NOW, 10).get(0);
+            assertEquals(OutboxEvent.OutboxState.PROCESSING, claimed.state());
+
+            // A claim still inside its timeout is left alone.
+            assertTrue(repository.readyOutbox(NOW.plusSeconds(30), 10).isEmpty());
+
+            // Once the claim is stale, the same runtime must reclaim and retry it.
+            List<OutboxEvent> reclaimed = repository.readyOutbox(NOW.plus(
+                    SqliteWorkflowRepository.PROCESSING_CLAIM_TIMEOUT.plusMinutes(1)), 10);
+            assertEquals(1, reclaimed.size());
+            assertEquals(claimed.id(), reclaimed.get(0).id());
+        }
+    }
+
+    @Test
+    void failedOutboxCompletionSurfacesInsteadOfLeavingAStuckEvent(@TempDir Path temp) throws Exception {
+        Path path = temp.resolve("complete-failure.sqlite");
+        UUID outboxId;
+        try (SqliteDatabase database = new SqliteDatabase(path, 5000);
+             SqliteWorkflowRepository repository = new SqliteWorkflowRepository(database)) {
+            repository.recordAttempt(PlayerIdentity.of("OutboxFailure"), NOW, Duration.ofDays(1));
+            outboxId = repository.readyOutbox(NOW, 10).get(0).id();
+            database.close();
+            org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                    () -> repository.completeOutbox(outboxId, NOW));
+        }
+    }
+
     private static List<OutboxEvent> claim(SqliteWorkflowRepository repository, CountDownLatch ready, CountDownLatch start) {
         ready.countDown();
         try {

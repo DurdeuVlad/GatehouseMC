@@ -29,6 +29,7 @@
   "confirm.cancelled": "Actiune anulata",
   "confirm.expired": "Confirmare expirata - incercati din nou",
   "command.no_requests": "Nu s-au gasit cereri",
+  "command.no_entries": "Nicio intrare",
   "command.help": "Administrare Gatehouse: /gatehouse help",
   "command.request_not_found": "Cererea nu a fost gasita",
   "command.not_available": "Gatehouse nu este disponibil",

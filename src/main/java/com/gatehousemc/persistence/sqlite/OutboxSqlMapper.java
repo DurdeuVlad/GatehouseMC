@@ -5,6 +5,7 @@ import com.gatehousemc.domain.OutboxEvent;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +54,17 @@ final class OutboxSqlMapper {
         }
     }
 
-    List<OutboxEvent> readyAndClaim(Instant now, int limit) throws SQLException {
+    List<OutboxEvent> readyAndClaim(Instant now, int limit, Duration claimTimeout) throws SQLException {
+        // Reclaim events stuck in PROCESSING past the claim timeout (dead publish
+        // callback, crashed drain pass, unwritable completion). Without this, only
+        // the startup migration reset rescues them and providers stay silent until
+        // the next restart.
+        try (PreparedStatement reclaim = tx.connection().prepareStatement(
+                "UPDATE integration_outbox SET state='READY', updated_at=? WHERE state='PROCESSING' AND updated_at<=?")) {
+            reclaim.setLong(1, SqliteWorkflowRepository.millis(now));
+            reclaim.setLong(2, SqliteWorkflowRepository.millis(now.minus(claimTimeout)));
+            reclaim.executeUpdate();
+        }
         List<OutboxEvent> events = new ArrayList<>();
         try (PreparedStatement statement = tx.connection().prepareStatement(
                 "SELECT * FROM integration_outbox WHERE state='READY' AND available_at<=? ORDER BY created_at LIMIT ?")) {
@@ -77,15 +88,15 @@ final class OutboxSqlMapper {
                 event.createdAt(), now, event.lastError())).toList();
     }
 
-    void complete(UUID outboxId, Instant now) {
+    void complete(UUID outboxId, Instant now) throws SQLException {
         update("UPDATE integration_outbox SET state='COMPLETE', updated_at=?, last_error=NULL WHERE id=? AND state='PROCESSING'", outboxId, now, null, null);
     }
 
-    void retry(UUID outboxId, Instant nextAttempt, String error, Instant now) {
+    void retry(UUID outboxId, Instant nextAttempt, String error, Instant now) throws SQLException {
         update("UPDATE integration_outbox SET state='READY', attempts=attempts+1, available_at=?, updated_at=?, last_error=? WHERE id=? AND state='PROCESSING'", outboxId, now, nextAttempt, error);
     }
 
-    void defer(UUID outboxId, Instant nextAttempt, Instant now) {
+    void defer(UUID outboxId, Instant nextAttempt, Instant now) throws SQLException {
         update("UPDATE integration_outbox SET state='READY', available_at=?, updated_at=? WHERE id=? AND state='PROCESSING'",
                 outboxId, now, nextAttempt, null);
     }
@@ -98,30 +109,25 @@ final class OutboxSqlMapper {
         }
     }
 
-    private void update(String sql, UUID id, Instant now, Instant nextAttempt, String error) {
-        try {
-            if (sql.contains("available_at")) {
-                try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
-                    statement.setLong(1, SqliteWorkflowRepository.millis(nextAttempt));
-                    statement.setLong(2, SqliteWorkflowRepository.millis(now));
-                    if (sql.contains("last_error")) {
-                        statement.setString(3, error);
-                        statement.setString(4, id.toString());
-                    } else {
-                        statement.setString(3, id.toString());
-                    }
-                    statement.executeUpdate();
+    private void update(String sql, UUID id, Instant now, Instant nextAttempt, String error) throws SQLException {
+        if (sql.contains("available_at")) {
+            try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
+                statement.setLong(1, SqliteWorkflowRepository.millis(nextAttempt));
+                statement.setLong(2, SqliteWorkflowRepository.millis(now));
+                if (sql.contains("last_error")) {
+                    statement.setString(3, error);
+                    statement.setString(4, id.toString());
+                } else {
+                    statement.setString(3, id.toString());
                 }
-            } else {
-                try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
-                    statement.setLong(1, SqliteWorkflowRepository.millis(now));
-                    statement.setString(2, id.toString());
-                    statement.executeUpdate();
-                }
+                statement.executeUpdate();
             }
-        } catch (SQLException sqlError) {
-            org.slf4j.LoggerFactory.getLogger(OutboxSqlMapper.class)
-                    .warn("storage.persistence.failed operation=update_outbox outboxId={} errorType={}", id, sqlError.getClass().getSimpleName());
+        } else {
+            try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
+                statement.setLong(1, SqliteWorkflowRepository.millis(now));
+                statement.setString(2, id.toString());
+                statement.executeUpdate();
+            }
         }
     }
 

@@ -29,6 +29,7 @@
   "confirm.cancelled": "Action cancelled",
   "confirm.expired": "Confirmation expired - please try again",
   "command.no_requests": "No requests found",
+  "command.no_entries": "No entries",
   "command.help": "Gatehouse administration: /gatehouse help",
   "command.request_not_found": "Request not found",
   "command.not_available": "Gatehouse is not available",

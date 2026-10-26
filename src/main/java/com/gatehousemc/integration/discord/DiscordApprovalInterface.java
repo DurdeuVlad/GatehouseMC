@@ -7,6 +7,7 @@ import com.gatehousemc.application.admin.RequestAction;
 import com.gatehousemc.application.admin.RequestActionPolicy;
 import com.gatehousemc.application.admin.AdminCommand;
 import com.gatehousemc.application.admin.AdminCommandService;
+import com.gatehousemc.application.admin.AdminResultRenderer;
 import com.gatehousemc.application.admin.RequestReference;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.domain.*;
@@ -429,7 +430,7 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
         }
         event.deferReply(true).queue();
         adminCommands.execute((AdminCommand) parsed.value().orElseThrow(), principalOf(event))
-                .thenAccept(result -> event.getHook().editOriginal(result.message()).queue())
+                .thenAccept(result -> event.getHook().editOriginal(AdminResultRenderer.render(result)).queue())
                 .exceptionally(error -> { event.getHook().editOriginal(Messages.get("provider.decision_failed")).queue(); return null; });
     }
 
@@ -466,7 +467,8 @@ public final class DiscordApprovalInterface extends ListenerAdapter implements A
             case UNDO -> AdminCommand.Kind.UNDO;
         };
         AdminCommand command = AdminCommand.base(kind).withRequest(RequestReference.parse(confirmation.requestId().toString()), null);
-        return adminCommands.execute(command, principal).thenApply(result -> new AdminCommandResultView(result.message()));
+        return adminCommands.execute(command, principal)
+                .thenApply(result -> new AdminCommandResultView(AdminResultRenderer.render(result)));
     }
 
     private record AdminCommandResultView(String message) {}

@@ -15,6 +15,12 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class SqliteWorkflowRepository implements WorkflowRepository {
+    /**
+     * How long an outbox event may stay in PROCESSING before another drain pass
+     * is allowed to reclaim it. Well past any provider publish timeout; reclaim
+     * only rescues events whose completion was never recorded.
+     */
+    public static final Duration PROCESSING_CLAIM_TIMEOUT = Duration.ofMinutes(5);
     private static final Logger LOGGER = LoggerFactory.getLogger(SqliteWorkflowRepository.class);
     private final SqliteDatabase database;
     private final TransactionHelper tx;
@@ -474,7 +480,7 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
     private List<OutboxEvent> readyOutbox(Instant now, int limit, int retriesRemaining) {
         try {
             tx.begin();
-            List<OutboxEvent> claimed = outbox.readyAndClaim(now, limit);
+            List<OutboxEvent> claimed = outbox.readyAndClaim(now, limit, PROCESSING_CLAIM_TIMEOUT);
             tx.commit();
             return claimed;
         } catch (SQLException exception) {
@@ -496,17 +502,29 @@ public final class SqliteWorkflowRepository implements WorkflowRepository {
 
     @Override
     public synchronized void completeOutbox(UUID outboxId, Instant now) {
-        outbox.complete(outboxId, now);
+        try {
+            outbox.complete(outboxId, now);
+        } catch (SQLException exception) {
+            throw storageFailure("complete_outbox", exception);
+        }
     }
 
     @Override
     public synchronized void retryOutbox(UUID outboxId, Instant nextAttempt, String error, Instant now) {
-        outbox.retry(outboxId, nextAttempt, error, now);
+        try {
+            outbox.retry(outboxId, nextAttempt, error, now);
+        } catch (SQLException exception) {
+            throw storageFailure("retry_outbox", exception);
+        }
     }
 
     @Override
     public synchronized void deferOutbox(UUID outboxId, Instant nextAttempt, Instant now) {
-        outbox.defer(outboxId, nextAttempt, now);
+        try {
+            outbox.defer(outboxId, nextAttempt, now);
+        } catch (SQLException exception) {
+            throw storageFailure("defer_outbox", exception);
+        }
     }
 
     @Override

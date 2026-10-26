@@ -30,10 +30,13 @@ public final class AdmissionWorker implements AutoCloseable {
     private final int maxPendingRequests;
     private final int maxCoalescingEntries;
     private final Duration coalesceWindow;
+    private final Duration degradedProbeInterval;
     private final ExecutorService executor;
+    private final ExecutorService probeExecutor;
     private final Map<String, WorkUnit> byUsername = new HashMap<>();
     private final AtomicLong coalescedAttempts = new AtomicLong();
     private final Object lock = new Object();
+    private volatile Instant lastDegradedProbe;
     private volatile boolean running;
     private volatile boolean closed;
 
@@ -51,8 +54,20 @@ public final class AdmissionWorker implements AutoCloseable {
     public AdmissionWorker(int capacity, WhitelistRequestService service, ClockPort clock,
                            ActiveRequestCounter activeRequests, int newRequestRatePerMinute,
                            int newRequestBurst, int maxPendingRequests, int attemptCoalesceSeconds) {
+        this(capacity, service, clock, activeRequests, newRequestRatePerMinute, newRequestBurst,
+                maxPendingRequests, attemptCoalesceSeconds, Duration.ofSeconds(15));
+    }
+
+    public AdmissionWorker(int capacity, WhitelistRequestService service, ClockPort clock,
+                           ActiveRequestCounter activeRequests, int newRequestRatePerMinute,
+                           int newRequestBurst, int maxPendingRequests, int attemptCoalesceSeconds,
+                           Duration degradedProbeInterval) {
         if (capacity < 1) throw new IllegalArgumentException("capacity must be positive");
         if (attemptCoalesceSeconds < 1) throw new IllegalArgumentException("attemptCoalesceSeconds must be positive");
+        this.degradedProbeInterval = Objects.requireNonNull(degradedProbeInterval, "degradedProbeInterval");
+        if (degradedProbeInterval.isNegative() || degradedProbeInterval.isZero()) {
+            throw new IllegalArgumentException("degradedProbeInterval must be positive");
+        }
         this.queue = new ArrayBlockingQueue<>(capacity);
         this.service = Objects.requireNonNull(service, "service");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -63,6 +78,13 @@ public final class AdmissionWorker implements AutoCloseable {
         this.coalesceWindow = Duration.ofSeconds(attemptCoalesceSeconds);
         this.executor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "gatehousemc-persistence");
+            thread.setDaemon(true);
+            return thread;
+        });
+        // The persistence executor is occupied by the never-returning drain loop,
+        // so degraded probes need their own single thread or they would starve.
+        this.probeExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "gatehousemc-degraded-probe");
             thread.setDaemon(true);
             return thread;
         });
@@ -93,6 +115,7 @@ public final class AdmissionWorker implements AutoCloseable {
         Objects.requireNonNull(knownState, "knownState");
         synchronized (lock) {
             if (closed || service.cache().isDegraded() || knownState == AdmissionState.Kind.DEGRADED) {
+                maybeScheduleProbe(identity);
                 return new OfferResult(OfferStatus.DEGRADED);
             }
             Instant now = clock.now();
@@ -134,6 +157,27 @@ public final class AdmissionWorker implements AutoCloseable {
 
     public boolean offer(PlayerIdentity identity) {
         return offer(identity, service.cache().get(identity.normalizedUsername()).kind()).status() == OfferStatus.ACCEPTED;
+    }
+
+    /**
+     * While the intake is degraded, keep one bounded probe in flight per
+     * {@link #degradedProbeInterval} so a transient persistence outage heals
+     * without a reload/restart. The caller still receives the honest DEGRADED
+     * signal; the probe replays the attempt through the canonical service so a
+     * successful write both clears the latch and persists the request.
+     */
+    private void maybeScheduleProbe(PlayerIdentity identity) {
+        Instant now = clock.now();
+        if (closed) return;
+        if (lastDegradedProbe != null && now.isBefore(lastDegradedProbe.plus(degradedProbeInterval))) return;
+        lastDegradedProbe = now;
+        probeExecutor.submit(() -> {
+            try {
+                service.recordAttempt(identity, 1, clock.now());
+            } catch (RuntimeException error) {
+                service.cache().markDegraded(true);
+            }
+        });
     }
 
     private void process(WorkUnit unit) {
@@ -197,11 +241,14 @@ public final class AdmissionWorker implements AutoCloseable {
             running = false;
         }
         executor.shutdown();
+        probeExecutor.shutdown();
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) executor.shutdownNow();
+            if (!probeExecutor.awaitTermination(5, TimeUnit.SECONDS)) probeExecutor.shutdownNow();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             executor.shutdownNow();
+            probeExecutor.shutdownNow();
         }
     }
 
