@@ -17,7 +17,9 @@ gates are green.
   storefront versions remain loader-qualified even though GitHub is unified.
   CurseForge publication is required. Modrinth publication is explicitly
   opt-in through the `PUBLISH_MODRINTH=true` repository variable, a valid
-  `MODRINTH_PROJECT_ID` repository variable, and the `MODRINTH_TOKEN` secret.
+  `MODRINTH_PROJECT_ID` repository variable, and the `MODRINTH_TOKEN` secret,
+  and remains a best-effort mirror: a Modrinth failure does not invalidate
+  the CurseForge upload or GitHub Release.
   A guarded manual dispatch can republish an existing tag.
 - Canonical publishing copy: [`docs/publishing/MODRINTH.md`](publishing/MODRINTH.md)
   and [`docs/publishing/CURSEFORGE.md`](publishing/CURSEFORGE.md)
@@ -118,7 +120,8 @@ the Gradle sources JAR is never sent to a storefront. A manual dispatch can
 set `publish_storefronts=false` when rebuilding a version whose storefront
 files already exist; this avoids duplicate storefront uploads during a GitHub
 release-page migration. Modrinth publication is skipped unless its opt-in
-variable, project ID variable, and token are all configured.
+variable, project ID variable, and token are all configured, and remains
+best-effort when enabled.
 
 Every successful release is visible in the GitHub Actions run and GitHub
 Release. This release lane does not send external Discord or Telegram

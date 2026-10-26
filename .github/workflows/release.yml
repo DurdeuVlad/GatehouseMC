@@ -270,6 +270,9 @@ jobs:
 
       - name: Publish Fabric to Modrinth
         if: (github.event_name != 'workflow_dispatch' || inputs.publish_storefronts) && steps.modrinth.outputs.available == 'true'
+        # Modrinth is an optional mirror; a storefront/API issue must not
+        # invalidate the required CurseForge publication or GitHub Release.
+        continue-on-error: true
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
@@ -290,6 +293,9 @@ jobs:
 
       - name: Publish Forge to Modrinth
         if: (github.event_name != 'workflow_dispatch' || inputs.publish_storefronts) && steps.modrinth.outputs.available == 'true'
+        # Modrinth is an optional mirror; a storefront/API issue must not
+        # invalidate the required CurseForge publication or GitHub Release.
+        continue-on-error: true
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
@@ -310,6 +316,9 @@ jobs:
 
       - name: Publish NeoForge to Modrinth
         if: (github.event_name != 'workflow_dispatch' || inputs.publish_storefronts) && steps.modrinth.outputs.available == 'true'
+        # Modrinth is an optional mirror; a storefront/API issue must not
+        # invalidate the required CurseForge publication or GitHub Release.
+        continue-on-error: true
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ steps.modrinth.outputs.project_id }}
