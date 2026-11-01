@@ -8,7 +8,7 @@
   "dependencies": {
     "minecraft-protocol": "1.68.0",
     "rcon-client": "4.2.5",
-    "sql.js": "1.14.2"
+    "sql.js": "1.15.2"
   },
   "scripts": {
     "smoke": "node src/smoke.mjs",
